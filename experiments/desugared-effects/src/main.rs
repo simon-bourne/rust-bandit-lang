@@ -71,6 +71,8 @@ mod handlers {
         }
 
         // TODO: Unwind the stack.
+        // TODO: What about handlers with multiple resumption?
+        // We could make `state` a list, then copy it.
         state.continuation = state.exception_end.unwrap();
     }
 }
