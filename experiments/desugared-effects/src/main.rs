@@ -18,6 +18,7 @@ type ActionHandler = fn(&mut EffectfulState);
 
 pub struct EffectfulState {
     throw_handler: ActionHandler,
+    exception_end: Option<Continuation>,
     action_args: Option<Action>,
     continuation: Continuation,
 }
@@ -26,6 +27,7 @@ impl EffectfulState {
     pub fn new(throw_handler: ActionHandler) -> Self {
         Self {
             throw_handler,
+            exception_end: None,
             action_args: None,
             continuation: effectful::enter_try,
         }
@@ -38,6 +40,7 @@ mod effectful {
 
     pub fn enter_try(state: &mut EffectfulState) -> Option<ActionHandler> {
         println!("Enter try");
+        state.exception_end = Some(after_exception_handler);
         state.action_args = Some(Action::Exception(ExceptionAction::Throw(Exception {
             message: "Testing".to_string(),
         })));
@@ -56,7 +59,7 @@ mod effectful {
 }
 
 mod handlers {
-    use crate::{effectful, Action, EffectfulState, Exception, ExceptionAction};
+    use crate::{Action, EffectfulState, Exception, ExceptionAction};
 
     pub fn throw(state: &mut EffectfulState) {
         if let Some(Action::Exception(ExceptionAction::Throw(Exception { message }))) =
@@ -67,9 +70,8 @@ mod handlers {
             panic!("Bad arguments");
         }
 
-        // TODO: Store this in the exception handler state, rather than hard wiring it.
         // TODO: Unwind the stack.
-        state.continuation = effectful::after_exception_handler;
+        state.continuation = state.exception_end.unwrap();
     }
 }
 
