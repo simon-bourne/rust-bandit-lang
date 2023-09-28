@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = ["experiments/*"]
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Simon Bourne <simonbourne@gmail.com>"]
+
+[profile.dev]
+# Debug info isn't useful most of the time. It slows down builds and uses up disk space.
+debug = 0
+
+[workspace.dependencies]

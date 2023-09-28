@@ -1,2 +1,7 @@
-# rust-bandit-lang
-An imperative language with algebraic effects
+# Bandit
+
+An experimental programming language for me to play around with:
+
+- Algebraic effects
+- Linear types
+- Borrow checking
