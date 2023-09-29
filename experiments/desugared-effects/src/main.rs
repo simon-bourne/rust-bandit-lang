@@ -1,7 +1,7 @@
 // The function is compiled to delimited continuations.
 // The action enum can hold arguments for any action that can happen.
 
-enum Action {
+enum ActionArgs {
     Exception(ExceptionAction),
 }
 
@@ -13,56 +13,56 @@ struct Exception {
     message: String,
 }
 
-type Continuation = fn(&mut EffectfulState) -> Option<ActionHandler>;
-type ActionHandler = fn(&mut EffectfulState);
+#[derive(Copy, Clone)]
+pub struct Continuation(fn(&mut EffectfulState) -> Option<(Action, Continuation)>);
+
+#[derive(Copy, Clone)]
+pub struct Action(fn(&mut EffectfulState, Continuation) -> Continuation);
 
 pub struct EffectfulState {
-    throw_handler: ActionHandler,
+    throw_handler: Action,
     exception_end: Option<Continuation>,
-    action_args: Option<Action>,
-    continuation: Continuation,
+    action_args: Option<ActionArgs>,
 }
 
 impl EffectfulState {
-    pub fn new(throw_handler: ActionHandler) -> Self {
+    pub fn new(throw_handler: Action) -> Self {
         Self {
             throw_handler,
             exception_end: None,
             action_args: None,
-            continuation: effectful::enter_try,
         }
     }
 }
 
 mod effectful {
     // An effectful function, split into delimited continuations.
-    use crate::{Action, ActionHandler, EffectfulState, Exception, ExceptionAction};
+    use crate::{Action, ActionArgs, Continuation, EffectfulState, Exception, ExceptionAction};
 
-    pub fn enter_try(state: &mut EffectfulState) -> Option<ActionHandler> {
+    pub fn enter_try(state: &mut EffectfulState) -> Option<(Action, Continuation)> {
         println!("Enter try");
-        state.exception_end = Some(after_exception_handler);
-        state.action_args = Some(Action::Exception(ExceptionAction::Throw(Exception {
+        state.exception_end = Some(Continuation(after_exception_handler));
+        state.action_args = Some(ActionArgs::Exception(ExceptionAction::Throw(Exception {
             message: "Testing".to_string(),
         })));
-        state.continuation = after_throw;
-        Some(state.throw_handler)
+        Some((state.throw_handler, Continuation(after_throw)))
     }
 
-    pub fn after_throw(_state: &mut EffectfulState) -> Option<ActionHandler> {
+    pub fn after_throw(_state: &mut EffectfulState) -> Option<(Action, Continuation)> {
         panic!("After throw");
     }
 
-    pub fn after_exception_handler(_state: &mut EffectfulState) -> Option<ActionHandler> {
+    pub fn after_exception_handler(_state: &mut EffectfulState) -> Option<(Action, Continuation)> {
         println!("Finished");
         None
     }
 }
 
 mod handlers {
-    use crate::{Action, EffectfulState, Exception, ExceptionAction};
+    use crate::{ActionArgs, Continuation, EffectfulState, Exception, ExceptionAction};
 
-    pub fn throw(state: &mut EffectfulState) {
-        if let Some(Action::Exception(ExceptionAction::Throw(Exception { message }))) =
+    pub fn throw(state: &mut EffectfulState, _continuation: Continuation) -> Continuation {
+        if let Some(ActionArgs::Exception(ExceptionAction::Throw(Exception { message }))) =
             &state.action_args
         {
             println!("Exception: {message}")
@@ -70,17 +70,17 @@ mod handlers {
             panic!("Bad arguments");
         }
 
-        // TODO: Unwind the stack.
-        // TODO: What about handlers with multiple resumption?
-        // We could make `state` a list, then copy it.
-        state.continuation = state.exception_end.unwrap();
+        // To return a value, set it in `state`.
+        // TODO: Support multiple resumes.
+        state.exception_end.unwrap()
     }
 }
 
 fn main() {
-    let mut state = EffectfulState::new(handlers::throw);
+    let mut state = EffectfulState::new(Action(handlers::throw));
+    let mut continuation = Continuation(effectful::enter_try);
 
-    while let Some(handler) = (state.continuation)(&mut state) {
-        handler(&mut state);
+    while let Some((action, cont)) = (continuation.0)(&mut state) {
+        continuation = (action.0)(&mut state, cont);
     }
 }
