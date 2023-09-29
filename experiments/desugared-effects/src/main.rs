@@ -4,5 +4,5 @@ use bandit_experiment_desugared_effects::desugared::{
 
 fn main() {
     let mut state = EffectfulState::new(Action(handlers::throw));
-    Continuation(effectful::enter_try).resume(&mut state);
+    Continuation::new(effectful::enter_try).resume(&mut state);
 }

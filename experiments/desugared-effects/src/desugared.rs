@@ -14,9 +14,13 @@ struct Exception {
 }
 
 #[derive(Copy, Clone)]
-pub struct Continuation(pub fn(&mut EffectfulState) -> Option<(Action, Continuation)>);
+pub struct Continuation(fn(&mut EffectfulState) -> Option<(Action, Continuation)>);
 
 impl Continuation {
+    pub fn new(f: fn(&mut EffectfulState) -> Option<(Action, Continuation)>) -> Self {
+        Self(f)
+    }
+
     pub fn run(self, state: &mut EffectfulState) -> Option<Continuation> {
         (self.0)(state).map(|(action, cont)| (action.0)(state, cont))
     }
@@ -59,7 +63,7 @@ pub mod effectful {
         state.action_args = Some(ActionArgs::Exception(ExceptionAction::Throw(Exception {
             message: "Testing".to_string(),
         })));
-        Some((state.throw_handler, Continuation(after_throw)))
+        Some((state.throw_handler, Continuation::new(after_throw)))
     }
 
     pub fn after_throw(_state: &mut EffectfulState) -> Option<(Action, Continuation)> {
@@ -92,6 +96,7 @@ pub mod handlers {
         //
         // - Exceptions: Throw just discards the continuation.
         // - Async functions: How do we interleave each newly spawned task?
+        //   We need a shared task queue.
 
         if let Some(ActionArgs::Exception(ExceptionAction::Throw(Exception { message }))) =
             &state.action_args
