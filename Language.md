@@ -80,14 +80,13 @@ Doc comments are formatted using a new markup language:
   - `# My Heading`, `## My Heading` to call `heading 1` and `heading 2` with `"My Heading"`. The text is read until the end of the paragraph.
   - `---` on a line by itself calls `horizontal_rule`.
   - `` `my code` `` to call `generic_code "my_code"`. Specific language code, for example Rust, should be called with `{rust "my code"}`.
-  - Lists: top level lists must be surrounded by blank lines to stop split lines being confused for lists. They start with `-`, `1.` or `:`. for unordered, ordered and definition lists respectively. Soft line breaks in the paragraph must be indented by the same as the list item. Extra paragraphs for a list item are indented once from the main list item marker.
+- Lists: All lists start with `-_`, where `_` means a space character. This means `-_` must not appear as the 1st non whitespace of a split line, so it isn't confused with the start of a list. Numbered lists start with `- 1._`.
+  
+  Soft line breaks must be indented at least the same amount as the list marker. Paragraphs belonging to a list item must be indented more than the parent list marker. Sub lists are indented once from the parent list item marker.
 
-    Sub lists are indented once from the parent list item marker, and if the parent list item is more than 1 paragraph, they must be preceded by a blank line.
-
-    The first paragraph in a definition list item is the "term". Any subsequent paragraphs are the "definitions".
-
-  - Tables use [djot](https://htmlpreview.github.io/?https://github.com/jgm/djot/blob/master/doc/syntax.html#pipe-table) syntax.
-  - Any group of lines starting with `>` is a block quote.
+- Definition lists start with a `:`. The initial paragraph is the "term", and subsequent paragraphs are the "definitions".
+- Tables use [djot](https://htmlpreview.github.io/?https://github.com/jgm/djot/blob/master/doc/syntax.html#pipe-table) syntax.
+- Any group of lines starting with `>` is a block quote.
 - Any single character can be escaped with a `\`.
 - `...` is translated to an elipsis.
 - `--` is translated into an en-dash.
