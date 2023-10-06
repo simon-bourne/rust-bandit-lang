@@ -92,6 +92,7 @@ Doc comments are formatted using a new markup language:
 - `...` is translated to an elipsis.
 - `--` is translated into an en-dash.
 - `---` is translated into an em-dash.
+- TODO: Images
 
 Things like math can be implemented with a `math` function. It could take an expression tree which can be built from native expressions. e.g.`{math (var "x" + 1)}`.
 
