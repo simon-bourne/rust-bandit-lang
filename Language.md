@@ -61,7 +61,10 @@ Doc comments are formatted using a new markup language:
 - `[my text]` will call `bracketed "my text"`, which should return a `DocFragment`. `[my text][my other text]` will call `double_bracketed "my text" "my other text"`. These can be used for:
   - Named links
   - Checkboxes (`[ ]` and `[x]`)
-  - Styled text, for example italic could be `[+italic text]`. The first non alphanumeric characters define the style:
+  - `_` for a footnote. `DocFragment` would need to support footnotes.
+  - `!` for an image. For example `[!My image]`.
+  - Code links, for example ``[`my_symbol`]`` or ``[`my_symbol`][`qualification.my_symbol`]``.
+  - Styled text, for example italic could be `[*italic text]`. The first non alphanumeric characters define the style:
     - `*` emphasis (italic)
     - `**`strong (bold)
     - `***` strong emphasis (bold italic)
@@ -73,8 +76,7 @@ Doc comments are formatted using a new markup language:
     - `"` or `'` for smart quotes
     - `:emoji_name` for an emoji
     - `.class` to apply `<span class=".class">...</span>`
-    - `_` for a footnote. `DocFragment` would need to support footnotes.
-- `[my text](additional text)` will call `link "my text" "additional text"`.
+- `[my text](additional text)` will call `link "my text" "additional text"`. Images are prefixed with `!`, for example `[!My image](http://example.com)`.
 - `body_of my_function` is a built in function that produces a listing for the body of `my_function`.
 - There are shortcuts to some functions:
   - `# My Heading`, `## My Heading` to call `heading 1` and `heading 2` with `"My Heading"`. The text is read until the end of the paragraph.
