@@ -89,6 +89,9 @@ Doc comments are formatted using a new markup language:
   - Tables use [djot](https://htmlpreview.github.io/?https://github.com/jgm/djot/blob/master/doc/syntax.html#pipe-table) syntax.
   - Any group of lines starting with `>` is a block quote.
 - Any single character can be escaped with a `\`.
+- `...` is translated to an elipsis.
+- `--` is translated into an en-dash.
+- `---` is translated into an em-dash.
 
 Things like math can be implemented with a `math` function. It could take an expression tree which can be built from native expressions. e.g.`{math (var "x" + 1)}`.
 
