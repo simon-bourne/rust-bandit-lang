@@ -58,19 +58,43 @@ Doc comments are formatted using a new markup language:
 
 - `{use my_module(a, b)}` will import `A` and `B` from `my_module`.
 - `{my_expression}` will evaluate `my_expression`. For example `{superscript "superscript text"}`. The return type should be `DocFragment`.
+- `[my text]` will call `bracketed "my text"`, which should return a `DocFragment`. `[my text][my other text]` will call `double_bracketed "my text" "my other text"`. These can be used for:
+  - Named links
+  - Checkboxes (`[ ]` and `[x]`)
+  - Styled text, for example italic could be `[+italic text]`. The first non alphanumeric characters define the style:
+    - `*` emphasis (italic)
+    - `**`strong (bold)
+    - `***` strong emphasis (bold italic)
+    - `=` for highlighted
+    - `+` for *ins* (underline)
+    - `-` for *del* (strikethrough)
+    - `^` for superscript
+    - `~` for subscript
+    - `"` or `'` for smart quotes
+    - `:emoji_name` for an emoji
+    - `.class` to apply `<span class=".class">...</span>`
+    - `_` for a footnote. `DocFragment` would need to support footnotes.
+- `[my text](additional text)` will call `link "my text" "additional text"`.
 - `body_of my_function` is a built in function that produces a listing for the body of `my_function`.
 - There are shortcuts to some functions:
   - `# My Heading`, `## My Heading` to call `heading 1` and `heading 2` with `"My Heading"`. The text is read until the end of the paragraph.
+  - `---` on a line by itself calls `horizontal_rule`.
   - `` `my code` `` to call `generic_code "my_code"`. Specific language code, for example Rust, should be called with `{rust "my code"}`.
-  - `*italic text*` to call `emphasise 1 "italic text"`, and `**bold text**`  to call `emphasise 2 "bold text"` etc. Parsing is simple and expects a matching number of `*`s. It is an error to have a group of unmatched `*`s in the same paragraph.
-  - `[link name]` to call `bracketed ["link name"]`. This can also be used for check marks with `[ ]` and `[x]`, or footnotes with `[^my footnote]`, for example. `DocFragment` would need to support adding footnotes.
-  - `[link name][link id]` to call `bracketed ["link name", "link id"]`.
-  - Lists are defined like markdown. All text for individual list items is processed, then put in a simple data structure and passed to either the `unordered_list` or `ordered_list` function.
-  - Any group of lines starting with `|` is put in a list and the text passed to a `table` function.
+  - Lists: top level lists must be surrounded by blank lines to stop split lines being confused for lists. They start with `-`, `1.` or `:`. for unordered, ordered and definition lists respectively. Soft line breaks in the paragraph must be indented by the same as the list item. Extra paragraphs for a list item are indented once from the main list item marker.
+
+    Sub lists are indented once from the parent list item marker, and if the parent list item is more than 1 paragraph, they must be preceded by a blank line.
+
+    The first paragraph in a definition list item is the "term". Any subsequent paragraphs are the "definitions".
+
+  - Tables use [djot](https://htmlpreview.github.io/?https://github.com/jgm/djot/blob/master/doc/syntax.html#pipe-table) syntax.
+  - Any group of lines starting with `>` is a block quote.
+- Any single character can be escaped with a `\`.
 
 Things like math can be implemented with a `math` function. It could take an expression tree which can be built from native expressions. e.g.`{math (var "x" + 1)}`.
 
-Documents are structured as trees. A tree node can be wrapped by putting `{@expression}` before it. This applies `expression` to the (opaque) rendered block.
+Documents are structured as trees. A tree node can be wrapped by putting `@{expression}` before it. This applies `expression` to the (opaque) rendered block.
+
+TODO: Checkout [Djot](https://htmlpreview.github.io/?https://github.com/jgm/djot/blob/master/doc/syntax.html) syntax.
 
 #### Doctests
 
