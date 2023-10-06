@@ -58,11 +58,13 @@ Doc comments are formatted using a new markup language:
 
 - `{use my_module(a, b)}` will import `A` and `B` from `my_module`.
 - `{my_expression}` will evaluate `my_expression`. For example `{superscript "superscript text"}`. The return type should be `DocFragment`.
+- `body_of my_function` is a built in function that produces a listing for the body of `my_function`.
+- `` `my code` `` to call `generic_code "my_code"`. Specific language code, for example Rust, should be called with `{rust "my code"}`.
 - `[my text]` will call `bracketed "my text"`, which should return a `DocFragment`. `[my text][my other text]` will call `double_bracketed "my text" "my other text"`. These can be used for:
   - Named links
   - Checkboxes (`[ ]` and `[x]`)
   - `_` for a footnote. `DocFragment` would need to support footnotes.
-  - `!` for an image. For example `[!My image]`.
+  - `!` for an inline image using a named link. For example `[!My image]`.
   - Code links, for example ``[`my_symbol`]`` or ``[`my_symbol`][`qualification.my_symbol`]``.
   - Styled text, for example italic could be `[*italic text]`. The first non alphanumeric characters define the style:
     - `*` emphasis (italic)
@@ -76,24 +78,20 @@ Doc comments are formatted using a new markup language:
     - `"` or `'` for smart quotes
     - `:emoji_name` for an emoji
     - `.class` to apply `<span class=".class">...</span>`
-- `[my text](additional text)` will call `link "my text" "additional text"`. Images are prefixed with `!`, for example `[!My image](http://example.com)`.
-- `body_of my_function` is a built in function that produces a listing for the body of `my_function`.
-- There are shortcuts to some functions:
-  - `# My Heading`, `## My Heading` to call `heading 1` and `heading 2` with `"My Heading"`. The text is read until the end of the paragraph.
-  - `---` on a line by itself calls `horizontal_rule`.
-  - `` `my code` `` to call `generic_code "my_code"`. Specific language code, for example Rust, should be called with `{rust "my code"}`.
+- `[my text](url)` is a link. Inline images are prefixed with `!`, for example `[!My image](http://example.com)`. `[](url)` is a raw link (like `<url>` in markdown).
+- Any single character can be escaped with a `\`.
+- `# My Heading`, `## My Heading` for headings. The text is read until the end of the paragraph.
+- `...` is translated to an elipsis.
+- `--` is translated into an en-dash.
+- `---` is translated into an em-dash, unless on a line by itself, in which case:
+- `---` on a line by itself is a horizontal rule.
 - Lists: All lists start with `-_`, where `_` means a space character. This means `-_` must not appear as the 1st non whitespace of a split line, so it isn't confused with the start of a list. Numbered lists start with `- 1._`.
   
   Soft line breaks must be indented at least the same amount as the list marker. Paragraphs belonging to a list item must be indented more than the parent list marker. Sub lists are indented once from the parent list item marker.
 
 - Definition lists start with a `:`. The initial paragraph is the "term", and subsequent paragraphs are the "definitions".
 - Tables use [djot](https://htmlpreview.github.io/?https://github.com/jgm/djot/blob/master/doc/syntax.html#pipe-table) syntax.
-- Any group of lines starting with `>` is a block quote.
-- Any single character can be escaped with a `\`.
-- `...` is translated to an elipsis.
-- `--` is translated into an en-dash.
-- `---` is translated into an em-dash.
-- TODO: Images
+- Any paragraph whose lines start with `>` is a block quote.
 
 Things like math can be implemented with a `math` function. It could take an expression tree which can be built from native expressions. e.g.`{math (var "x" + 1)}`.
 
