@@ -56,8 +56,7 @@ Whether a comment is a doc comment depends on where it is placed. If it's before
 
 Doc comments are formatted using a new markup language:
 
-- `{use my_module(a, b)}` will import `A` and `B` from `my_module`.
-- `{my_expression}` will evaluate `my_expression`. For example `{superscript "superscript text"}`. The return type should be `DocFragment`.
+- `{my_expression}` will evaluate `my_expression`. For example `{superscript "superscript text"}`. The return type should be `DocFragment`. Anything in a `doc` submodule (relative to the current module) is in scope.
 - `body_of my_function` is a built in function that produces a listing for the body of `my_function`.
 - `` `my code` `` to call `generic_code "my_code"`. Specific language code, for example Rust, should be called with `{rust "my code"}`.
 - `[my text]` will call `bracketed "my text"`, which should return a `DocFragment`. `[my text][my other text]` will call `double_bracketed "my text" "my other text"`. These can be used for:
@@ -67,6 +66,7 @@ Doc comments are formatted using a new markup language:
   - `!` for an inline image using a named link. For example `[!My image]`.
   - Code links, for example ``[`my_symbol`]`` or ``[`my_symbol`][`qualification.my_symbol`]``.
   - Styled text, for example italic could be `[*italic text]`. The first non alphanumeric characters define the style:
+    - TODO: These should be hard wired, and italic and bold should be `_` and `*` without brackets, as they're common.
     - `*` emphasis (italic)
     - `**`strong (bold)
     - `***` strong emphasis (bold italic)
@@ -76,9 +76,9 @@ Doc comments are formatted using a new markup language:
     - `^` for superscript
     - `~` for subscript
     - `"` or `'` for smart quotes
-    - `:emoji_name` for an emoji
-    - `.class` to apply `<span class=".class">...</span>`
 - `[my text](url)` is a link. Inline images are prefixed with `!`, for example `[!My image](http://example.com)`. `[](url)` is a raw link (like `<url>` in markdown).
+- TODO: `[my text]{expression}` should call `expression "my text"`. This allows named links and more.
+- TODO: Should `[]` be for link stuff only, and make `{}` more versatile? `{expression}` for expression and `{=highlighed}` for example? `{(expression)}` can be used as an escape. Probably not, as `[abc]{xyz}` is a confusing exception.
 - Any single character can be escaped with a `\`.
 - `# My Heading`, `## My Heading` for headings. The text is read until the end of the paragraph.
 - `...` is translated to an elipsis.
