@@ -4,16 +4,16 @@
 
 - Similar to markdown.
 - Document looks good as plain text.
-- Reduce number of special characters/escaping required.
+- Minimize escaping, especially in the free text outside `[]` and `{}`.
 - Integration with programming languages. Code links and expressions.
 
 ## Escaping
 
-Any character can be escaped with `\`. Outside `[]` and `{}`, the characters ``[]()`\*`` have special meaning, and require escaping. `#` requires escaping at the start of a paragraph. `-` requires escaping at the start of a line. Line breaks can be escaped to produce hard line breaks (`<br>`), and space can be escaped for a non-breaking space.
+Any character can be escaped with `\`. Outside `[]` and `{}`, the characters ``[]()`\`` have special meaning, and require escaping. `#` requires escaping at the start of a paragraph. `-` requires escaping at the start of a line. Line breaks can be escaped to produce hard line breaks (`<br>`), and space can be escaped for a non-breaking space.
 
 ## Links
 
-URL is URL encoded when rendering. Markup special characters should be escaped with `\\`.
+URL is URL encoded when rendering. Markup special characters should be escaped with `\`.
 
 - `[(URL)]` is a link to `URL`.
 - `[title(URL)]` is a link to `URL` with an explicit title.
@@ -29,13 +29,13 @@ URL is URL encoded when rendering. Markup special characters should be escaped w
 - `[title[name]]` is a reference link with an explicit title.
 - `[:name]` is a reference link definition, and must be the start of a paragraph.
 
-## Code Links
+### Code Links
 
 - ``[`item`]`` is a link to a code item. It is looked up in code reference links first.
 - ``[:`name`]`` is a code reference link definition, and must be the start of a paragraph. It specifies the path to `name`.
 - ``[`item`[qualified.path]]`` is a qualified link to a code item.
 
-## Footnotes
+### Footnotes
 
 - `[^footnote]` is a footnode link.
 - `[:^footnote]` is a footnote definition, and must be the start of a paragraph.
@@ -53,15 +53,17 @@ Start with 3 or more backticks and end with the same number.
 
 ## Text style
 
+- `{/italic/}`
+- `{*bold*}`
 - `{=highlight=}`
 - `{^superscript^}`
 - `{~subscript~}`
 - `{+ins+}`
 - `{-del-}`
+- `{"curly double quotes"}`
+- `{'curly single quotes'}`
 
-Text style can be nested and contain links. If you want curly quotes, use Unicode.
-
-`*` is used for emphasis. `**` and `***` are interpreted as double and triple emphasis respectively. Emphasis must be matched in the same paragraph, and non overlapping. Other uses of `*` must be escaped.
+Text style can be nested and can contain links. As a shortcut, nesting can be done with `{/*bold italic*/}` for example. Styles can't be empty.
 
 ## Spans and Divs
 
@@ -70,7 +72,7 @@ Text style can be nested and contain links. If you want curly quotes, use Unicod
 
 ## Lists
 
-Unordered lists use `-`. Ordered lists use `-#`. Definition lists start with `-:`. All must be followed by at least 1 space.
+Unordered lists use `-`. Ordered lists use `-#`. Definition lists start with `-:`. All must be followed by at least 1 space. Use `[x]` for task lists.
 
 ## Block Quotes
 
@@ -78,23 +80,41 @@ Block quotes start lines with `>` and at least 1 space, and must be in their own
 
 ## Embedded Languages
 
-- `{$KaTeX$}` will embed KaTeX in inline mode.
-- `{$$KaTeX$$}` will embed KaTeX in display mode.
-- `{|html|}` will embed HTML.
-- ``{`bandit expression`}`` will embed a Bandit expression.
-- `{@apply bandit expression@}` will apply a Bandit expression to the preceding item, or if at the start of a block, to the whole block.
+Embedded languages can be specified after a code fence with `` `expression`{language_name}`` to evaluate the expression and put the result inline. For example, `` `x^2`{math}``.
 
-Zero or more `#` characters can follow the language identifier (`$`, `|`, `` ` `` or `@`). The expression must be closed with the same number of `#`s. For example, `{$###KaTeX###$}`. This means the renderer doesn't need to parse the embedded language.
+Supported languages are:
+
+- `math` for inline KaTeX.
+- `Math` for display KaTeX.
+- `html` for HTML.
+- `bandit` for Bandit.
+
+Some languages support applying an expression to a block. This is done with `` `expression`{@language_name}``. The expression is applied to the block if at the start of a block, otherwise the preceding block.
+
+- `@html` for HTML opening tags applied to the block. For example, `` `<div><p>`{@html}`` would surround the block with `<div><p>block</p></div>`.
+- `@bandit` for a Bandit expression applied to the block.
 
 Bandit expressions can use anything public in a `doc` module in the current module.
 
 ## Attributes
 
-`{attributes}`
+Attributes are supported via an embedded `attr` language. For example, `` `attributes`{@attr}``.
 
-Attributes at the start of a paragraph/list block apply to that block. Attributes following links, styling or spanned text apply to that element.
+## Named Entities
 
-Attribute syntax is the same as djot, including comments.
+Some Emojis and HTML entities are supported, for example:
+
+- `{smiley}` for a smiley.
+- `{ldquo}` for left double quote.
+
+## Punctuation
+
+- `...` is an ellipsis. More than 3 consecutive dots is not interpreted as an ellipsis.
+- `--` is an en-dash.
+- `---` is an em-dash.
+- `----` is a horizontal rule. It is only allowed in a paragraph on its own. More than 4 consecutive hyphens is not interpreted in any special way.
+- `{--}`, `{---}`, `{----}` and `{...}` are escapes for the above.
+- `{'}` is a curly apostrophe.
 
 ## Headings
 
