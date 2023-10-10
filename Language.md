@@ -54,50 +54,7 @@ Multiline comments are not supported because:
 
 Whether a comment is a doc comment depends on where it is placed. If it's before a public item, it's a doc comment. If you want to document the implementation of a public function or type for example, put the comment inside the implementation block. If you want an implementation note for a module or group of functions, put it in a private module.
 
-Doc comments are formatted using a new markup language:
-
-- `{my_expression}` will evaluate `my_expression`. For example `{superscript "superscript text"}`. The return type should be `DocFragment`. Anything in a `doc` submodule (relative to the current module) is in scope.
-- `body_of my_function` is a built in function that produces a listing for the body of `my_function`.
-- `` `my code` `` to call `generic_code "my_code"`. Specific language code, for example Rust, should be called with `{rust "my code"}`.
-- `[my text]` will call `bracketed "my text"`, which should return a `DocFragment`. `[my text][my other text]` will call `double_bracketed "my text" "my other text"`. These can be used for:
-  - Named links
-  - Checkboxes (`[ ]` and `[x]`)
-  - `_` for a footnote. `DocFragment` would need to support footnotes.
-  - `!` for an inline image using a named link. For example `[!My image]`.
-  - Code links, for example ``[`my_symbol`]`` or ``[`my_symbol`][`qualification.my_symbol`]``.
-  - Styled text, for example italic could be `[*italic text]`. The first non alphanumeric characters define the style:
-    - TODO: These should be hard wired, and italic and bold should be `_` and `*` without brackets, as they're common.
-    - `*` emphasis (italic)
-    - `**`strong (bold)
-    - `***` strong emphasis (bold italic)
-    - `=` for highlighted
-    - `+` for *ins* (underline)
-    - `-` for *del* (strikethrough)
-    - `^` for superscript
-    - `~` for subscript
-    - `"` or `'` for smart quotes
-- `[my text](url)` is a link. Inline images are prefixed with `!`, for example `[!My image](http://example.com)`. `[](url)` is a raw link (like `<url>` in markdown).
-- TODO: `[my text]{expression}` should call `expression "my text"`. This allows named links and more.
-- TODO: Should `[]` be for link stuff only, and make `{}` more versatile? `{expression}` for expression and `{=highlighed}` for example? `{(expression)}` can be used as an escape. Probably not, as `[abc]{xyz}` is a confusing exception.
-- Any single character can be escaped with a `\`.
-- `# My Heading`, `## My Heading` for headings. The text is read until the end of the paragraph.
-- `...` is translated to an elipsis.
-- `--` is translated into an en-dash.
-- `---` is translated into an em-dash, unless on a line by itself, in which case:
-- `---` on a line by itself is a horizontal rule.
-- Lists: All lists start with `-_`, where `_` means a space character. This means `-_` must not appear as the 1st non whitespace of a split line, so it isn't confused with the start of a list. Numbered lists start with `- 1._`.
-  
-  Soft line breaks must be indented at least the same amount as the list marker. Paragraphs belonging to a list item must be indented more than the parent list marker. Sub lists are indented once from the parent list item marker.
-
-- Definition lists start with a `:`. The initial paragraph is the "term", and subsequent paragraphs are the "definitions".
-- Tables use [djot](https://htmlpreview.github.io/?https://github.com/jgm/djot/blob/master/doc/syntax.html#pipe-table) syntax.
-- Any paragraph whose lines start with `>` is a block quote.
-
-Things like math can be implemented with a `math` function. It could take an expression tree which can be built from native expressions. e.g.`{math (var "x" + 1)}`.
-
-Documents are structured as trees. A tree node can be wrapped by putting `@{expression}` before it. This applies `expression` to the (opaque) rendered block.
-
-TODO: Checkout [Djot](https://htmlpreview.github.io/?https://github.com/jgm/djot/blob/master/doc/syntax.html) syntax.
+Doc comments are formatted using [a new markup language](./Markup.md)
 
 #### Doctests
 
