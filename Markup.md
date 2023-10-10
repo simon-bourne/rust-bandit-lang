@@ -2,14 +2,23 @@
 
 ## Goals
 
-- Similar to markdown.
+- Similar to markdown, but:
+  - more obvious and consistent syntax.
+  - stricter. If there's an error it should be reported.
 - Document looks good as plain text.
 - Minimize escaping, especially in the free text outside `[]` and `{}`.
 - Integration with programming languages. Code links and expressions.
 
 ## Escaping
 
-Any character can be escaped with `\`. Outside `[]` and `{}`, the characters ``[]()`\`` have special meaning, and require escaping. `#` requires escaping at the start of a paragraph. `-` requires escaping at the start of a line. Line breaks can be escaped to produce hard line breaks (`<br>`), and space can be escaped for a non-breaking space.
+- Any character can be escaped with `\`
+- ``[]{}`\`` characters must always be escaped to include them in the text.
+- `#>` characters must be escaped at the start of a paragraph.
+- `-` must be escaped at the start of a line.
+- Styling characters (`/*=^~+-"'`) must be escaped if they're the first character in styled text.
+- Link special characters (`#^!`) must be escaped directly after `[`. `:` must be escaped before `]`. `()` must be escaped inside `[]`.
+- Some [punctuation](#punctuation) combinations must be escaped.
+- Line breaks can be escaped to produce hard line breaks (`<br>`), and space can be escaped for a non-breaking space.
 
 ## Links
 
@@ -27,18 +36,18 @@ URL is URL encoded when rendering. Markup special characters should be escaped w
 
 - `[name]` is a reference link.
 - `[title[name]]` is a reference link with an explicit title.
-- `[:name]` is a reference link definition, and must be the start of a paragraph.
+- `[name:]` is a reference link definition, and must be the start of a paragraph.
 
 ### Code Links
 
 - ``[`item`]`` is a link to a code item. It is looked up in code reference links first.
-- ``[:`name`]`` is a code reference link definition, and must be the start of a paragraph. It specifies the path to `name`.
+- ``[`name`:]`` is a code reference link definition, and must be the start of a paragraph. It specifies the path to `name`.
 - ``[`item`[qualified.path]]`` is a qualified link to a code item.
 
 ### Footnotes
 
 - `[^footnote]` is a footnode link.
-- `[:^footnote]` is a footnote definition, and must be the start of a paragraph.
+- `[^footnote:]` is a footnote definition, and must be the start of a paragraph.
 
 ### Inline images
 
@@ -105,7 +114,7 @@ Attributes are supported via an embedded `attr` language. For example, `` `attri
 Some Emojis and HTML entities are supported, for example:
 
 - `{smiley}` for a smiley.
-- `{ldquo}` for left double quote.
+- `{&copy;}` for the `&copy;` HTML entity.
 
 ## Punctuation
 
