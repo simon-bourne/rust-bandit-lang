@@ -71,13 +71,9 @@ Start with 3 or more backticks and end with the same number.
 - `{-del-}`
 - `{"curly double quotes"}`
 - `{'curly single quotes'}`
+- `{{text}}` renders a `<span>` with no extra styling. It can have attributes attached to it.
 
 Text style can be nested and can contain links. As a shortcut, nesting can be done with `{/*bold italic*/}` for example. Styles can't be empty.
-
-## Spans and Divs
-
-`{{text}}` renders a `<span>`.
-`{{` and `}}` on their own separate line renders a `<div>`. It can contain many paragraphs.
 
 ## Lists
 
@@ -129,6 +125,43 @@ Some Emojis and HTML entities are supported, for example:
 
 A heading has an ID generated from the heading hierarchy. Headings can be linked with reference links beginning with a `#`. E.g. `[my link[#My Title/My Subtitle]]`. The main document title is excluded from the heading hierarchy, and doesn't have an id. `_` and `-` are escaped with a preceding `_`. Spaces are replaced with `-`, and any other non-alphanumeric characters are escaped with `_Unicode ID_`. See [MDN](https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/id) for recommendations on ID's. Duplicate headings at the same level are not allowed. There must be 0 or 1 main headings. If included, it must be the first thing in the document, so doesn't need an anchor. ID attributes are checked for uniqueness with the headings.
 
+## TODO: Nesting
+
+- Nestable blocks are sections, headings, lists, block quotes, paragraphs and code fences.
+- Sections, lists and block quotes can have nestable elements nested in them.
+- Sections are started with `{section}` and continued with indented blocks. For example:
+
+    ```bandoc
+    [^footnote 1:] {section}
+        First paragraph
+
+        Second paragraph
+
+        > block quoted
+        >
+        > ```
+        > with a nested code block
+        > ```
+
+    This paragraph is not part of the `section`.
+    ```
+
+- Footnotes and reference link definitions are only valid within their section and it's children.
+
+## Comments
+
+`{% A comment %}`
+
 ## Backend
 
 Renders to a defined subset of HTML + whatever embedded languages generate.
+
+## TODO
+
+- Tables
+- Better reference link definition syntax
+- Better way to specify language on code fences:
+  - Consistency between inline and block fences
+  - Specify render, evaluate or apply
+- Document hierarchy. e.g. block quoted code fences, footnotes with multiple paragraphs etc.
+  - block quotes can have things nested in them (lists, multiple paragraphs, code fences)
