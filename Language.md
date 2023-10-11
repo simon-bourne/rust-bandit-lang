@@ -1,5 +1,7 @@
 # Language
 
+TODO: Rust style traits, with an "owner". Better `impl` keyword? `embodies`, `fulfills`, `satisfies`, `provides`?
+
 ## Benefits Over Rust
 
 - Higher kinded types.
