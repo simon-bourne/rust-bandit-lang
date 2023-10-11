@@ -47,7 +47,7 @@ URL is URL encoded when rendering. Markup special characters should be escaped w
 ### Footnotes
 
 - `[^footnote]` is a footnode link.
-- `[^footnote:]` is a footnote definition, and must be the start of a paragraph.
+- `[^footnote:]` is a footnote definition, and must be the start of a paragraph or `<div>`. `<div>`s can be used to group several paragraphs into a single footnote.
 
 ### Inline images
 
@@ -71,9 +71,23 @@ Start with 3 or more backticks and end with the same number.
 - `{-del-}`
 - `{"curly double quotes"}`
 - `{'curly single quotes'}`
-- `{{text}}` renders a `<span>` with no extra styling. It can have attributes attached to it.
 
 Text style can be nested and can contain links. As a shortcut, nesting can be done with `{/*bold italic*/}` for example. Styles can't be empty.
+
+## Spans and Divs
+
+- `{{text}}` renders a `<span>`.
+- `{{` and `}}` on their own lines renders a `<div>`. For example:
+
+  ```bandoc
+  {{
+  Paragraph 1
+
+  Paragraph 2
+  }}
+  ```
+
+They can both have attributes attached.
 
 ## Lists
 
@@ -81,7 +95,7 @@ Unordered lists use `-`. Ordered lists use `-#`. Definition lists start with `-:
 
 ## Block Quotes
 
-Block quotes start lines with `>` and at least 1 space, and must be in their own paragraph.
+Block quotes start lines with `>` and at least 1 space, and must be in their own paragraph. They can contain code fence blocks and lists.
 
 ## Embedded Languages
 
@@ -94,16 +108,16 @@ Supported languages are:
 - `html` for HTML.
 - `bandit` for Bandit.
 
-Some languages support applying an expression to a block. This is done with `` `expression`{@language_name}``. The expression is applied to the block if at the start of a block, otherwise the preceding block.
+Some languages support applying an expression to a block. The expression is applied to the block if at the start of a block, otherwise the preceding block.
 
-- `@html` for HTML opening tags applied to the block. For example, `` `<div><p>`{@html}`` would surround the block with `<div><p>block</p></div>`.
-- `@bandit` for a Bandit expression applied to the block.
+- `html@` for HTML opening tags applied to the block. For example, `` `<div><p>`{html@}`` would surround the block with `<div><p>block</p></div>`.
+- `bandit@` for a Bandit expression applied to the block.
 
 Bandit expressions can use anything public in a `doc` module in the current module.
 
 ## Attributes
 
-Attributes are supported via an embedded `attr` language. For example, `` `attributes`{@attr}``.
+Attributes are supported via an embedded `attr` language. The atrtibutes are applied to a language block. For example, `` `attributes`{attr}``.
 
 ## Named Entities
 
@@ -125,29 +139,6 @@ Some Emojis and HTML entities are supported, for example:
 
 A heading has an ID generated from the heading hierarchy. Headings can be linked with reference links beginning with a `#`. E.g. `[my link[#My Title/My Subtitle]]`. The main document title is excluded from the heading hierarchy, and doesn't have an id. `_` and `-` are escaped with a preceding `_`. Spaces are replaced with `-`, and any other non-alphanumeric characters are escaped with `_Unicode ID_`. See [MDN](https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/id) for recommendations on ID's. Duplicate headings at the same level are not allowed. There must be 0 or 1 main headings. If included, it must be the first thing in the document, so doesn't need an anchor. ID attributes are checked for uniqueness with the headings.
 
-## TODO: Nesting
-
-- Nestable blocks are sections, headings, lists, block quotes, paragraphs and code fences.
-- Sections, lists and block quotes can have nestable elements nested in them.
-- Sections are started with `{section}` and continued with indented blocks. For example:
-
-    ```bandoc
-    [^footnote 1:] {section}
-        First paragraph
-
-        Second paragraph
-
-        > block quoted
-        >
-        > ```
-        > with a nested code block
-        > ```
-
-    This paragraph is not part of the `section`.
-    ```
-
-- Footnotes and reference link definitions are only valid within their section and it's children.
-
 ## Comments
 
 `{% A comment %}`
@@ -155,13 +146,3 @@ A heading has an ID generated from the heading hierarchy. Headings can be linked
 ## Backend
 
 Renders to a defined subset of HTML + whatever embedded languages generate.
-
-## TODO
-
-- Tables
-- Better reference link definition syntax
-- Better way to specify language on code fences:
-  - Consistency between inline and block fences
-  - Specify render, evaluate or apply
-- Document hierarchy. e.g. block quoted code fences, footnotes with multiple paragraphs etc.
-  - block quotes can have things nested in them (lists, multiple paragraphs, code fences)
