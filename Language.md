@@ -89,7 +89,7 @@ my_function6 : forall (a : Type) (b : Type). a -> b case
     another_pattern then other_stuff
     else more_stuff
 
-my_function7 : Ord a => a 'b -> a 'b -> a 'b case
+my_function7 : a is Ord => a 'b -> a 'b -> a 'b case
     x y then
         if x > y then x
         else y
@@ -127,7 +127,7 @@ Bandit:
 
 ```bandit
 f 
-    : (X a, Y a, 'static a, c ~ a.b, X c, Z c Int)
+    : (a is X + Y + 'static, a.b is X + Z Int)
     => (x : X) : ()
 do
     ...
@@ -208,18 +208,18 @@ xs.for \x = stuff
 There are only 2 types of tuple, `()`, and `Pair x y`. `(x, y, z)` is syntactic sugar for the nested pairs `(x, (y, (z, ())))`. This allows traits to be written to consume the tuple. For example:
 
 ```bandit
-trait Apply f a r where
-    apply : f -> a -> r
+trait Apply a r where
+    apply : self -> a -> r
   
-impl Apply f_tail tuple_tail result => Apply (arg -> f_tail) (arg, tuple_tail) result where
-    apply f (fst, snd) = apply (f fst) snd
+impl f_tail is Apply tuple_tail result => (arg -> f_tail) is Apply (arg, tuple_tail) result where
+    apply self (fst, snd) = apply (f fst) snd
 
-impl Apply result () result where
-  apply x () = x
+impl result is Apply () result where
+  apply self () = self
 
 f : Int -> Int -> Int = (+)
 
-g : Int = apply f (1 : Int, 2 : Int)
+g : Int = f.apply (1 : Int, 2 : Int)
 ```
 
 ### Sums
@@ -235,7 +235,7 @@ type MyGenericSum a b = Single a | Pair{first : a, second : b}
 type Term a where
     Empty : Self ()
     Literal : a -> Self a
-    Equal : Compare b => b -> b -> Self Bool
+    Equal : b is Compare => b -> b -> Self Bool
     Pair : {first : f, second : s} -> Self (f, s)
     ExplicitlyQuantifiedPair : forall f s. {first : f, second : s} -> Self (f, s)
 ```
@@ -272,7 +272,7 @@ type MyGenericProduct a = New{field1 : U32, field2 : a}
 
 ### Records
 
-Differently to Haskell, we have a class with field accessors for each record. Duplicate names across traits are allowed and disambiguated by the typechecker.
+Differently to Haskell, we have a class with field accessors for each record. Duplicate names across traits are allowed and disambiguated by the typechecker and the dot operator.
 
 ### Higher Kinded Types
 
@@ -281,7 +281,7 @@ type Wrapper (container : Type -> Type) (element : Type) = New (container elemen
 
 hkt
     : forall (container : Type -> Type) (element : Type).
-    MyConstraint container
+    container is MyTrait
     => container element -> ()
 ```
 
@@ -310,7 +310,7 @@ Traits use the Rust coherency rules.
 They also don't do an ambiguity check like Haskell.
 
 ```bandit
-trait MyTrait t where
+trait MyTrait where
     alias MyType
 
     f : Int
@@ -319,45 +319,47 @@ trait MyTrait t where
 Both `MyType` and `f` are ambiguous, because `MyType` and `f` don't include the anything from the instance head. Haskell forbids this, but we allow it. Trait items can be disambiguated with:
 
 - `variable.method` where `method` has a first argument with the same type as `variable`.
-- `TraitName a b c.item` where `item` is any trait item.
-- `TypeName a b c.item` where the type is the first type in the `impl` head.
+- `(a is TraitName b c).item` where `item` is any trait item. `b` and `c` can be omitted if they're not needed to resolve the ambiguity.
+- `a.item` where `a` is the `self` and `item` is any trait item.
+
+Traits implicitly have a `Self` type.
 
 ```bandit
-trait A a where
+trait A where
     alias R
     f : Self.R
 
-trait B a where
+trait B where
     f : Int
 
 type X
 
-impl A X where
+impl X is A where
     alias R = Int
     f = 1
 
-impl B X where
+impl X is B where
     f = 2
 
 g : Int = A X.f
 
 data Y a = New a
 
-impl A (Y a) where
+impl (Y a) is A where
     alias R = Int
     f = 1
 
-impl B (Y a) where
+impl (Y a) is B where
     f = 1
 
 data Z = New Int
 
-impl A Z where
+impl Z is A where
     alias R = Int
     f = 1
 
 h : Y t -> A.R case
-    _ then A (Y t).f
+    _ then (Y t is A).f
 
 j : Z -> Z.R case
     _ then Z.f
@@ -407,7 +409,7 @@ make_fn_once : FnOnce (a -> b)
 #### Implementing `Fn` Traits
 
 ```bandit
-impl Fn MyType where
+impl MyType is Fn where
     call x = do_stuff
 ```
 
@@ -457,7 +459,7 @@ This will import `std.Y` as`RenamedY`. These are all the imported names:
 use
     other_module.MyTrait
 
-module my_module : forall a b. (Eq a, MyTrait b)
+module my_module : forall a b. (a is Eq, b is MyTrait)
 ...
 ```
 
@@ -547,13 +549,15 @@ method
 and a parent trait:
 
 ```bandit
-trait Effect state output where
+trait Effect output where
     alias Output;
 
     result : output -> Self.Output
 ```
 
 Handling an effect produces a `Continuation` that can be sequentially run or interleaved with other tasks via a user defined scheduler.
+
+`impl Continuation input output where` is short for `impl Continuation is Continuation input output where`.
 
 ```bandit
 type Continuation input output
@@ -582,23 +586,23 @@ handle : (() -> {e :: es} ()) -> impl e -> {es} ()
 Define the exception effect:
 
 ```bandit
-trait Effect state output => ExceptionEffect state output where
+trait Self is Effect output => ExceptionEffect output where
     alias Error
 
     throw
-        : state 'a mut
+        : Self 'a mut
         -> Continuation String output
         -> Self.Error
         -> Self.Result
 
 type Exception error = New (PhantomData error)
 
-impl Effect (Exception error) output where
+impl (Exception error) is Effect output where
     alias Result = Result output error
 
     result = Ok
 
-impl ExceptionEffect (Exception error) output where
+impl (Exception error) is ExceptionEffect output where
     alias Error = error
 
     throw _self _contination = Err
@@ -635,23 +639,23 @@ TODO: Write the example
 #### Iterator
 
 ```bandit
-trait Effect state output => IteratorEffect state output where
+trait Self is Effect output => IteratorEffect output where
     alias Item
 
     yield
-        : state 'a mut
+        : Self 'a mut
         -> Continuation () output
         -> Self.Item
         -> Self.Result
 
 type IteratorData item = New (Option item)
 
-impl Effect (IteratorData item) () where
+impl (IteratorData item) is Effect () where
     alias Result = ()
 
     result  = id
 
-impl IteratorEffect (IteratorData item) where
+impl (IteratorData item) is IteratorEffect where
     alias Item = item
 
     yield self cont i do
@@ -666,7 +670,7 @@ impl Generator item where
         : {effects} Self
         = (handle f).run (IteratorData.New @ item None).mut
 
-impl Iterator (Generator item) where
+impl (Generator item) is Iterator where
     alias Item = item
 
     next self do
