@@ -127,7 +127,7 @@ Bandit:
 
 ```bandit
 f 
-    : (a is X + Y + 'static, a.b is X + Z Int)
+    : (a is X + Y + 'static, a::b is X + Z Int)
     => (x : X) : ()
 do
     ...
@@ -240,7 +240,7 @@ type Term a where
     ExplicitlyQuantifiedPair : forall f s. {first : f, second : s} -> Self (f, s)
 ```
 
-Type constructors are namespaced under their type. For example, `MySum.EmptyVariant`.
+Type constructors are namespaced under their type. For example, `MySum::EmptyVariant`.
 
 GADTs are not very easy to map to Rust. For example, the `Equal` variant needs to be expanded to include a variant for each type sent to `Equal` (or alternatively, erase the type via a boxed `dyn` trait).
 
@@ -287,11 +287,9 @@ hkt
 
 ## Dot Notation
 
-`.` is used for resolving scopes, not function composition. Function composition is:
+`.` is used for resolving scopes, not function composition. Function composition is `second <| first` or `first |> second`
 
-```bandit
-f ~< g
-```
+`.` can resolve field names and trait methods from values, and make something into a mutable reference.
 
 ## Relevant Types
 
@@ -319,15 +317,15 @@ trait MyTrait where
 Both `MyType` and `f` are ambiguous, because `MyType` and `f` don't include the anything from the instance head. Haskell forbids this, but we allow it. Trait items can be disambiguated with:
 
 - `variable.method` where `method` has a first argument with the same type as `variable`.
-- `(a is TraitName b c).item` where `item` is any trait item. `b` and `c` can be omitted if they're not needed to resolve the ambiguity.
-- `a.item` where `a` is the `self` and `item` is any trait item.
+- `(a is TraitName b c)::item` where `item` is any trait item. `b` and `c` can be omitted if they're not needed to resolve the ambiguity.
+- `a::item` where `a` is the `self` and `item` is any trait item.
 
 Traits implicitly have a `Self` type.
 
 ```bandit
 trait A where
     alias R
-    f : Self.R
+    f : Self::R
 
 trait B where
     f : Int
@@ -341,7 +339,7 @@ impl X is A where
 impl X is B where
     f = 2
 
-g : Int = A X.f
+g : Int = A X::f
 
 data Y a = New a
 
@@ -358,11 +356,11 @@ impl Z is A where
     alias R = Int
     f = 1
 
-h : Y t -> A.R case
-    _ then (Y t is A).f
+h : Y t -> A::R case
+    _ then (Y t is A)::f
 
-j : Z -> Z.R case
-    _ then Z.f
+j : Z -> Z::R case
+    _ then Z::f
 ```
 
 `h` is equivalent to the Rust code:
@@ -441,7 +439,7 @@ use
     std (X, RenamedY = Y)
     my_module
     my_module (A, f)
-        deeply_nested = my_nested_module.my_deeply_nested_module
+        deeply_nested = my_nested_module::my_deeply_nested_module
 ```
 
 This will import `std.Y` as`RenamedY`. These are all the imported names:
@@ -543,7 +541,7 @@ method
     -> ActionArg1
     ...
     -> ActionArgN
-    -> Self.Output
+    -> Self::Output
 ```
 
 and a parent trait:
@@ -552,7 +550,7 @@ and a parent trait:
 trait Effect output where
     alias Output;
 
-    result : output -> Self.Output
+    result : output -> Self::Output
 ```
 
 Handling an effect produces a `Continuation` that can be sequentially run or interleaved with other tasks via a user defined scheduler.
@@ -592,8 +590,8 @@ trait Self is Effect output => ExceptionEffect output where
     throw
         : Self 'a mut
         -> Continuation String output
-        -> Self.Error
-        -> Self.Result
+        -> Self::Error
+        -> Self::Result
 
 type Exception error = New (PhantomData error)
 
@@ -608,7 +606,7 @@ impl (Exception error) is ExceptionEffect output where
     throw _self _contination = Err
 
 try (f : () -> {Exception error :: effects} result) : {effects} result do
-    (handle f).run Exception.New.mut
+    (handle f).run Exception::New.mut
 ```
 
 Define an error type and try/catch an exception:
@@ -645,8 +643,8 @@ trait Self is Effect output => IteratorEffect output where
     yield
         : Self 'a mut
         -> Continuation () output
-        -> Self.Item
-        -> Self.Result
+        -> Self::Item
+        -> Self::Result
 
 type IteratorData item = New (Option item)
 
@@ -668,7 +666,7 @@ impl Generator item where
     new
         (f : () -> {IteratorEffect :: effects} ())
         : {effects} Self
-        = (handle f).run (IteratorData.New @ item None).mut
+        = (handle f).run (IteratorData::New @ item None).mut
 
 impl (Generator item) is Iterator where
     alias Item = item
