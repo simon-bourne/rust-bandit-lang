@@ -289,7 +289,7 @@ hkt
 
 `.` is used for resolving scopes, not function composition. Function composition is `second <| first` or `first |> second`
 
-`.` can resolve field names and trait methods from values, and make something into a mutable reference.
+`.` can resolve field names and trait methods from values, and make something into a reference (e.g. `x.mut`).
 
 ## Relevant Types
 
