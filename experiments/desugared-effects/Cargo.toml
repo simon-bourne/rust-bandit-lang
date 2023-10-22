@@ -1,8 +1,0 @@
-[package]
-name = "bandit-experiment-desugared-effects"
-version = "0.1.0"
-authors = { workspace = true }
-edition = "2021"
-publish = false
-
-[dependencies]
