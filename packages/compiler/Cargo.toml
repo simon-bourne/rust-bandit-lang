@@ -5,3 +5,5 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+ariadne.workspace = true
+chumsky.workspace = true
