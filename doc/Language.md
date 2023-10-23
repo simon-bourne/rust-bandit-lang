@@ -269,7 +269,9 @@ type MySum where
     MySumOfProduct record field1 field2 : U32
     MyVariant U32 U64
 
-type MyGenericSum a b where Single a, Pair record first : a, second : b
+type MyGenericSum a b where
+    Single a
+    Pair record first : a, second : b
 
 type Term a where
     Empty with a = ()
