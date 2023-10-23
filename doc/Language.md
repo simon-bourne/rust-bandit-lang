@@ -78,7 +78,7 @@ my_function2 : a -> b match
     x then stuff
 
 my_function3 : a -> b =
-    \x: stuff
+    \x do stuff
 
 my_function4 x = \y: stuff
 
