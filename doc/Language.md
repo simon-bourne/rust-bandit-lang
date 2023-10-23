@@ -90,7 +90,7 @@ my_function6 : forall (a : Type) (b : Type). a -> b match
     another_pattern then other_stuff
     else more_stuff
 
-my_function7 : a 'b -> a 'b -> a 'b with a is Ord + Eq match
+my_function7 : a 'b -> a 'b -> a 'b with (Ord + Eq) a match
     x y then
         if x > y then x
         else y
@@ -105,7 +105,7 @@ my_function9 : Option a -> Option a -> Option a match
     _ (Some y) then y
     _ _ then None
 
-simple_quantification : forall ('a : Lifetime) (t is Ord). t 'a -> t 'a
+simple_quantification : forall ('a : Lifetime) (Ord t). t 'a -> t 'a
 
 multiplicity : Int 'a 1 -> Int 'a 1
 
@@ -115,6 +115,8 @@ multiplicity_polymorphism :  Int 'a n ->  Int 'a n
 `f do ...` (with no arguments) is short for `f () do`. Similarly for `match`, but not for `=`, as that's for constants. Use `f = do ...` if you want a function that's a block that returns a function.
 
 ## Contexts
+
+The context of a type variable can be defined in the `foreach` or `with` clause. The context of a function can only be specified in the `with` clause. `( Y + Z) X` means traits `Y` and `Z` are implemented for `X`. Functions might want to specify marker traits like `Send`.
 
 Rust:
 
@@ -128,14 +130,10 @@ where
 
 Bandit:
 
-The context of a type variable can be defined in the `foreach` or `with` clause. `X is Y + Z` means `X` has traits `Y` and `Z`. `trait X is Y` is shorthand for `trait X where Self is Y`.
-
-TODO: Should we use `is` to specify function traits, or `impl`?
-
 ```bandit
 f (x : X) : () with
-    a is X + Y + 'static
-    a::b is X + Z Int
+    (X + Y + 'static) a
+    (X + Z Int) (B a)
 do
     ...
 ```
@@ -238,26 +236,24 @@ instance Apply a () a where
 instance Apply f_tail tuple_tail result => Apply (arg -> f_tail) (arg, tuple_tail) result where
   apply f (x, y) = apply (f x) y
 
-f :: Int -> Int -> Int -> Int
-f a b c = 10
+f :: Int -> Int -> Int
+f = (+)
 
 x :: Int
-x = apply f (1 :: Int, (2 :: Int, (3 :: Int, ())))
+x = apply f (1 :: Int, (2 :: Int, ()))
 ```
 
 can be written as:
-
-// TODO: Use more Rust or Haskell like syntax using `Trait for Type` or `Trait Type`?
 
 ```bandit
 trait Apply a r where
     apply : self -> a -> r
 
-impl (arg -> f_tail) is Apply (arg, tuple_tail) result
-with f_tail is Apply tuple_tail result
+Apply (arg -> f_tail) (arg, tuple_tail) result
+with Apply f_tail tuple_tail result
     apply self (fst, snd) = apply (f fst) snd
 
-impl (() -> result) is Apply () result where
+Apply (() -> result) () result where
   apply self () = self ()
 
 f : Int -> Int -> Int = (+)
@@ -278,7 +274,7 @@ type MyGenericSum a b = Single a | Pair{first : a, second : b}
 type Term a where
     Empty : Self ()
     Literal : a -> Self a
-    Equal : b -> b -> Self Bool with b is Compare
+    Equal : b -> b -> Self Bool with Compare b
     Pair : {first : f, second : s} -> Self (f, s)
     ExplicitlyQuantifiedPair : forall f s. {first : f, second : s} -> Self (f, s)
 ```
@@ -320,7 +316,7 @@ type Wrapper (container : Type -> Type) (element : Type) = New (container elemen
 
 hkt : forall (container : Type -> Type) (element : Type).
     container element -> ()
-    with container is MyTrait
+    with MyTrait container
 ```
 
 ## Dot Notation
@@ -347,7 +343,9 @@ Traits use the Rust coherency rules.
 
 ### Disambiguating Trait Members
 
-They also don't do an ambiguity check like Haskell.
+Like Haskell.
+
+TODO: Do we want the Haskell style ambiguity check?
 
 ```bandit
 trait MyTrait where
@@ -356,53 +354,47 @@ trait MyTrait where
     f : Int
 ```
 
-Both `MyType` and `f` are ambiguous, because `MyType` and `f` don't include the anything from the instance head. Haskell forbids this, but we allow it. Trait items can be disambiguated with:
-
-- `variable.method` where `method` has a first argument with the same type as `variable`.
-- `(a is TraitName b c)::item` where `item` is any trait item. `b` and `c` can be omitted if they're not needed to resolve the ambiguity.
-- `a::item` where `a` is the `self` and `item` is any trait item.
-
-Traits implicitly have a `Self` type.
+Both `MyType` and `f` are ambiguous and so can never be called.
 
 ```bandit
-trait A where
-    alias R
-    f : Self::R
+trait A a where
+    alias R a
+    f : R a
 
-trait B where
-    f : Int
+trait B a where
+    f : forall a. Int
 
 type X
 
-impl X is A where
-    alias R = Int
+A X where
+    alias R X = Int
     f = 1
 
-impl X is B where
+B X where
     f = 2
 
-g : Int = A X::f
+g : Int = f @ X
 
 data Y a = New a
 
-impl (Y a) is A where
-    alias R = Int
+A (Y a) where
+    alias R (Y a) = Int
     f = 1
 
-impl (Y a) is B where
+B (Y a) where
     f = 1
 
 data Z = New Int
 
-impl Z is A where
-    alias R = Int
+A Z where
+    alias R Z = Int
     f = 1
 
-h : Y t -> A::R match
-    _ then (Y t is A)::f
+h : Y t -> R (Y t) match
+    _ then f @ (Y t)
 
 j : Z -> Z::R match
-    _ then Z::f
+    _ then f @ Z
 ```
 
 `h` is equivalent to the Rust code:
@@ -449,7 +441,7 @@ make_fn_once : FnOnce (a -> b)
 #### Implementing `Fn` Traits
 
 ```bandit
-impl MyType is Fn where
+Fn MyType where
     call x = do_stuff
 ```
 
@@ -499,7 +491,7 @@ This will import `std.Y` as`RenamedY`. These are all the imported names:
 use
     other_module.MyTrait
 
-module my_module : forall a b. (a is Eq, b is MyTrait)
+module my_module : forall a b. (Eq a, MyTrait b)
 ...
 ```
 
@@ -525,7 +517,7 @@ Some control flow is implementated natively:
 In particular, with `if`/`else` and `match`, the borrow checker needs to understand that only one branch will be run, so it's OK to move the same thing inside each branch.
 
 ```bandit
-match x where
+x . match
     Some x if x > 10 then ...
     Some 10 then ...
     _: ...
@@ -589,34 +581,32 @@ method
 and a parent trait:
 
 ```bandit
-trait Effect output where
-    alias Output;
+trait Effect eff output where
+    alias Output eff;
 
-    result : output -> Self::Output
+    result : output -> Output eff
 ```
 
 Handling an effect produces a `Continuation` that can be sequentially run or interleaved with other tasks via a user defined scheduler.
 
-`impl Continuation input output where` is short for `impl Continuation is Continuation input output where`.
-
 ```bandit
 type Continuation input output
 
-impl Continuation input output where
+Continuation cont input output where
     # Run to completion
-    resume : Self -> input -> output
-    run_one : Self -> input -> Option output
+    resume : cont -> input -> output
+    run_one : cont -> input -> Option output
 
 type Task state output
 
-impl Task state output where
+Task state output where
     run_one : Self -> state 'a mut -> output
 ```
 
 `handle` is a built in function that divides a function into delimited continuations and links effect action calls to effect trait methods. `::` is a cons for sets.
 
 ```bandit
-handle : (() -> {e :: es} ()) -> impl e -> {es} ()
+handle : (() -> {e :: es} ()) -> e -> {es} ()
 ```
 
 ### Examples
@@ -626,23 +616,23 @@ handle : (() -> {e :: es} ()) -> impl e -> {es} ()
 Define the exception effect:
 
 ```bandit
-trait ExceptionEffect output with Self is Effect output where
-    alias Error
+trait ExceptionEffect eff output with Effect eff output where
+    alias Error eff
 
     throw
-        : Self 'a mut
+        : eff 'a mut
         -> Continuation String output
-        -> Self::Error
-        -> Self::Result
+        -> Error eff
+        -> Output eff
 
 type Exception error = New (PhantomData error)
 
-impl (Exception error) is Effect output where
-    alias Result = Result output error
+Effect (eff = Exception error) output where
+    alias Output eff = Result output error
 
     result = Ok
 
-impl (Exception error) is ExceptionEffect output where
+ExceptionEffect (eff = Exception error) output where
     alias Error = error
 
     throw _self _contination = Err
@@ -679,24 +669,24 @@ TODO: Write the example
 #### Iterator
 
 ```bandit
-trait IteratorEffect output with Self is Effect output where
-    alias Item
+trait IteratorEffect eff output with Effect eff output where
+    alias Item eff
 
     yield
-        : Self 'a mut
+        : eff 'a mut
         -> Continuation () output
-        -> Self::Item
-        -> Self::Result
+        -> Item eff
+        -> Result eff
 
 type IteratorData item = New (Option item)
 
-impl (IteratorData item) is Effect () where
-    alias Result = ()
+Effect (eff = IteratorData item) () where
+    alias Result eff = ()
 
     result  = id
 
-impl (IteratorData item) is IteratorEffect where
-    alias Item = item
+IteratorEffect (eff = IteratorData item) where
+    alias Item eff = item
 
     yield self cont i do
         self.0 = Some i
@@ -704,14 +694,15 @@ impl (IteratorData item) is IteratorEffect where
 
 type Generator item = New (Task (IteratorData item) ())
 
-impl Generator item where
+# TODO: Document how to add constructors like this.
+Generator item where
     new
         (f : () -> {IteratorEffect :: effects} ())
         : {effects} Self
         = (handle f).run (IteratorData::New @ item None).mut
 
-impl (Generator item) is Iterator where
-    alias Item = item
+Iterator (iter = Generator item) where
+    alias Item iter = item
 
     next self do
         let mut data = IteratorData None
