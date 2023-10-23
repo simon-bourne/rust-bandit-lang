@@ -263,23 +263,31 @@ g : Int = f.apply (1 : Int, 2 : Int)
 
 ### Sums
 
-```bandit
-type MySum =
-    MyEmptyVariant |
-    MyVariant U32 |
-    MySumOfProduct{field1 : U32, field2 : U32}
+TODO: Update type syntax for rest of document
 
-type MyGenericSum a b = Single a | Pair{first : a, second : b}
+```bandit
+type MySum where
+    MyEmptyVariant
+    MySumOfProduct record field1 field2 : U32
+    MyVariant U32 U64
+
+type MyGenericSum a b where Single a, Pair record first : a, second : b
 
 type Term a where
-    Empty : Term ()
-    Literal : a -> Term a
-    Equal : b -> b -> Term Bool with Compare b
-    Pair : {first : f, second : s} -> Term (f, s)
-    ExplicitlyQuantifiedPair : forall f s. {first : f, second : s} -> Term (f, s)
+    Empty with a = ()
+    Literal a
+    Equal b b with Compare b, a = Bool
+    Pair record first : f, second : s with a = (f, s)
+    ExplicitlyQuantifiedPair forall f s. record
+        first : f
+        second : s
+    with
+        a = (f, s)
 ```
 
 Type constructors are namespaced under their type. For example, `MySum::EmptyVariant`.
+
+`record` allows you to name the fields. Multiple fields with the same type can be defined on a single line.
 
 GADTs are not very easy to map to Rust. For example, the `Equal` variant needs to be expanded to include a variant for each type sent to `Equal` (or alternatively, erase the type via a boxed `dyn` trait).
 
@@ -303,16 +311,19 @@ Products are just sums with only 1 variant. It's suggested to use the name `New`
 For example:
 
 ```bandit
-type MyUnit = New
-type MyType = New U32
-type MyProduct = New{field1 : U32, field2 : U32}
-type MyGenericProduct a = New{field1 : U32, field2 : a}
+type MyUnit where New
+type MyType where New U32
+type MyProduct where New record field1 field2 : U32
+type MyGenericProduct a where
+    New record
+        field1 : U32
+        field2 : a
 ```
 
 ### Higher Kinded Types
 
 ```bandit
-type Wrapper (container : Type -> Type) (element : Type) = New (container element)
+type Wrapper (container : Type -> Type) (element : Type) where New (container element)
 
 hkt : forall (container : Type -> Type) (element : Type).
     container element -> ()
@@ -632,7 +643,7 @@ trait ExceptionEffect eff output with Effect eff output where
         -> Error eff
         -> Output eff
 
-type Exception error = New (PhantomData error)
+type Exception error where New (PhantomData error)
 
 Effect (eff = Exception error) output where
     alias Output eff = Result output error
@@ -651,7 +662,7 @@ try (f : () -> {Exception error :: effects} result) : {effects} result do
 Define an error type and try/catch an exception:
 
 ```bandit
-type MyError = New String
+type MyError where New String
 
 f : () -> Result Int MyError = \do
     try \do
@@ -685,7 +696,7 @@ trait IteratorEffect eff output with Effect eff output where
         -> Item eff
         -> Result eff
 
-type IteratorData item = New (Option item)
+type IteratorData item where New (Option item)
 
 Effect (eff = IteratorData item) () where
     alias Result eff = ()
@@ -699,7 +710,7 @@ IteratorEffect (eff = IteratorData item) where
         self.0 = Some i
         cont.resume ()
 
-type Generator item = New (Task (IteratorData item) ())
+type Generator item where New (Task (IteratorData item) ())
 
 # TODO: Constructors
 Generator item where
