@@ -13,7 +13,7 @@
 
 ## Layout
 
-Blocks start with the keywords `do`, `then`, `where`, `match` and `case`. If block start keyword is at the start of a line, it should be indented by the same amount as the block header statement:
+Blocks start with the keywords `do`, `then`, `where`, and `match`. If block start keyword is at the start of a line, it can be indented by the same amount as the block header statement without creating a new line. Lines in a block can be separated explicitly with `,`.
 
 ```bandit
 block header
@@ -23,6 +23,7 @@ do
 
     nested block header then
         a statement
+        do a statement, another statement
         etc
 ```
 
@@ -60,9 +61,9 @@ Doc comments are formatted using [a new markup language](./Markup.md)
 
 There's no such thing as a doctest, just a unit test. The body of a function can be included in a comment. If you want a function definition included, make the function local to the function body.
 
-## `case` vs `match`
+## `match`
 
-Using `match`, an expression is bound to the patterns. Using `case` defines a function that takes the pattern expressions as arguments.
+`match` defines a function that takes the pattern expressions as arguments. You can match a variable to paterns with `x . match ...`
 
 ## Syntax
 
@@ -73,7 +74,7 @@ The syntax is generally Haskell-like, but strict. To make a type into a referenc
 ```bandit
 my_function1 x = stuff
 
-my_function2 : a -> b case
+my_function2 : a -> b match
     x then stuff
 
 my_function3 : a -> b =
@@ -81,35 +82,37 @@ my_function3 : a -> b =
 
 my_function4 x = \y: stuff
 
-my_function5 : forall a b. a -> b case
+my_function5 : forall a b. a -> b match
     x then stuff
 
-my_function6 : forall (a : Type) (b : Type). a -> b case
+my_function6 : forall (a : Type) (b : Type). a -> b match
     some_pattern if condition then stuff
     another_pattern then other_stuff
     else more_stuff
 
-my_function7 : a is Ord => a 'b -> a 'b -> a 'b case
+my_function7 : a 'b -> a 'b -> a 'b with a is Ord + Eq match
     x y then
         if x > y then x
         else y
 
-my_function8 : Option a -> Option a -> Option a case
+my_function8 : Option a -> Option a -> Option a match
     (Some x) _ then x
     _ (Some y) then y
     _ _ then None
 
-my_function9 : Option a -> Option a -> Option a case
+my_function9 : Option a -> Option a -> Option a match
     (Some x) _ then x
     _ (Some y) then y
     _ _ then None
 
-lifetime_quantification : forall ('a : Lifetime). Int 'a -> Int 'a
+simple_quantification : forall ('a : Lifetime) (t is Ord). t 'a -> t 'a
 
 multiplicity : Int 'a 1 -> Int 'a 1
 
 multiplicity_polymorphism :  Int 'a n ->  Int 'a n
 ```
+
+`f do ...` (with no arguments) is short for `f () do`. Similarly for `match`, but not for `=`, as that's for constants. Use `f = do ...` if you want a function that's a block that returns a function.
 
 ## Contexts
 
@@ -125,12 +128,30 @@ where
 
 Bandit:
 
+The context of a type variable can be defined in the `foreach` or `with` clause. `X is Y + Z` means `X` has traits `Y` and `Z`. `trait X is Y` is shorthand for `trait X where Self is Y`.
+
+TODO: Should we use `is` to specify function traits, or `impl`?
+
 ```bandit
-f 
-    : (a is X + Y + 'static, a::b is X + Z Int)
-    => (x : X) : ()
+f (x : X) : () with
+    a is X + Y + 'static
+    a::b is X + Z Int
 do
     ...
+```
+
+## Lambdas
+
+Lambdas are defined exactly like names functions, but their name is `\`. So:
+
+```bandit
+\x y = z x y
+\x y do
+    z xy
+\x y match
+    ...
+
+\ : Int -> Int -> Int = add
 ```
 
 ## Type Application
@@ -205,17 +226,39 @@ xs.for \x = stuff
 
 ### Tuples
 
-There are only 2 types of tuple, `()`, and `Pair x y`. `(x, y, z)` is syntactic sugar for the nested pairs `(x, (y, (z, ())))`. This allows traits to be written to consume the tuple. For example:
+There are only 2 types of tuple, `()`, and `Pair x y`. `(x, y, z)` is syntactic sugar for the nested pairs `(x, (y, (z, ())))`. This allows traits to be written to consume the tuple. For example, the Haskell:
+
+```haskell
+class Apply f t r where
+  apply :: f -> t -> r
+
+instance Apply a () a where
+  apply x () = x
+  
+instance Apply f_tail tuple_tail result => Apply (arg -> f_tail) (arg, tuple_tail) result where
+  apply f (x, y) = apply (f x) y
+
+f :: Int -> Int -> Int -> Int
+f a b c = 10
+
+x :: Int
+x = apply f (1 :: Int, (2 :: Int, (3 :: Int, ())))
+```
+
+can be written as:
+
+// TODO: Use more Rust or Haskell like syntax using `Trait for Type` or `Trait Type`?
 
 ```bandit
 trait Apply a r where
     apply : self -> a -> r
-  
-impl f_tail is Apply tuple_tail result => (arg -> f_tail) is Apply (arg, tuple_tail) result where
+
+impl (arg -> f_tail) is Apply (arg, tuple_tail) result
+with f_tail is Apply tuple_tail result
     apply self (fst, snd) = apply (f fst) snd
 
-impl result is Apply () result where
-  apply self () = self
+impl (() -> result) is Apply () result where
+  apply self () = self ()
 
 f : Int -> Int -> Int = (+)
 
@@ -235,7 +278,7 @@ type MyGenericSum a b = Single a | Pair{first : a, second : b}
 type Term a where
     Empty : Self ()
     Literal : a -> Self a
-    Equal : b is Compare => b -> b -> Self Bool
+    Equal : b -> b -> Self Bool with b is Compare
     Pair : {first : f, second : s} -> Self (f, s)
     ExplicitlyQuantifiedPair : forall f s. {first : f, second : s} -> Self (f, s)
 ```
@@ -247,7 +290,7 @@ GADTs are not very easy to map to Rust. For example, the `Equal` variant needs t
 With GADTs, we can use the more specific result type in a pattern match:
 
 ```bandit
-eval : Term a -> a case
+eval : Term a -> a match
     Empty then ()
     Literal i then i
     Equal i j then i == j
@@ -270,26 +313,25 @@ type MyProduct = New{field1 : U32, field2 : U32}
 type MyGenericProduct a = New{field1 : U32, field2 : a}
 ```
 
-### Records
-
-Differently to Haskell, we have a class with field accessors for each record. Duplicate names across traits are allowed and disambiguated by the typechecker and the dot operator.
-
 ### Higher Kinded Types
 
 ```bandit
 type Wrapper (container : Type -> Type) (element : Type) = New (container element)
 
-hkt
-    : forall (container : Type -> Type) (element : Type).
-    container is MyTrait
-    => container element -> ()
+hkt : forall (container : Type -> Type) (element : Type).
+    container element -> ()
+    with container is MyTrait
 ```
 
 ## Dot Notation
 
-`.` is used for resolving scopes, not function composition. Function composition is `second <| first` or `first |> second`
+There's no special dot notation. `.` is just an operator. Operators lookup their 2nd argument additionally in the module of the 1st arguments type.
 
-`.` can resolve field names and trait methods from values, and make something into a reference (e.g. `x.mut`).
+`.` has higher precedence than function application, so `.` `x.f y` is equivalent to `f x y`.
+
+`.` is left associative, so `a.b.c` is equivalent to `(a.b).c`.
+
+TODO: What to use for function composition?
 
 ## Relevant Types
 
@@ -356,10 +398,10 @@ impl Z is A where
     alias R = Int
     f = 1
 
-h : Y t -> A::R case
+h : Y t -> A::R match
     _ then (Y t is A)::f
 
-j : Z -> Z::R case
+j : Z -> Z::R match
     _ then Z::f
 ```
 
@@ -584,7 +626,7 @@ handle : (() -> {e :: es} ()) -> impl e -> {es} ()
 Define the exception effect:
 
 ```bandit
-trait Self is Effect output => ExceptionEffect output where
+trait ExceptionEffect output with Self is Effect output where
     alias Error
 
     throw
@@ -637,7 +679,7 @@ TODO: Write the example
 #### Iterator
 
 ```bandit
-trait Self is Effect output => IteratorEffect output where
+trait IteratorEffect output with Self is Effect output where
     alias Item
 
     yield
@@ -697,31 +739,8 @@ fn f<'a, 'b: 'a, T>(x: &'a T, y: &'b T)
 is equivalent to:
 
 ```bandit
-f : ('a <= 'b) => t 'a -> t 'b -> ()
+f : t 'a -> t 'b -> () with ('a <= 'b)
 ```
-
-## Keywords
-
-- `alias`
-- `case`
-- `do`
-- `else`
-- `forall`
-- `if`
-- `impl`
-- `infer`
-- `match`
-- `module`
-- `let`
-- `loop`
-- `return`
-- `Self`
-- `then`
-- `trait`
-- `type`
-- `use`
-- `where`
-- `while`
 
 ## TODO
 
