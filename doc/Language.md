@@ -272,11 +272,11 @@ type MySum =
 type MyGenericSum a b = Single a | Pair{first : a, second : b}
 
 type Term a where
-    Empty : Self ()
-    Literal : a -> Self a
-    Equal : b -> b -> Self Bool with Compare b
-    Pair : {first : f, second : s} -> Self (f, s)
-    ExplicitlyQuantifiedPair : forall f s. {first : f, second : s} -> Self (f, s)
+    Empty : Term ()
+    Literal : a -> Term a
+    Equal : b -> b -> Term Bool with Compare b
+    Pair : {first : f, second : s} -> Term (f, s)
+    ExplicitlyQuantifiedPair : forall f s. {first : f, second : s} -> Term (f, s)
 ```
 
 Type constructors are namespaced under their type. For example, `MySum::EmptyVariant`.
@@ -318,6 +318,10 @@ hkt : forall (container : Type -> Type) (element : Type).
     container element -> ()
     with MyTrait container
 ```
+
+### Constructors
+
+TODO: Constructors are like normal functions in a parameterized module. Remove the `Self` keyword and define constructors in parameterized modules.
 
 ## Dot Notation
 
@@ -572,12 +576,12 @@ An effect is a trait with methods of the form:
 
 ```bandit
 method
-    : Self 'a mut
+    : Effect 'a mut
     -> Continuation ActionReturnType output
     -> ActionArg1
     ...
     -> ActionArgN
-    -> Self::Output
+    -> Output Effect
 ```
 
 and a parent trait:
@@ -601,6 +605,7 @@ Continuation cont input output where
 
 type Task state output
 
+## TODO: Constructors
 Task state output where
     run_one : Self -> state 'a mut -> output
 ```
@@ -696,7 +701,7 @@ IteratorEffect (eff = IteratorData item) where
 
 type Generator item = New (Task (IteratorData item) ())
 
-# TODO: Document how to add constructors like this.
+# TODO: Constructors
 Generator item where
     new
         (f : () -> {IteratorEffect :: effects} ())
