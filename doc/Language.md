@@ -7,7 +7,7 @@
 - Cleaner syntax.
 - Marker polymorphism.
 - Generalized tuples.
-- Parameterized modules
+- Parameterized modules.
 - GADTs.
 - Macro hygiene.
 
@@ -330,10 +330,6 @@ hkt : forall (container : Type -> Type) (element : Type).
     with MyTrait container
 ```
 
-### Constructors
-
-TODO: Constructors are like normal functions in a parameterized module. Remove the `Self` keyword and define constructors in parameterized modules.
-
 ## Dot Notation
 
 There's no special dot notation. `.` is just an operator. Operators lookup their 2nd argument additionally in the module of the 1st arguments type.
@@ -618,7 +614,6 @@ Continuation cont input output where
 
 type Task state output
 
-## TODO: Constructors
 Task state output where
     run_one : Self -> state 'a mut -> output
 ```
@@ -712,9 +707,9 @@ IteratorEffect (eff = IteratorData item) where
         self.0 = Some i
         cont.resume ()
 
-type Generator item where New (Task (IteratorData item) ())
+type Generator item where
+    New (Task (IteratorData item) ())
 
-# TODO: Constructors
 Generator item where
     new
         (f : () -> {IteratorEffect :: effects} ())
