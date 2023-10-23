@@ -539,6 +539,8 @@ while let Some x = y do
 
 ## Effects
 
+TODO: We should require the effect data when calling an effect. If there's no data, we can just construct empty data when needed. This allows us to disambiguate between multiple effects if needed.
+
 Effectful blocks are compiled to [delimited continuations]. Each continuation is delimited by an action that takes some parameters and yields a value.
 
 - The continuation state could allocate an untagged union in which to store the action arguments and results. Actions could read and write them.
