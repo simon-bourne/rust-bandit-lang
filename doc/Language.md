@@ -263,8 +263,6 @@ g : Int = f.apply (1 : Int, 2 : Int)
 
 ### Sums
 
-TODO: Update type syntax for rest of document
-
 ```bandit
 type MySum where
     MyEmptyVariant
@@ -299,7 +297,7 @@ eval : Term a -> a match
     Literal i then i
     Equal i j then i == j
     Pair x then (x.first, x.second)
-    ExplicitlyQuantifiedPair {first, second} then (f, s)
+    ExplicitlyQuantifiedPair first, second then (f, s)
 ```
 
 This is where things diverge from Haskell. Record syntax is not just sugar. So `x` in `Pair x` above is the entire record, which can be accessed with `.` notation.
@@ -555,6 +553,8 @@ while let Some x = y do
 ## Effects
 
 TODO: We should require the effect data when calling an effect. If there's no data, we can just construct empty data when needed. This allows us to disambiguate between multiple effects if needed.
+
+TODO: I think all we need is effect support in the type system, and a `continuation` function.
 
 Effectful blocks are compiled to [delimited continuations]. Each continuation is delimited by an action that takes some parameters and yields a value.
 
