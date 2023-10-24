@@ -1,6 +1,6 @@
 use chumsky::{
     prelude::*,
-    text::{ascii::ident, Char},
+    text::{ascii::ident, inline_whitespace, Char},
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -35,7 +35,7 @@ fn lexer<'src>(
             .map(LayoutToken::Indentation),
     );
     let token = indentation.or(choice((line_end, structure, identifier))
-        .padded()
+        .padded_by(inline_whitespace())
         .map(LayoutToken::Token));
 
     token
@@ -49,11 +49,36 @@ fn lexer<'src>(
 // TODO: Write parser of `[Spanned<Token>]`
 
 fn main() {
+    /*
+identifier: 0..10,
+indentation: "": 10..11,
+identifier: 11..21,
+indentation: "": 21..22,
+indentation: "": 22..23,
+identifier: 23..34,
+Do: 34..36,
+indentation: "    ": 36..41,
+identifier: 41..51,
+indentation: "": 51..52,
+indentation: "    ": 52..57,
+Do: 57..59,
+indentation: "        ": 59..68,
+identifier: 68..78,
+indentation: "        ": 78..87,
+identifier: 87..97,
+indentation: "    ": 97..102,
+identifier: 102..112,
+indentation: "": 112..113,
+identifier: 113..123,
+indentation: "": 123..124,
+    */
     let tokens = lexer().parse(
         r#"identifier
 identifier
+
 identifier do
     identifier
+
     do
         identifier
         identifier
