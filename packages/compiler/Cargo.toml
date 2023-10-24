@@ -7,4 +7,3 @@ default-run = "bandit-compiler"
 
 [dependencies]
 chumsky.workspace = true
-num-bigint.workspace = true
