@@ -184,9 +184,9 @@ my_constant1 : Int = 42
 
 ## Literals
 
-Multiline string literals begin with 3 or more `"`s, and end with the same number. They can't be empty, as that would make parsing difficult. For example:
+Multiline string literals begin with 3 or more `"`s and a newline. The initial newline doesn't appear in the string. They end with the same number of `"`s. Indentation is not removed, but this could be done with a function if required. For example:
 
-```python
+```bandit
 """
 line1
 line2
