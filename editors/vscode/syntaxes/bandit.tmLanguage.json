@@ -1,0 +1,77 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Bandit",
+	"patterns": [
+		{
+			"include": "#keyword"
+		},
+		{
+			"include": "#storage"
+		},
+		{
+			"include": "#multiline-string"
+		},
+		{
+			"include": "#string"
+		},
+		{
+			"name": "comment.line.number-sign.bandit",
+			"match": "#.*"
+		},
+		{
+			"name": "entity.name.function.effect.bandit",
+			"match": "\\b[a-z][a-zA-Z0-9_]*\\b\\?"
+		},
+		{
+			"name": "entity.name.type.data.bandit",
+			"match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
+		},
+		{
+			"name": "entity.name.type.lifetime.bandit",
+			"match": "\\b'[a-z][a-zA-Z0-9_]*\\b"
+		},
+		{
+			"name": "variable.other.bandit",
+			"match": "\\b[a-z][a-zA-Z0-9_]*\\b"
+		}
+	],
+	"repository": {
+		"keyword": {
+			"patterns": [
+				{
+					"name": "keyword.control.bandit",
+					"match": "\\b(do|else|if|match|loop|return|then|while)\\b"
+				},
+				{
+					"name": "keyword.other.bandit",
+					"match": "\\b(alias|forall|infer|module|let|record|Self|trait|type|use|where|with)\\b"
+				}
+			]
+		},
+		"storage": {
+			"patterns": [
+				{
+					"name": "storage.modifier.mut.bandit",
+					"match": "\\b(mut)\\b"
+				}
+			]
+		},
+		"string": {
+			"name": "string.quoted.double.bandit",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.bandit",
+					"match": "\\\\."
+				}
+			]
+		},
+		"multiline-string": {
+			"name": "string.quoted.triple.bandit",
+			"begin": "(\"\"\"\"*)$",
+			"end": "\\1"
+		}
+	},
+	"scopeName": "source.bandit"
+}

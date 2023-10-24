@@ -1,0 +1,48 @@
+{
+  "name": "bandit",
+  "displayName": "bnd",
+  "description": "Bandit Language Support",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "bandit",
+        "aliases": [
+          "Bandit",
+          "bandit"
+        ],
+        "extensions": [
+          "bnd"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "bandit-markdown-injection"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "bandit",
+        "scopeName": "source.bandit",
+        "path": "./syntaxes/bandit.tmLanguage.json"
+      },
+      {
+        "language": "bandit-markdown-injection",
+        "scopeName": "markdown.bandit.codeblock",
+        "path": "./syntaxes/bandit-markdown-injection.json",
+        "injectTo": [
+          "text.html.markdown"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.bandit": "bandit"
+        }
+      }
+    ]
+  }
+}
