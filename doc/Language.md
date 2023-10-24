@@ -59,9 +59,9 @@ Multiline comments are not supported because:
 
 #### Doc Comments
 
-Whether a comment is a doc comment depends on where it is placed. If it's before a public item, it's a doc comment. If you want to document the implementation of a public function or type for example, put the comment inside the implementation block. If you want an implementation note for a module or group of functions, put it in a private module.
+A doc comment block is a block of contiguous lines starting with `##`. They must be contiguous and indented at the same level as the item they're documenting. Doc comments can only appear in certain places (before a module or item definition), and it's an error to put them elsewhere.
 
-Doc comments are formatted using [a new markup language](./Markup.md)
+Doc comments are formatted using [a markup language similar to markdown](./Markup.md)
 
 #### Doctests
 
