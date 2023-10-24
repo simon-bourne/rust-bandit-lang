@@ -27,13 +27,14 @@ fn lexer<'src>(
     });
     let structure = one_of("()[]{}").map(Token::Structure);
     let line_end = just(';').to(Token::LineEnd);
-    let indentation = text::newline().ignore_then(
+    let single_indentation = text::newline().ignore_then(
         any()
             .filter(|c: &char| c.is_inline_whitespace())
             .repeated()
             .to_slice()
             .map(LayoutToken::Indentation),
     );
+    let indentation = single_indentation.foldl(single_indentation.repeated(), |_x, y| y);
     let token = indentation.or(choice((line_end, structure, identifier))
         .padded_by(inline_whitespace())
         .map(LayoutToken::Token));
