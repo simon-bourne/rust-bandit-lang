@@ -41,6 +41,12 @@ trait EmptyTrait
 type Void
 ```
 
+## Types
+
+### Coercion
+
+The type `from` can can be coerced into `to` if there's an implementation for `Coerce from to`.
+
 ### Comments
 
 Single line comments start with a `#`. This allows us to ignore the shebang in unix scripts.
