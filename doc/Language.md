@@ -13,7 +13,7 @@
 
 ## Layout
 
-Blocks start with the keywords `do`, `then`, `where`, and `match`. If block start keyword is at the start of a line, it can be indented by the same amount as the block header statement without creating a new line. Lines in a block can be separated explicitly with `,`. Blocks can be explicitly terminated with `;`.
+Blocks start with the keywords `do`, `then`, `where`, and `match`. If block start keyword is at the start of a line, it can be indented by the same amount as the block header statement without creating a new line.
 
 ```bandit
 block header

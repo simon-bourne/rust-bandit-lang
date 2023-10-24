@@ -3,6 +3,8 @@ name = "bandit-compiler"
 version.workspace = true
 edition.workspace = true
 publish = false
+default-run = "bandit-compiler"
 
 [dependencies]
 chumsky.workspace = true
+num-bigint.workspace = true

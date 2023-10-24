@@ -12,5 +12,6 @@ authors = ["Simon Bourne <simonbourne@gmail.com>"]
 debug = 0
 
 [workspace.dependencies]
-chumsky = "0.9.2"
+chumsky = "1.0.0-alpha.6"
+num-bigint = "0.4.4"
 xtask-base = { git = "https://github.com/simon-bourne/rust-xtask-base" }
