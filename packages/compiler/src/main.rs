@@ -14,7 +14,7 @@ enum Token<'src> {
     Do,
     Identifier(&'src str),
     Structure(char),
-    NewLine,
+    LineEnd,
 }
 
 type Spanned<T> = (T, SimpleSpan<usize>);
@@ -26,7 +26,7 @@ fn lexer<'src>(
         _ => Token::Identifier(ident),
     });
     let structure = one_of("()[]{}").map(Token::Structure);
-    let newline = just(';').to(Token::NewLine);
+    let line_end = just(';').to(Token::LineEnd);
     let indentation = text::newline().ignore_then(
         any()
             .filter(|c: &char| c.is_inline_whitespace())
@@ -34,7 +34,7 @@ fn lexer<'src>(
             .to_slice()
             .map(LayoutToken::Indentation),
     );
-    let token = indentation.or(choice((newline, structure, identifier))
+    let token = indentation.or(choice((line_end, structure, identifier))
         .padded()
         .map(LayoutToken::Token));
 
