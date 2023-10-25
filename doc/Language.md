@@ -13,7 +13,7 @@
 
 ## Layout
 
-Blocks start with the keywords `do`, `then`, `where`, and `match`. If block start keyword is at the start of a line, it can be indented by the same amount as the block header statement without creating a new line.
+Blocks start with the keywords `do`, `then`, `where`, and `match`. If block start keyword is at the start of a line, it can be indented by the same amount as the block header statement without creating a new line. There's no `pass` keyword, or similar, because we can just use the unit type.
 
 ```bandit
 block header
@@ -25,6 +25,22 @@ do
         a statement
         do a statement, another statement
         etc
+    
+    # Empty single line block
+    do ()
+
+    # Empty multi line block
+    do
+        ()
+
+    # 2 blocks on a single line
+    (do x + y) + (do y + z)
+    
+    do
+            statement
+            statement
+        + x
+        + y
 ```
 
 If anything appears on the same line after the block keyword, it is a single line block:
