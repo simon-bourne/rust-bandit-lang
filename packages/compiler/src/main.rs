@@ -22,16 +22,16 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Stmt<'a>>> {
             .repeated()
             .at_most(1);
         let word_separator = inline_whitespace().then(continue_line);
+        let block = just("do")
+            .then(text::newline())
+            .ignore_then(block)
+            .map(Stmt::Do);
         let expr = just("expr")
             .separated_by(word_separator)
             .collect::<Vec<_>>();
 
         let expr_stmt = expr.then_ignore(text::newline()).map(Stmt::Expr);
-        let open_layout_block = just("do")
-            .then(text::newline())
-            .ignore_then(block)
-            .map(Stmt::Do);
-        let stmt = expr_stmt.or(open_layout_block);
+        let stmt = expr_stmt.or(block);
 
         text::whitespace()
             .count()
