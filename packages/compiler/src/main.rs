@@ -15,14 +15,13 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Stmt<'a>>> {
             .repeated()
             .configure(|cfg, parent_indent| cfg.exactly(*parent_indent));
         let blank_lines = inline_whitespace().then(newline()).repeated();
-        let word_separator = inline_whitespace().then(
-            newline()
-                .then(blank_lines)
-                .then(indent)
-                .then(inline_whitespace().at_least(1))
-                .repeated()
-                .at_most(1),
-        );
+        let extra_indent = indent.then(inline_whitespace().at_least(1));
+        let continue_line = newline()
+            .then(blank_lines)
+            .then(extra_indent)
+            .repeated()
+            .at_most(1);
+        let word_separator = inline_whitespace().then(continue_line);
         let expr = just("expr")
             .separated_by(word_separator)
             .collect::<Vec<_>>();
