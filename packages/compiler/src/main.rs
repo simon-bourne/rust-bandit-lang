@@ -50,10 +50,6 @@ fn main() {
     // TODO: Pretty printer
     // TODO: Handle inline `do`
     // TODO: Brackets
-    // TODO: Handle do in middle of expression:
-    // do
-    //         expr
-    //     expr
 
     let stmts = parser().padded().parse(
         r#"
