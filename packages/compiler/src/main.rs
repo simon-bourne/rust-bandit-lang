@@ -1,6 +1,6 @@
 use chumsky::{
     prelude::*,
-    text::{inline_whitespace, newline},
+    text::{inline_whitespace, newline, whitespace},
 };
 
 #[derive(Clone, Debug)]
@@ -37,7 +37,7 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Stmt<'a>>> {
             .map(Stmt);
         let stmt_separator = newline().then(blank_lines).then(indent);
 
-        text::whitespace()
+        whitespace()
             .count()
             .ignore_with_ctx(stmt.separated_by(stmt_separator).collect())
     });
