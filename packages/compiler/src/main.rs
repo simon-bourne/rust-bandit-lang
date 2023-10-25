@@ -4,8 +4,11 @@ use chumsky::{
 };
 
 #[derive(Clone, Debug)]
-enum Stmt<'src> {
-    Expr(Vec<&'src str>),
+struct Stmt<'src>(Vec<Expr<'src>>);
+
+#[derive(Clone, Debug)]
+enum Expr<'src> {
+    Expr(&'src str),
     Do(Vec<Stmt<'src>>),
 }
 
@@ -25,24 +28,25 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Stmt<'a>>> {
         let do_block = just("do")
             .then(text::newline())
             .ignore_then(block)
-            .map(Stmt::Do);
-        let expr = just("expr")
+            .map(Expr::Do);
+        let expr = just("expr").map(Expr::Expr);
+        let stmt = expr
+            .or(do_block)
             .separated_by(word_separator)
-            .collect::<Vec<_>>();
-
-        let expr_stmt = expr.then_ignore(text::newline()).map(Stmt::Expr);
-        let stmt = expr_stmt.or(do_block);
+            .collect::<Vec<_>>()
+            .map(Stmt);
+        let stmt_separator = newline().then(blank_lines).then(indent);
 
         text::whitespace()
             .count()
-            .ignore_with_ctx(stmt.separated_by(indent).collect())
+            .ignore_with_ctx(stmt.separated_by(stmt_separator).collect())
     });
 
     block.with_ctx(0)
 }
 
 fn main() {
-    // TODO: Handle `do` at end of line
+    // TODO: Pretty printer
     // TODO: Handle inline `do`
     // TODO: Brackets
     // TODO: Handle do in middle of expression:
@@ -57,8 +61,9 @@ expr
 do
     expr expr
      expr
-    do
-        expr expr
+    expr expr do
+            expr expr
+            expr
         expr
 exprexpr
 "#,
