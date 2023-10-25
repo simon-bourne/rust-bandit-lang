@@ -1,5 +1,5 @@
 use chumsky::{
-    primitive::just,
+    primitive::{choice, just},
     recursive::recursive,
     text::{inline_whitespace, newline, whitespace},
     ConfigIterParser, IterParser, Parser,
@@ -33,7 +33,19 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Statement<'a>>> {
             .then(newline())
             .ignore_then(block)
             .map(TreeToken::Do);
+        let inline_block = recursive(|inline_block| {
+            open_block
+                .then_ignore(inline_whitespace())
+                .then(
+                    choice((token, layout_block.clone(), inline_block))
+                        .separated_by(inline_whitespace())
+                        .collect::<Vec<_>>()
+                        .map(Statement),
+                )
+                .map(|(_do, statement)| TreeToken::Do(vec![statement]))
+        });
         let statement = token
+            .or(inline_block)
             .or(layout_block)
             .separated_by(token_separator)
             .collect::<Vec<_>>()
@@ -51,7 +63,6 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Statement<'a>>> {
 fn main() {
     // TODO: Test performance
     // TODO: Pretty printer
-    // TODO: Handle inline `do`
     // TODO: Brackets
 
     let statements = parser().padded().parse(
@@ -70,6 +81,9 @@ do
         do
             expr
 exprexpr
+expr do expr expr do
+    expr
+    expr
 "#,
     );
     println!("{:#?}", statements.output());
