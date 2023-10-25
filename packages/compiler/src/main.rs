@@ -22,7 +22,7 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Stmt<'a>>> {
             .repeated()
             .at_most(1);
         let word_separator = inline_whitespace().then(continue_line);
-        let block = just("do")
+        let do_block = just("do")
             .then(text::newline())
             .ignore_then(block)
             .map(Stmt::Do);
@@ -31,7 +31,7 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Stmt<'a>>> {
             .collect::<Vec<_>>();
 
         let expr_stmt = expr.then_ignore(text::newline()).map(Stmt::Expr);
-        let stmt = expr_stmt.or(block);
+        let stmt = expr_stmt.or(do_block);
 
         text::whitespace()
             .count()
