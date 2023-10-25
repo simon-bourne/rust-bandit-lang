@@ -10,10 +10,18 @@ enum LayoutToken<'src> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+enum Delimiter {
+    Parentheses,
+    Bracket,
+    Brace,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 enum Token<'src> {
     Do,
+    Open(Delimiter),
+    Close(Delimiter),
     Identifier(&'src str),
-    Structure(char),
     LineEnd,
 }
 
@@ -25,7 +33,17 @@ fn lexer<'src>(
         "do" => Token::Do,
         _ => Token::Identifier(ident),
     });
-    let structure = one_of("()[]{}").map(Token::Structure);
+
+    let delimiter = one_of("()[]{}").map(|c| match c {
+        '(' => Token::Open(Delimiter::Parentheses),
+        ')' => Token::Close(Delimiter::Parentheses),
+        '[' => Token::Open(Delimiter::Bracket),
+        ']' => Token::Close(Delimiter::Bracket),
+        '{' => Token::Open(Delimiter::Brace),
+        '}' => Token::Close(Delimiter::Brace),
+        _ => unreachable!(),
+    });
+
     let line_end = just(';').to(Token::LineEnd);
     let single_indentation = text::newline().ignore_then(
         any()
@@ -35,7 +53,7 @@ fn lexer<'src>(
             .map(LayoutToken::Indentation),
     );
     let indentation = single_indentation.foldl(single_indentation.repeated(), |_x, y| y);
-    let token = indentation.or(choice((line_end, structure, identifier))
+    let token = indentation.or(choice((line_end, delimiter, identifier))
         .padded_by(inline_whitespace())
         .map(LayoutToken::Token));
 
