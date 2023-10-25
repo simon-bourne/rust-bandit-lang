@@ -25,10 +25,7 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Stmt<'a>>> {
             .repeated()
             .at_most(1);
         let word_separator = inline_whitespace().then(continue_line);
-        let do_block = just("do")
-            .then(text::newline())
-            .ignore_then(block)
-            .map(Expr::Do);
+        let do_block = just("do").then(newline()).ignore_then(block).map(Expr::Do);
         let expr = just("expr").map(Expr::Expr);
         let stmt = expr
             .or(do_block)
