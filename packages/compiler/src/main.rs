@@ -14,9 +14,10 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Stmt<'a>>> {
         let indent = just(' ')
             .repeated()
             .configure(|cfg, parent_indent| cfg.exactly(*parent_indent));
-        // TODO: Ignore blank lines
+        let blank_lines = inline_whitespace().then(newline()).repeated();
         let word_separator = inline_whitespace().then(
             newline()
+                .then(blank_lines)
                 .then(indent)
                 .then(inline_whitespace().at_least(1))
                 .repeated()
