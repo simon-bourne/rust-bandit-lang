@@ -15,10 +15,10 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Stmt<'a>>> {
             .repeated()
             .configure(|cfg, parent_indent| cfg.exactly(*parent_indent));
         // TODO: Ignore blank lines
-        let word_separator = inline_whitespace().then_ignore(
+        let word_separator = inline_whitespace().then(
             newline()
-                .then_ignore(indent)
-                .then_ignore(inline_whitespace().at_least(1))
+                .then(indent)
+                .then(inline_whitespace().at_least(1))
                 .repeated()
                 .at_most(1),
         );
