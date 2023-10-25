@@ -6,15 +6,15 @@ use chumsky::{
 };
 
 #[derive(Clone, Debug)]
-struct Stmt<'src>(Vec<Expr<'src>>);
+struct Statement<'src>(Vec<TreeToken<'src>>);
 
 #[derive(Clone, Debug)]
-enum Expr<'src> {
-    Expr(&'src str),
-    Do(Vec<Stmt<'src>>),
+enum TreeToken<'src> {
+    Token(&'src str),
+    Do(Vec<Statement<'src>>),
 }
 
-fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Stmt<'a>>> {
+fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Statement<'a>>> {
     let block = recursive(|block| {
         let indent = just(' ')
             .repeated()
@@ -26,19 +26,23 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Stmt<'a>>> {
             .then(extra_indent)
             .repeated()
             .at_most(1);
-        let word_separator = inline_whitespace().then(continue_line);
-        let do_block = just("do").then(newline()).ignore_then(block).map(Expr::Do);
-        let expr = just("expr").map(Expr::Expr);
-        let stmt = expr
-            .or(do_block)
-            .separated_by(word_separator)
+        let token_separator = inline_whitespace().then(continue_line);
+        let token = just("expr").map(TreeToken::Token);
+        let open_block = just("do");
+        let layout_block = open_block
+            .then(newline())
+            .ignore_then(block)
+            .map(TreeToken::Do);
+        let statement = token
+            .or(layout_block)
+            .separated_by(token_separator)
             .collect::<Vec<_>>()
-            .map(Stmt);
-        let stmt_separator = newline().then(blank_lines).then(indent);
+            .map(Statement);
+        let statement_separator = newline().then(blank_lines).then(indent);
 
         whitespace()
             .count()
-            .ignore_with_ctx(stmt.separated_by(stmt_separator).collect())
+            .ignore_with_ctx(statement.separated_by(statement_separator).collect())
     });
 
     block.with_ctx(0)
@@ -50,7 +54,7 @@ fn main() {
     // TODO: Handle inline `do`
     // TODO: Brackets
 
-    let stmts = parser().padded().parse(
+    let statements = parser().padded().parse(
         r#"
 expr
 expr
@@ -68,6 +72,6 @@ do
 exprexpr
 "#,
     );
-    println!("{:#?}", stmts.output());
-    println!("{:?}", stmts.errors().collect::<Vec<_>>());
+    println!("{:#?}", statements.output());
+    println!("{:?}", statements.errors().collect::<Vec<_>>());
 }
