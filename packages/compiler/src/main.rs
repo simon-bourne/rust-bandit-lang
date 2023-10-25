@@ -14,12 +14,16 @@ enum TreeToken<'src> {
     Do(Vec<Statement<'src>>),
 }
 
-fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Statement<'a>>> {
+fn lexer<'a>() -> impl Parser<'a, &'a str, Vec<Statement<'a>>> {
+    let open_block = just("do");
+    let token = just("expr").map(TreeToken::Token);
+
+    let blank_lines = inline_whitespace().then(newline()).repeated();
+
     let block = recursive(|block| {
         let indent = just(' ')
             .repeated()
             .configure(|cfg, parent_indent| cfg.exactly(*parent_indent));
-        let blank_lines = inline_whitespace().then(newline()).repeated();
         let extra_indent = indent.then(inline_whitespace().at_least(1));
         let continue_line = newline()
             .then(blank_lines)
@@ -27,8 +31,6 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Statement<'a>>> {
             .repeated()
             .at_most(1);
         let token_separator = inline_whitespace().then(continue_line);
-        let token = just("expr").map(TreeToken::Token);
-        let open_block = just("do");
         let layout_block = open_block
             .then(newline())
             .ignore_then(block)
@@ -39,7 +41,7 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Statement<'a>>> {
                 .then(
                     choice((token, layout_block.clone(), inline_block))
                         .separated_by(inline_whitespace())
-                        .collect::<Vec<_>>()
+                        .collect()
                         .map(Statement),
                 )
                 .map(|(_do, statement)| TreeToken::Do(vec![statement]))
@@ -48,7 +50,7 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Statement<'a>>> {
             .or(inline_block)
             .or(layout_block)
             .separated_by(token_separator)
-            .collect::<Vec<_>>()
+            .collect()
             .map(Statement);
         let statement_separator = newline().then(blank_lines).then(indent);
 
@@ -61,11 +63,12 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Statement<'a>>> {
 }
 
 fn main() {
-    // TODO: Test performance
+    // TODO: Benchmarks
+    // TODO: Tests
     // TODO: Pretty printer
     // TODO: Brackets
 
-    let statements = parser().padded().parse(
+    let statements = lexer().padded().parse(
         r#"
 expr
 expr
