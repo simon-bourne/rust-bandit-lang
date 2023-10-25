@@ -65,6 +65,10 @@ do
             expr expr
             expr
         expr
+    do
+            expr
+        do
+            expr
 exprexpr
 "#,
     );
