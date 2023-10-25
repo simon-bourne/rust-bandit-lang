@@ -46,6 +46,7 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Vec<Stmt<'a>>> {
 }
 
 fn main() {
+    // TODO: Test performance
     // TODO: Pretty printer
     // TODO: Handle inline `do`
     // TODO: Brackets
