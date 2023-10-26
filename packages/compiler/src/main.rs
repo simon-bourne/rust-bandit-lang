@@ -15,6 +15,7 @@ impl<'src> Line<'src> {
     fn is_continuation(&self) -> bool {
         self.0.first().is_some_and(|t| match t {
             TreeToken::Token(_) => false,
+            TreeToken::Delimited(_, _) => false,
             TreeToken::Block(block_type, _) => match block_type {
                 // We merge these block types so you can put the block start on a new line. None of
                 // these block types can start a line.
@@ -30,6 +31,14 @@ impl<'src> Line<'src> {
             },
         })
     }
+
+    fn pretty(&self, indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
+        for token in &self.0 {
+            token.pretty(indent, f)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Default, Clone, Debug)]
@@ -43,11 +52,7 @@ impl<'src> Block<'src> {
     fn pretty(&self, indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
         for line in &self.0 {
             pretty_indent(indent, f)?;
-
-            for token in &line.0 {
-                token.pretty(indent + 1, f)?;
-            }
-
+            line.pretty(indent + 1, f)?;
             f.write_char('\n')?;
         }
 
@@ -108,12 +113,24 @@ impl Display for BlockType {
 }
 
 #[derive(Clone, Debug)]
+enum Delimiter {
+    Parentheses,
+    Brackets,
+    Braces,
+}
+
+#[derive(Clone, Debug)]
 enum TreeToken<'src> {
     Token(&'src str),
     Block(BlockType, Block<'src>),
+    Delimited(Delimiter, Line<'src>),
 }
 
 impl<'src> TreeToken<'src> {
+    fn delimited(delimiter: Delimiter, line: Vec<TreeToken<'src>>) -> Self {
+        Self::Delimited(delimiter, Line(line))
+    }
+
     fn pretty(&self, indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             TreeToken::Token(t) => write!(f, "{t} "),
@@ -124,6 +141,23 @@ impl<'src> TreeToken<'src> {
                 block.pretty(indent + 1, f)?;
                 pretty_indent(indent, f)
             }
+            TreeToken::Delimited(delimiter, line) => match delimiter {
+                Delimiter::Parentheses => {
+                    f.write_char('(')?;
+                    line.pretty(indent, f)?;
+                    f.write_char(')')
+                }
+                Delimiter::Brackets => {
+                    f.write_char('[')?;
+                    line.pretty(indent, f)?;
+                    f.write_char(']')
+                }
+                Delimiter::Braces => {
+                    f.write_char('{')?;
+                    line.pretty(indent, f)?;
+                    f.write_char('}')
+                }
+            },
         }
     }
 }
@@ -178,12 +212,29 @@ fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
                 )
                 .map(|(block_type, line)| TreeToken::Block(block_type, Block::new(line)))
         });
-        let line = token
-            .or(layout_block)
-            .or(inline_block)
-            .separated_by(token_separator)
-            .collect()
-            .map(Line);
+        let atom = recursive(|atom| {
+            let atom = atom.separated_by(whitespace()).collect();
+            let parenthesised = atom
+                .clone()
+                .delimited_by(just('('), just(')'))
+                .map(|line| TreeToken::delimited(Delimiter::Parentheses, line));
+            let bracketed = atom
+                .clone()
+                .delimited_by(just('['), just(']'))
+                .map(|line| TreeToken::delimited(Delimiter::Brackets, line));
+            let braced = atom
+                .delimited_by(just('{'), just('}'))
+                .map(|line| TreeToken::delimited(Delimiter::Braces, line));
+            choice((
+                token,
+                layout_block,
+                inline_block,
+                parenthesised,
+                bracketed,
+                braced,
+            ))
+        });
+        let line = atom.separated_by(token_separator).collect().map(Line);
         let line_separator = newline().then(blank_lines).then(indent);
 
         whitespace()
@@ -206,12 +257,12 @@ fn main() {
 expr
 expr
 do
-    expr expr
+    (expr expr)
      expr
-    expr expr do
+    expr expr (do
             expr expr
             expr
-        expr
+        expr)
     do
             expr
         do
