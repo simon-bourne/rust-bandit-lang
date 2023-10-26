@@ -206,19 +206,7 @@ my_constant1 : Int = 42
 
 ## Literals
 
-Multiline string literals begin with 3 or more `"`s and a newline. The initial newline doesn't appear in the string. They end with the same number of `"`s. Indentation is not removed, but this could be done with a function if required. For example:
-
-```bandit
-"""
-line1
-line2
-"""
-
-""""
-line 1
-line 2
-""""
-```
+All string literals can be split across multiple lines, like Rust.
 
 ## Closures
 
