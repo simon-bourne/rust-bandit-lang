@@ -29,7 +29,7 @@ impl<'src> Container<Line<'src>> for Block<'src> {
         if let Some(last) = self.0.last_mut() {
             if line.is_continuation() {
                 last.0.extend(line.0);
-                return;   
+                return;
             }
         }
 
