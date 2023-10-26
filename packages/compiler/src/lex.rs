@@ -18,13 +18,13 @@ pub type Span = SimpleSpan<usize>;
 pub type Spanned<T> = (T, Span);
 
 #[derive(Default, Clone, Debug)]
-struct Line<'src>(Vec<TreeToken<'src>>);
+struct Line<'src>(Vec<TokenTree<'src>>);
 
 impl<'src> Line<'src> {
     fn is_continuation(&self) -> bool {
         self.0.first().is_some_and(|t| match t {
-            TreeToken::Token(_) | TreeToken::Delimited(_, _) => false,
-            TreeToken::Block(block_type, _) => match block_type {
+            TokenTree::Token(_) | TokenTree::Delimited(_, _) => false,
+            TokenTree::Block(block_type, _) => match block_type {
                 // We merge these block types so you can put the block start on a new line. None of
                 // these block types can start a line.
                 BlockType::Do
@@ -216,28 +216,28 @@ impl<'src> Display for Token<'src> {
 }
 
 #[derive(Clone, Debug)]
-enum TreeToken<'src> {
+enum TokenTree<'src> {
     Token(Token<'src>),
     Block(BlockType, Block<'src>),
     Delimited(Delimiter, Line<'src>),
 }
 
-impl<'src> TreeToken<'src> {
-    fn delimited(delimiter: Delimiter, line: Vec<TreeToken<'src>>) -> Self {
+impl<'src> TokenTree<'src> {
+    fn delimited(delimiter: Delimiter, line: Vec<TokenTree<'src>>) -> Self {
         Self::Delimited(delimiter, Line(line))
     }
 
     fn pretty(&self, indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            TreeToken::Token(t) => write!(f, "{t} "),
-            TreeToken::Block(block_type, block) => {
+            TokenTree::Token(t) => write!(f, "{t} "),
+            TokenTree::Block(block_type, block) => {
                 f.write_char('\n')?;
                 pretty_indent(indent, f)?;
                 writeln!(f, "{block_type}")?;
                 block.pretty(indent + 1, f)?;
                 pretty_indent(indent, f)
             }
-            TreeToken::Delimited(delimiter, line) => match delimiter {
+            TokenTree::Delimited(delimiter, line) => match delimiter {
                 Delimiter::Parentheses => write_brackets(f, indent, '(', ')', line),
                 Delimiter::Brackets => write_brackets(f, indent, '[', ']', line),
                 Delimiter::Braces => write_brackets(f, indent, '{', '}', line),
@@ -283,17 +283,17 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Block<'src>, extra::Err<Ric
             Ok(kw) => Token::Keyword(kw),
             Err(()) => Token::Ident(ident),
         };
-        TreeToken::Token(token)
+        TokenTree::Token(token)
     });
-    let lambda = just('\\').to(TreeToken::Token(Token::Lambda));
+    let lambda = just('\\').to(TokenTree::Token(Token::Lambda));
     let lifetime = just('\'')
         .ignore_then(ascii::ident())
-        .map(|lt| TreeToken::Token(Token::Lifetime(lt)));
+        .map(|lt| TokenTree::Token(Token::Lifetime(lt)));
     let operator = one_of("$%&*+./<=>@^-~|")
         .repeated()
         .at_least(1)
         .to_slice()
-        .map(|op| TreeToken::Token(Token::Operator(op)));
+        .map(|op| TokenTree::Token(Token::Operator(op)));
 
     let blank_lines = inline_whitespace().then(newline()).repeated();
     let indent = just(' ')
@@ -312,7 +312,7 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Block<'src>, extra::Err<Ric
         let layout_block = open_layout_block
             .then_ignore(newline())
             .then(block)
-            .map(|(block_type, block)| TreeToken::Block(block_type, block));
+            .map(|(block_type, block)| TokenTree::Block(block_type, block));
         let inline_block = recursive(|inline_block| {
             open_layout_block
                 .then_ignore(inline_whitespace())
@@ -323,7 +323,7 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Block<'src>, extra::Err<Ric
                         .collect()
                         .map(Line),
                 )
-                .map(|(block_type, line)| TreeToken::Block(block_type, Block::new(line)))
+                .map(|(block_type, line)| TokenTree::Block(block_type, Block::new(line)))
         });
         let atom = recursive(|atom| {
             let delimited = |open, close, delimiter| {
@@ -331,7 +331,7 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Block<'src>, extra::Err<Ric
                     .separated_by(whitespace())
                     .collect()
                     .delimited_by(just(open), just(close))
-                    .map(move |line| TreeToken::delimited(delimiter, line))
+                    .map(move |line| TokenTree::delimited(delimiter, line))
             };
             choice((
                 layout_block,
