@@ -112,7 +112,7 @@ impl Display for BlockType {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 enum Delimiter {
     Parentheses,
     Brackets,
@@ -214,25 +214,20 @@ pub fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
                 .map(|(block_type, line)| TreeToken::Block(block_type, Block::new(line)))
         });
         let atom = recursive(|atom| {
-            let atom = atom.separated_by(whitespace()).collect();
-            let parenthesised = atom
-                .clone()
-                .delimited_by(just('('), just(')'))
-                .map(|line| TreeToken::delimited(Delimiter::Parentheses, line));
-            let bracketed = atom
-                .clone()
-                .delimited_by(just('['), just(']'))
-                .map(|line| TreeToken::delimited(Delimiter::Brackets, line));
-            let braced = atom
-                .delimited_by(just('{'), just('}'))
-                .map(|line| TreeToken::delimited(Delimiter::Braces, line));
+            let delimited = |open, close, delimiter| {
+                atom.clone()
+                    .separated_by(whitespace())
+                    .collect()
+                    .delimited_by(just(open), just(close))
+                    .map(move |line| TreeToken::delimited(delimiter, line))
+            };
             choice((
                 token,
                 layout_block,
                 inline_block,
-                parenthesised,
-                bracketed,
-                braced,
+                delimited('(', ')', Delimiter::Parentheses),
+                delimited('[', ']', Delimiter::Brackets),
+                delimited('{', '}', Delimiter::Braces),
             ))
         });
         let line = atom.separated_by(token_separator).collect().map(Line);
