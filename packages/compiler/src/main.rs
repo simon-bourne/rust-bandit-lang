@@ -170,14 +170,15 @@ fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
                 .then(
                     choice((token, layout_block.clone(), inline_block))
                         .separated_by(inline_whitespace())
+                        .at_least(1)
                         .collect()
                         .map(Line),
                 )
                 .map(|(block_type, line)| TreeToken::Block(block_type, Block::new(line)))
         });
         let line = token
-            .or(inline_block)
             .or(layout_block)
+            .or(inline_block)
             .separated_by(token_separator)
             .collect()
             .map(Line);
