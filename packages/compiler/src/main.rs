@@ -6,15 +6,15 @@ use chumsky::{
 };
 
 #[derive(Clone, Debug)]
-struct Statement<'src>(Vec<TreeToken<'src>>);
+struct Line<'src>(Vec<TreeToken<'src>>);
 
 #[derive(Clone, Debug)]
 enum TreeToken<'src> {
     Token(&'src str),
-    Do(Vec<Statement<'src>>),
+    Do(Vec<Line<'src>>),
 }
 
-fn lexer<'a>() -> impl Parser<'a, &'a str, Vec<Statement<'a>>> {
+fn lexer<'a>() -> impl Parser<'a, &'a str, Vec<Line<'a>>> {
     let open_block = just("do");
     let token = just("expr").map(TreeToken::Token);
 
@@ -42,21 +42,21 @@ fn lexer<'a>() -> impl Parser<'a, &'a str, Vec<Statement<'a>>> {
                     choice((token, layout_block.clone(), inline_block))
                         .separated_by(inline_whitespace())
                         .collect()
-                        .map(Statement),
+                        .map(Line),
                 )
-                .map(|(_do, statement)| TreeToken::Do(vec![statement]))
+                .map(|(_do, line)| TreeToken::Do(vec![line]))
         });
-        let statement = token
+        let line = token
             .or(inline_block)
             .or(layout_block)
             .separated_by(token_separator)
             .collect()
-            .map(Statement);
-        let statement_separator = newline().then(blank_lines).then(indent);
+            .map(Line);
+        let line_separator = newline().then(blank_lines).then(indent);
 
         whitespace()
             .count()
-            .ignore_with_ctx(statement.separated_by(statement_separator).collect())
+            .ignore_with_ctx(line.separated_by(line_separator).collect())
     });
 
     block.with_ctx(0)
@@ -68,7 +68,7 @@ fn main() {
     // TODO: Pretty printer
     // TODO: Brackets
 
-    let statements = lexer().padded().parse(
+    let lines = lexer().padded().parse(
         r#"
 expr
 expr
@@ -89,6 +89,6 @@ expr do expr expr do
     expr
 "#,
     );
-    println!("{:#?}", statements.output());
-    println!("{:?}", statements.errors().collect::<Vec<_>>());
+    println!("{:#?}", lines.output());
+    println!("{:?}", lines.errors().collect::<Vec<_>>());
 }
