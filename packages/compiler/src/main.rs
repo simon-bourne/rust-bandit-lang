@@ -1,20 +1,53 @@
 use chumsky::{
+    container::Container,
     primitive::{choice, just},
     recursive::recursive,
     text::{inline_whitespace, newline, whitespace},
     ConfigIterParser, IterParser, Parser,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Default, Clone, Debug)]
 struct Line<'src>(Vec<TreeToken<'src>>);
+
+impl<'src> Line<'src> {
+    fn is_continuation(&self) -> bool {
+        matches!(self.0.first(), Some(TreeToken::Do(_)))
+    }
+}
+
+#[derive(Default, Clone, Debug)]
+struct Block<'src>(Vec<Line<'src>>);
+
+impl<'src> Block<'src> {
+    fn new(line: Line<'src>) -> Self {
+        Self(vec![line])
+    }
+}
+
+impl<'src> Container<Line<'src>> for Block<'src> {
+    fn push(&mut self, line: Line<'src>) {
+        if let Some(last) = self.0.last_mut() {
+            if line.is_continuation() {
+                last.0.extend(line.0);
+                return;   
+            }
+        }
+
+        self.0.push(line)
+    }
+
+    fn with_capacity(n: usize) -> Self {
+        Self(Vec::with_capacity(n))
+    }
+}
 
 #[derive(Clone, Debug)]
 enum TreeToken<'src> {
     Token(&'src str),
-    Do(Vec<Line<'src>>),
+    Do(Block<'src>),
 }
 
-fn lexer<'a>() -> impl Parser<'a, &'a str, Vec<Line<'a>>> {
+fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
     let open_block = just("do");
     let token = just("expr").map(TreeToken::Token);
 
@@ -44,7 +77,7 @@ fn lexer<'a>() -> impl Parser<'a, &'a str, Vec<Line<'a>>> {
                         .collect()
                         .map(Line),
                 )
-                .map(|(_do, line)| TreeToken::Do(vec![line]))
+                .map(|(_do, line)| TreeToken::Do(Block::new(line)))
         });
         let line = token
             .or(inline_block)
@@ -66,6 +99,8 @@ fn main() {
     // TODO: Benchmarks
     // TODO: Tests
     // TODO: Pretty printer
+    // TODO: Other block types
+    // TODO: Other tokens
     // TODO: Brackets
 
     let lines = lexer().padded().parse(
