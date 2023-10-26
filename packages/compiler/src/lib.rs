@@ -194,6 +194,7 @@ pub fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
         .repeated()
         .at_most(1);
     let token_separator = inline_whitespace().then(continue_line);
+    let line_separator = newline().then(blank_lines).then(indent);
 
     let block = recursive(|block| {
         let layout_block = open_layout_block
@@ -235,7 +236,6 @@ pub fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
             ))
         });
         let line = atom.separated_by(token_separator).collect().map(Line);
-        let line_separator = newline().then(blank_lines).then(indent);
 
         whitespace()
             .count()
