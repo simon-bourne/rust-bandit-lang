@@ -7,3 +7,10 @@ default-run = "bandit-compiler"
 
 [dependencies]
 chumsky.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "lexer"
+harness = false
