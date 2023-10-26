@@ -11,7 +11,22 @@ struct Line<'src>(Vec<TreeToken<'src>>);
 
 impl<'src> Line<'src> {
     fn is_continuation(&self) -> bool {
-        matches!(self.0.first(), Some(TreeToken::Do(_)))
+        self.0.first().is_some_and(|t| match t {
+            TreeToken::Token(_) => false,
+            TreeToken::Block(block_type, _) => match block_type {
+                // We merge these block types so you can put the block start on a new line. None of
+                // these block types can start a line.
+                BlockType::Do
+                | BlockType::Else
+                | BlockType::Match
+                | BlockType::Then
+                | BlockType::Record
+                | BlockType::Where
+                | BlockType::With => true,
+                // Loop can start a line, so it can't be merged.
+                BlockType::Loop => false,
+            },
+        })
     }
 }
 
@@ -41,14 +56,35 @@ impl<'src> Container<Line<'src>> for Block<'src> {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+enum BlockType {
+    Do,
+    Else,
+    Match,
+    Loop,
+    Then,
+    Record,
+    Where,
+    With,
+}
+
 #[derive(Clone, Debug)]
 enum TreeToken<'src> {
     Token(&'src str),
-    Do(Block<'src>),
+    Block(BlockType, Block<'src>),
 }
 
 fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
-    let open_block = just("do");
+    let open_layout_block = choice((
+        just("do").to(BlockType::Do),
+        just("else").to(BlockType::Else),
+        just("match").to(BlockType::Match),
+        just("loop").to(BlockType::Loop),
+        just("then").to(BlockType::Then),
+        just("record").to(BlockType::Record),
+        just("where").to(BlockType::Where),
+        just("with").to(BlockType::With),
+    ));
     let token = just("expr").map(TreeToken::Token);
 
     let blank_lines = inline_whitespace().then(newline()).repeated();
@@ -64,12 +100,12 @@ fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
             .repeated()
             .at_most(1);
         let token_separator = inline_whitespace().then(continue_line);
-        let layout_block = open_block
-            .then(newline())
-            .ignore_then(block)
-            .map(TreeToken::Do);
+        let layout_block = open_layout_block
+            .then_ignore(newline())
+            .then(block)
+            .map(|(block_type, block)| TreeToken::Block(block_type, block));
         let inline_block = recursive(|inline_block| {
-            open_block
+            open_layout_block
                 .then_ignore(inline_whitespace())
                 .then(
                     choice((token, layout_block.clone(), inline_block))
@@ -77,7 +113,7 @@ fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
                         .collect()
                         .map(Line),
                 )
-                .map(|(_do, line)| TreeToken::Do(Block::new(line)))
+                .map(|(block_type, line)| TreeToken::Block(block_type, Block::new(line)))
         });
         let line = token
             .or(inline_block)
@@ -99,7 +135,6 @@ fn main() {
     // TODO: Benchmarks
     // TODO: Tests
     // TODO: Pretty printer
-    // TODO: Other block types
     // TODO: Other tokens
     // TODO: Brackets
 
