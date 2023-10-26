@@ -150,18 +150,18 @@ fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
     let token = just("expr").map(TreeToken::Token);
 
     let blank_lines = inline_whitespace().then(newline()).repeated();
+    let indent = just(' ')
+        .repeated()
+        .configure(|cfg, parent_indent| cfg.exactly(*parent_indent));
+    let extra_indent = indent.then(inline_whitespace().at_least(1));
+    let continue_line = newline()
+        .then(blank_lines)
+        .then(extra_indent)
+        .repeated()
+        .at_most(1);
+    let token_separator = inline_whitespace().then(continue_line);
 
     let block = recursive(|block| {
-        let indent = just(' ')
-            .repeated()
-            .configure(|cfg, parent_indent| cfg.exactly(*parent_indent));
-        let extra_indent = indent.then(inline_whitespace().at_least(1));
-        let continue_line = newline()
-            .then(blank_lines)
-            .then(extra_indent)
-            .repeated()
-            .at_most(1);
-        let token_separator = inline_whitespace().then(continue_line);
         let layout_block = open_layout_block
             .then_ignore(newline())
             .then(block)
