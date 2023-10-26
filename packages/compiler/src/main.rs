@@ -118,8 +118,10 @@ impl<'src> TreeToken<'src> {
         match self {
             TreeToken::Token(t) => write!(f, "{t} "),
             TreeToken::Block(block_type, block) => {
+                f.write_char('\n')?;
+                pretty_indent(indent, f)?;
                 writeln!(f, "{block_type}")?;
-                block.pretty(indent + 2, f)?;
+                block.pretty(indent + 1, f)?;
                 pretty_indent(indent, f)
             }
         }
