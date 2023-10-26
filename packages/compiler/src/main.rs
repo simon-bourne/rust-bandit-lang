@@ -248,9 +248,7 @@ fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
 fn main() {
     // TODO: Benchmarks
     // TODO: Tests
-    // TODO: Pretty printer
     // TODO: Other tokens
-    // TODO: Brackets
 
     let lines = lexer().padded().parse(
         r#"
