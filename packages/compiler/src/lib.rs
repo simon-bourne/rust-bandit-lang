@@ -4,7 +4,7 @@ use chumsky::{
     container::Container,
     primitive::{choice, just},
     recursive::recursive,
-    text::{inline_whitespace, newline, whitespace},
+    text::{ascii::ident, inline_whitespace, newline, whitespace},
     ConfigIterParser, IterParser, Parser,
 };
 
@@ -14,7 +14,8 @@ struct Line<'src>(Vec<TreeToken<'src>>);
 impl<'src> Line<'src> {
     fn is_continuation(&self) -> bool {
         self.0.first().is_some_and(|t| match t {
-            TreeToken::Token(_) => false,
+            TreeToken::Ident(_) => false,
+            TreeToken::Keyword(_) => false,
             TreeToken::Delimited(_, _) => false,
             TreeToken::Block(block_type, _) => match block_type {
                 // We merge these block types so you can put the block start on a new line. None of
@@ -119,9 +120,77 @@ enum Delimiter {
     Braces,
 }
 
+#[derive(Copy, Clone, Debug)]
+enum Keyword {
+    If,
+    Return,
+    While,
+    Alias,
+    Forall,
+    Infer,
+    Module,
+    Let,
+    SelfType,
+    Trait,
+    Type,
+    Use,
+}
+
+impl AsRef<str> for Keyword {
+    fn as_ref(&self) -> &str {
+        use Keyword as K;
+
+        match self {
+            K::If => "if",
+            K::Return => "return",
+            K::While => "while",
+            K::Alias => "alias",
+            K::Forall => "forall",
+            K::Infer => "infer",
+            K::Module => "module",
+            K::Let => "let",
+            K::SelfType => "Self",
+            K::Trait => "trait",
+            K::Type => "type",
+            K::Use => "use",
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Keyword {
+    type Error = ();
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        use Keyword as K;
+
+        match value {
+            "if" => Ok(K::If),
+            "return" => Ok(K::Return),
+            "while" => Ok(K::While),
+            "alias" => Ok(K::Alias),
+            "forall" => Ok(K::Forall),
+            "infer" => Ok(K::Infer),
+            "module" => Ok(K::Module),
+            "let" => Ok(K::Let),
+            "Self" => Ok(K::SelfType),
+            "trait" => Ok(K::Trait),
+            "type" => Ok(K::Type),
+            "use" => Ok(K::Use),
+            _ => Err(()),
+        }
+    }
+}
+
+impl Display for Keyword {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_ref())
+    }
+}
+
 #[derive(Clone, Debug)]
 enum TreeToken<'src> {
-    Token(&'src str),
+    Ident(&'src str),
+    Keyword(Keyword),
     Block(BlockType, Block<'src>),
     Delimited(Delimiter, Line<'src>),
 }
@@ -133,7 +202,8 @@ impl<'src> TreeToken<'src> {
 
     fn pretty(&self, indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            TreeToken::Token(t) => write!(f, "{t} "),
+            TreeToken::Keyword(kw) => write!(f, "{kw} "),
+            TreeToken::Ident(t) => write!(f, "{t} "),
             TreeToken::Block(block_type, block) => {
                 f.write_char('\n')?;
                 pretty_indent(indent, f)?;
@@ -181,7 +251,10 @@ pub fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
         just("where").to(BlockType::Where),
         just("with").to(BlockType::With),
     ));
-    let token = just("expr").map(TreeToken::Token);
+    let ident = ident().map(|ident: &str| match ident.try_into() {
+        Ok(kw) => TreeToken::Keyword(kw),
+        Err(()) => TreeToken::Ident(ident),
+    });
 
     let blank_lines = inline_whitespace().then(newline()).repeated();
     let indent = just(' ')
@@ -205,7 +278,7 @@ pub fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
             open_layout_block
                 .then_ignore(inline_whitespace())
                 .then(
-                    choice((token, layout_block.clone(), inline_block))
+                    choice((layout_block.clone(), inline_block, ident))
                         .separated_by(inline_whitespace())
                         .at_least(1)
                         .collect()
@@ -222,12 +295,12 @@ pub fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
                     .map(move |line| TreeToken::delimited(delimiter, line))
             };
             choice((
-                token,
                 layout_block,
                 inline_block,
                 delimited('(', ')', Delimiter::Parentheses),
                 delimited('[', ']', Delimiter::Brackets),
                 delimited('{', '}', Delimiter::Braces),
+                ident,
             ))
         });
         let line = atom.separated_by(token_separator).collect().map(Line);
