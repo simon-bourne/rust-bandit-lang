@@ -3,7 +3,7 @@ use chumsky::Parser;
 
 fn main() {
     // TODO: Tests
-    // TODO: Other tokens
+    // TODO: Literals
 
     let lines = lexer().padded().parse(
         r#"
@@ -23,7 +23,7 @@ do
 exprexpr
 expr do expr expr do
     expr
-    expr
+    expr if 'lt ++++ 
 "#,
     );
     println!("{:#?}", lines.output());

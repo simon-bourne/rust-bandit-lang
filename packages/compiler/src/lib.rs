@@ -2,22 +2,23 @@ use std::fmt::{self, Display, Formatter, Write};
 
 use chumsky::{
     container::Container,
-    primitive::{choice, just},
+    primitive::{choice, just, one_of},
     recursive::recursive,
-    text::{ascii::ident, inline_whitespace, newline, whitespace},
+    text::{
+        ascii::{self, ident},
+        inline_whitespace, newline, whitespace,
+    },
     ConfigIterParser, IterParser, Parser,
 };
 
 #[derive(Default, Clone, Debug)]
-struct Line<'src>(Vec<Token<'src>>);
+struct Line<'src>(Vec<TreeToken<'src>>);
 
 impl<'src> Line<'src> {
     fn is_continuation(&self) -> bool {
         self.0.first().is_some_and(|t| match t {
-            Token::Ident(_) => false,
-            Token::Keyword(_) => false,
-            Token::Delimited(_, _) => false,
-            Token::Block(block_type, _) => match block_type {
+            TreeToken::Token(_) | TreeToken::Delimited(_, _) => false,
+            TreeToken::Block(block_type, _) => match block_type {
                 // We merge these block types so you can put the block start on a new line. None of
                 // these block types can start a line.
                 BlockType::Do
@@ -191,27 +192,46 @@ impl Display for Keyword {
 enum Token<'src> {
     Ident(&'src str),
     Keyword(Keyword),
+    Lambda,
+    Operator(&'src str),
+    Lifetime(&'src str),
+}
+
+impl<'src> Display for Token<'src> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Token::Ident(t) => write!(f, "id:{t}"),
+            Token::Keyword(kw) => write!(f, "kw:{kw}"),
+            Token::Lambda => f.write_str("lambda:\\"),
+            Token::Operator(op) => write!(f, "op:{op}"),
+            Token::Lifetime(lt) => write!(f, "'lt:{lt}"),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum TreeToken<'src> {
+    Token(Token<'src>),
     Block(BlockType, Block<'src>),
     Delimited(Delimiter, Line<'src>),
 }
 
-impl<'src> Token<'src> {
-    fn delimited(delimiter: Delimiter, line: Vec<Token<'src>>) -> Self {
+impl<'src> TreeToken<'src> {
+    fn delimited(delimiter: Delimiter, line: Vec<TreeToken<'src>>) -> Self {
         Self::Delimited(delimiter, Line(line))
     }
 
     fn pretty(&self, indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Token::Keyword(kw) => write!(f, "{kw} "),
-            Token::Ident(t) => write!(f, "{t} "),
-            Token::Block(block_type, block) => {
+            TreeToken::Token(t) => write!(f, "{t} "),
+            TreeToken::Block(block_type, block) => {
                 f.write_char('\n')?;
                 pretty_indent(indent, f)?;
                 writeln!(f, "{block_type}")?;
                 block.pretty(indent + 1, f)?;
                 pretty_indent(indent, f)
             }
-            Token::Delimited(delimiter, line) => match delimiter {
+            TreeToken::Delimited(delimiter, line) => match delimiter {
                 Delimiter::Parentheses => write_brackets(f, indent, '(', ')', line),
                 Delimiter::Brackets => write_brackets(f, indent, '[', ']', line),
                 Delimiter::Braces => write_brackets(f, indent, '{', '}', line),
@@ -251,10 +271,22 @@ pub fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
         just("where").to(BlockType::Where),
         just("with").to(BlockType::With),
     ));
-    let ident = ident().map(|ident: &str| match ident.try_into() {
-        Ok(kw) => Token::Keyword(kw),
-        Err(()) => Token::Ident(ident),
+    let ident = ident().map(|ident: &str| {
+        let token = match ident.try_into() {
+            Ok(kw) => Token::Keyword(kw),
+            Err(()) => Token::Ident(ident),
+        };
+        TreeToken::Token(token)
     });
+    let lambda = just('\\').to(TreeToken::Token(Token::Lambda));
+    let lifetime = just('\'')
+        .ignore_then(ascii::ident())
+        .map(|lt| TreeToken::Token(Token::Lifetime(lt)));
+    let operator = one_of("$%&*+./<=>@^-~|")
+        .repeated()
+        .at_least(1)
+        .to_slice()
+        .map(|op| TreeToken::Token(Token::Operator(op)));
 
     let blank_lines = inline_whitespace().then(newline()).repeated();
     let indent = just(' ')
@@ -273,7 +305,7 @@ pub fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
         let layout_block = open_layout_block
             .then_ignore(newline())
             .then(block)
-            .map(|(block_type, block)| Token::Block(block_type, block));
+            .map(|(block_type, block)| TreeToken::Block(block_type, block));
         let inline_block = recursive(|inline_block| {
             open_layout_block
                 .then_ignore(inline_whitespace())
@@ -284,7 +316,7 @@ pub fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
                         .collect()
                         .map(Line),
                 )
-                .map(|(block_type, line)| Token::Block(block_type, Block::new(line)))
+                .map(|(block_type, line)| TreeToken::Block(block_type, Block::new(line)))
         });
         let atom = recursive(|atom| {
             let delimited = |open, close, delimiter| {
@@ -292,7 +324,7 @@ pub fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
                     .separated_by(whitespace())
                     .collect()
                     .delimited_by(just(open), just(close))
-                    .map(move |line| Token::delimited(delimiter, line))
+                    .map(move |line| TreeToken::delimited(delimiter, line))
             };
             choice((
                 layout_block,
@@ -300,6 +332,9 @@ pub fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
                 delimited('(', ')', Delimiter::Parentheses),
                 delimited('[', ']', Delimiter::Brackets),
                 delimited('{', '}', Delimiter::Braces),
+                lambda,
+                lifetime,
+                operator,
                 ident,
             ))
         });
