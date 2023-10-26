@@ -1,3 +1,5 @@
+use std::fmt::{self, Display, Formatter, Write};
+
 use chumsky::{
     container::Container,
     primitive::{choice, just},
@@ -37,6 +39,26 @@ impl<'src> Block<'src> {
     fn new(line: Line<'src>) -> Self {
         Self(vec![line])
     }
+
+    fn pretty(&self, indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
+        for line in &self.0 {
+            pretty_indent(indent, f)?;
+
+            for token in &line.0 {
+                token.pretty(indent + 1, f)?;
+            }
+
+            f.write_char('\n')?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<'src> Display for Block<'src> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.pretty(0, f)
+    }
 }
 
 impl<'src> Container<Line<'src>> for Block<'src> {
@@ -68,10 +90,48 @@ enum BlockType {
     With,
 }
 
+impl Display for BlockType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            BlockType::Do => "do",
+            BlockType::Else => "else",
+            BlockType::Match => "match",
+            BlockType::Loop => "loop",
+            BlockType::Then => "then",
+            BlockType::Record => "record",
+            BlockType::Where => "where",
+            BlockType::With => "with",
+        };
+
+        f.write_str(s)
+    }
+}
+
 #[derive(Clone, Debug)]
 enum TreeToken<'src> {
     Token(&'src str),
     Block(BlockType, Block<'src>),
+}
+
+impl<'src> TreeToken<'src> {
+    fn pretty(&self, indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            TreeToken::Token(t) => write!(f, "{t} "),
+            TreeToken::Block(block_type, block) => {
+                writeln!(f, "{block_type}")?;
+                block.pretty(indent + 2, f)?;
+                pretty_indent(indent, f)
+            }
+        }
+    }
+}
+
+fn pretty_indent(indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
+    for _i in 0..indent {
+        f.write_str("    ")?;
+    }
+
+    Ok(())
 }
 
 fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
@@ -161,4 +221,8 @@ expr do expr expr do
     );
     println!("{:#?}", lines.output());
     println!("{:?}", lines.errors().collect::<Vec<_>>());
+
+    if let Some(lines) = lines.output() {
+        println!("{lines}");
+    }
 }
