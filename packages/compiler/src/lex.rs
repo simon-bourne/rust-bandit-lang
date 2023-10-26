@@ -2,11 +2,11 @@ use std::fmt::{self, Display, Formatter, Write};
 
 use chumsky::{
     container::Container,
-    extra,
-    prelude::Rich,
+    extra, input,
+    prelude::{Input, Rich},
     primitive::{choice, just, one_of},
     recursive::recursive,
-    span::SimpleSpan,
+    span::{self, SimpleSpan},
     text::{
         ascii::{self, ident},
         inline_whitespace, newline, whitespace,
@@ -16,11 +16,26 @@ use chumsky::{
 
 pub type Span = SimpleSpan<usize>;
 pub type Spanned<T> = (T, Span);
+pub type SpannedInput<'src, T> = input::SpannedInput<T, Span, &'src [(T, Span)]>;
 
 #[derive(Default, Clone, Debug)]
-struct Line<'src>(Vec<Spanned<TokenTree<'src>>>);
+pub struct Line<'src>(Vec<Spanned<TokenTree<'src>>>);
+
+fn spanned<T>(slice: &[Spanned<T>]) -> SpannedInput<T> {
+    let end_of_input = if let Some((_, last_span)) = slice.last() {
+        span::Span::to_end(last_span)
+    } else {
+        SimpleSpan::new(0, 0)
+    };
+
+    slice.spanned(end_of_input)
+}
 
 impl<'src> Line<'src> {
+    pub fn spanned(&self) -> SpannedInput<TokenTree> {
+        spanned(&self.0)
+    }
+
     fn is_continuation(&self) -> bool {
         self.0.first().is_some_and(|t| match t.0 {
             TokenTree::Token(_) | TokenTree::Delimited(_, _) => false,
@@ -53,6 +68,10 @@ impl<'src> Line<'src> {
 pub struct Block<'src>(Vec<Spanned<Line<'src>>>);
 
 impl<'src> Block<'src> {
+    pub fn spanned(&self) -> SpannedInput<Line> {
+        spanned(&self.0)
+    }
+
     fn new(line: Spanned<Line<'src>>) -> Self {
         Self(vec![line])
     }
@@ -92,7 +111,7 @@ impl<'src> Container<Spanned<Line<'src>>> for Block<'src> {
 }
 
 #[derive(Copy, Clone, Debug)]
-enum BlockType {
+pub enum BlockType {
     Do,
     Else,
     Match,
@@ -121,14 +140,14 @@ impl Display for BlockType {
 }
 
 #[derive(Copy, Clone, Debug)]
-enum Delimiter {
+pub enum Delimiter {
     Parentheses,
     Brackets,
     Braces,
 }
 
 #[derive(Copy, Clone, Debug)]
-enum Keyword {
+pub enum Keyword {
     If,
     Return,
     While,
@@ -195,7 +214,7 @@ impl Display for Keyword {
 }
 
 #[derive(Clone, Debug)]
-enum Token<'src> {
+pub enum Token<'src> {
     Ident(&'src str),
     Keyword(Keyword),
     Lambda,
@@ -216,7 +235,7 @@ impl<'src> Display for Token<'src> {
 }
 
 #[derive(Clone, Debug)]
-enum TokenTree<'src> {
+pub enum TokenTree<'src> {
     Token(Token<'src>),
     Block(BlockType, Block<'src>),
     Delimited(Delimiter, Line<'src>),
