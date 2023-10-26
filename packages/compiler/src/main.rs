@@ -2,6 +2,7 @@ use bandit_compiler::lexer;
 use chumsky::Parser;
 
 fn main() {
+    // TODO: Span. Look at `nested_span` example.
     // TODO: Tests
     // TODO: Literals
 
