@@ -142,24 +142,24 @@ impl<'src> TreeToken<'src> {
                 pretty_indent(indent, f)
             }
             TreeToken::Delimited(delimiter, line) => match delimiter {
-                Delimiter::Parentheses => {
-                    f.write_char('(')?;
-                    line.pretty(indent, f)?;
-                    f.write_char(')')
-                }
-                Delimiter::Brackets => {
-                    f.write_char('[')?;
-                    line.pretty(indent, f)?;
-                    f.write_char(']')
-                }
-                Delimiter::Braces => {
-                    f.write_char('{')?;
-                    line.pretty(indent, f)?;
-                    f.write_char('}')
-                }
+                Delimiter::Parentheses => write_brackets(f, indent, '(', ')', line),
+                Delimiter::Brackets => write_brackets(f, indent, '[', ']', line),
+                Delimiter::Braces => write_brackets(f, indent, '{', '}', line),
             },
         }
     }
+}
+
+fn write_brackets(
+    f: &mut Formatter<'_>,
+    indent: usize,
+    open: char,
+    close: char,
+    line: &Line<'_>,
+) -> fmt::Result {
+    f.write_char(open)?;
+    line.pretty(indent, f)?;
+    f.write_char(close)
 }
 
 fn pretty_indent(indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
