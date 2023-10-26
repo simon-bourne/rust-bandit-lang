@@ -2,14 +2,20 @@ use std::fmt::{self, Display, Formatter, Write};
 
 use chumsky::{
     container::Container,
+    extra,
+    prelude::Rich,
     primitive::{choice, just, one_of},
     recursive::recursive,
+    span::SimpleSpan,
     text::{
         ascii::{self, ident},
         inline_whitespace, newline, whitespace,
     },
     ConfigIterParser, IterParser, Parser,
 };
+
+pub type Span = SimpleSpan<usize>;
+pub type Spanned<T> = (T, Span);
 
 #[derive(Default, Clone, Debug)]
 struct Line<'src>(Vec<TreeToken<'src>>);
@@ -260,7 +266,8 @@ fn pretty_indent(indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
     Ok(())
 }
 
-pub fn lexer<'a>() -> impl Parser<'a, &'a str, Block<'a>> {
+pub fn lexer<'src>() -> impl Parser<'src, &'src str, Block<'src>, extra::Err<Rich<'src, char, Span>>>
+{
     let open_layout_block = choice((
         just("do").to(BlockType::Do),
         just("else").to(BlockType::Else),
