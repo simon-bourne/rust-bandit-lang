@@ -2,8 +2,8 @@ use std::fmt::{self, Display, Formatter, Write};
 
 use chumsky::{
     container::Container,
-    extra, input,
-    prelude::{Input, Rich},
+    input,
+    prelude::Input,
     primitive::{choice, just, one_of},
     recursive::recursive,
     span::{self, SimpleSpan},
@@ -13,6 +13,8 @@ use chumsky::{
     },
     ConfigIterParser, IterParser, Parser,
 };
+
+use crate::RichParser;
 
 pub type Span = SimpleSpan<usize>;
 pub type Spanned<T> = (T, Span);
@@ -285,8 +287,7 @@ fn pretty_indent(indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
     Ok(())
 }
 
-pub fn lexer<'src>() -> impl Parser<'src, &'src str, Block<'src>, extra::Err<Rich<'src, char, Span>>>
-{
+pub fn lexer<'src>() -> impl RichParser<'src, &'src str, Block<'src>> {
     let open_layout_block = choice((
         just("do").to(BlockType::Do),
         just("else").to(BlockType::Else),
