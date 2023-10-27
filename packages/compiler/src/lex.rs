@@ -319,6 +319,7 @@ pub fn lexer<'src>() -> impl RichParser<'src, &'src str, Block<'src>> {
     let indent = just(' ')
         .repeated()
         .configure(|cfg, parent_indent| cfg.exactly(*parent_indent));
+    let token = choice((lambda, lifetime, operator, ident));
     let extra_indent = indent.then(inline_whitespace().at_least(1));
     let continue_line = newline()
         .then(blank_lines)
@@ -337,7 +338,7 @@ pub fn lexer<'src>() -> impl RichParser<'src, &'src str, Block<'src>> {
             open_layout_block
                 .then_ignore(inline_whitespace())
                 .then(
-                    choice((layout_block.clone(), inline_block, ident))
+                    choice((layout_block.clone(), inline_block, token.clone()))
                         .map_with(|tt, extra| (tt, extra.span()))
                         .separated_by(inline_whitespace())
                         .at_least(1)
@@ -348,9 +349,10 @@ pub fn lexer<'src>() -> impl RichParser<'src, &'src str, Block<'src>> {
                     TokenTree::Block(block_type, Block::new((line, extra.span())))
                 })
         });
-        let atom = recursive(|atom| {
+        let token_tree = recursive(|token_tree| {
             let delimited = |open, close, delimiter| {
-                atom.clone()
+                token_tree
+                    .clone()
                     .separated_by(whitespace())
                     .collect()
                     .delimited_by(just(open), just(close))
@@ -362,14 +364,11 @@ pub fn lexer<'src>() -> impl RichParser<'src, &'src str, Block<'src>> {
                 delimited('(', ')', Delimiter::Parentheses),
                 delimited('[', ']', Delimiter::Brackets),
                 delimited('{', '}', Delimiter::Braces),
-                lambda,
-                lifetime,
-                operator,
-                ident,
+                token,
             ))
             .map_with(|tt, extra| (tt, extra.span()))
         });
-        let line = atom
+        let line = token_tree
             .separated_by(token_separator)
             .collect()
             .map_with(|line, extra| (Line(line), extra.span()));
