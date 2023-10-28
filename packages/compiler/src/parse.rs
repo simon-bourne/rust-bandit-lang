@@ -5,11 +5,11 @@ use chumsky::{
     select, select_ref, IterParser, Parser,
 };
 
-use crate::lex::{end_of_line, BlockType, Span, Spanned, SpannedInput, Token, TokenTree};
+use crate::lex::{end_of_line, BlockType, Span, SpannedInput, Token, TokenTree};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AST<'src> {
-    pub items: Vec<Spanned<Item<'src>>>,
+    pub items: Vec<Item<'src>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -56,7 +56,7 @@ pub fn parser<'src>() -> impl TTParser<'src, AST<'src>> {
     let function = ident
         .then(body.nested_in(block(BlockType::Do)))
         .map(|(name, body)| Function { name, body });
-    let item = function.map_with(|function, extra| (Item::Function(function), extra.span()));
+    let item = function.map(Item::Function);
 
     item.repeated().collect().map(|items| AST { items })
 }
@@ -66,7 +66,7 @@ mod tests {
     use chumsky::{primitive::just, Parser};
 
     use crate::{
-        lex::{self, end_of_line, Span},
+        lex::{self, end_of_line},
         lexer,
         parse::{parser, Function, Item, Line, AST},
     };
@@ -90,13 +90,10 @@ my_function do
         assert_eq!(
             ast.unwrap(),
             AST {
-                items: vec![(
-                    Item::Function(Function {
-                        name: "my_function",
-                        body: vec![Line("call1"), Line("call2")]
-                    }),
-                    Span::new(1, 35)
-                )]
+                items: vec![Item::Function(Function {
+                    name: "my_function",
+                    body: vec![Line("call1"), Line("call2")]
+                })]
             }
         )
     }
