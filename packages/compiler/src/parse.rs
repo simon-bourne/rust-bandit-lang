@@ -93,6 +93,8 @@ my_function do
         let ast = parser()
             .padded_by(just(end_of_line()).repeated())
             .parse(lines.output().unwrap().spanned());
+        // TODO: Pretty print the AST and use golden tests. Assert all the id's are the
+        // same in their source to check the spans are correct.
         assert_eq!(
             ast.unwrap(),
             AST {
