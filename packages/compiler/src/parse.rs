@@ -19,12 +19,18 @@ pub enum Item<'src> {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Function<'src> {
-    pub name: &'src str,
+    pub name: Ident<'src>,
     pub body: Vec<Line<'src>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Line<'src>(&'src str);
+pub struct Line<'src>(Ident<'src>);
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Ident<'src> {
+    name: &'src str,
+    span: Span,
+}
 
 pub type FastError<'src> = extra::Err<Cheap<Span>>;
 pub type RichError<'src> = extra::Err<Rich<'src, TokenTree<'src>, Span>>;
@@ -39,8 +45,8 @@ impl<'src, Output, T> TTParser<'src, Output> for T where
 {
 }
 
-fn ident<'src>() -> impl TTParser<'src, &'src str> + Copy + Clone {
-    select! { TokenTree::Token(Token::Ident(name)) => name }
+fn ident<'src>() -> impl TTParser<'src, Ident<'src>> + Copy + Clone {
+    select! { TokenTree::Token(Token::Ident(name)) = ext => Ident{ name, span: ext.span()} }
 }
 
 fn block<'src>(typ: BlockType) -> impl TTParser<'src, SpannedInput<'src, TokenTree<'src>>> {
@@ -66,9 +72,9 @@ mod tests {
     use chumsky::{primitive::just, Parser};
 
     use crate::{
-        lex::{self, end_of_line},
+        lex::{self, end_of_line, Span},
         lexer,
-        parse::{parser, Function, Item, Line, AST},
+        parse::{parser, Function, Ident, Item, Line, AST},
     };
 
     #[test]
@@ -91,8 +97,20 @@ my_function do
             ast.unwrap(),
             AST {
                 items: vec![Item::Function(Function {
-                    name: "my_function",
-                    body: vec![Line("call1"), Line("call2")]
+                    name: Ident {
+                        name: "my_function",
+                        span: Span::new(1, 12)
+                    },
+                    body: vec![
+                        Line(Ident {
+                            name: "call1",
+                            span: Span::new(20, 25)
+                        }),
+                        Line(Ident {
+                            name: "call2",
+                            span: Span::new(30, 35)
+                        })
+                    ]
                 })]
             }
         )
