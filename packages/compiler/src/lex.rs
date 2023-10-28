@@ -19,7 +19,7 @@ pub type Span = SimpleSpan<usize>;
 pub type Spanned<T> = (T, Span);
 pub type SpannedInput<'src, T> = input::SpannedInput<T, Span, &'src [(T, Span)]>;
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, Eq, PartialEq)]
 pub struct Line<'src>(Vec<Spanned<TokenTree<'src>>>);
 
 impl<'src> Line<'src> {
@@ -69,7 +69,7 @@ fn end_of_input(tokens: &[Spanned<TokenTree<'_>>]) -> SimpleSpan {
     }
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, Eq, PartialEq)]
 pub struct Block<'src>(Vec<Spanned<TokenTree<'src>>>);
 
 impl<'src> Block<'src> {
@@ -117,7 +117,7 @@ impl<'src> Container<Line<'src>> for Block<'src> {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum BlockType {
     Do,
     Else,
@@ -146,14 +146,14 @@ impl Display for BlockType {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Delimiter {
     Parentheses,
     Brackets,
     Braces,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Keyword {
     If,
     Return,
@@ -220,7 +220,7 @@ impl Display for Keyword {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Token<'src> {
     Ident(&'src str),
     Keyword(Keyword),
@@ -246,7 +246,7 @@ impl<'src> Token<'src> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TokenTree<'src> {
     Token(Token<'src>),
     Block(BlockType, Block<'src>),
