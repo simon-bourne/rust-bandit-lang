@@ -55,8 +55,7 @@ impl<'src> Line<'src> {
     }
 
     fn tokens(mut self) -> Vec<Spanned<TokenTree<'src>>> {
-        self.0
-            .push((TokenTree::Token(Token::EndOfLine), end_of_input(&self.0)));
+        self.0.push((end_of_line(), end_of_input(&self.0)));
         self.0
     }
 }
@@ -101,12 +100,9 @@ impl<'src> Display for Block<'src> {
 impl<'src> Container<Line<'src>> for Block<'src> {
     fn push(&mut self, line: Line<'src>) {
         if line.is_continuation() {
-            let end_of_line = self.0.pop();
+            let top = self.0.pop();
 
-            assert!(matches!(
-                end_of_line.unwrap().0,
-                TokenTree::Token(Token::EndOfLine)
-            ));
+            assert_eq!(top.unwrap().0, end_of_line());
         }
 
         self.0.extend(line.tokens())
@@ -251,6 +247,10 @@ pub enum TokenTree<'src> {
     Token(Token<'src>),
     Block(BlockType, Block<'src>),
     Delimited(Delimiter, Line<'src>),
+}
+
+pub fn end_of_line() -> TokenTree<'static> {
+    TokenTree::Token(Token::EndOfLine)
 }
 
 impl<'src> TokenTree<'src> {
