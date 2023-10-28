@@ -16,6 +16,6 @@ pub enum AST<'src> {
 // `Error` from `error::Rich`) isn't a good idea for tree tokens.
 pub fn parser<'src>() -> impl Parser<'src, SpannedInput<'src, TokenTree<'src>>, AST<'src>> {
     select_ref! {TokenTree::Delimited(_delimiter, line) =>
-        line.spanned()}
-        .to(AST::Empty)
+    line.spanned()}
+    .to(AST::Empty)
 }

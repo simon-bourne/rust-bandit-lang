@@ -1,4 +1,4 @@
-use bandit_compiler::lexer;
+use bandit_compiler::{lex::RichError, lexer};
 use chumsky::Parser;
 
 fn main() {
@@ -6,7 +6,7 @@ fn main() {
     // TODO: Tests
     // TODO: Literals
 
-    let lines = lexer().padded().parse(
+    let lines = lexer::<RichError>().padded().parse(
         r#"
 expr
 expr

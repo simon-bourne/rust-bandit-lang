@@ -1,4 +1,4 @@
-use bandit_compiler::lexer;
+use bandit_compiler::{lex::FastError, lexer};
 use chumsky::Parser;
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 
@@ -33,7 +33,7 @@ expr do expr expr do
     group.throughput(Throughput::Bytes(input.len() as u64));
 
     group.bench_function("parse", |b| {
-        let lexer = lexer().padded();
+        let lexer = lexer::<FastError>().padded();
 
         b.iter(|| {
             lexer.parse(black_box(&input));
