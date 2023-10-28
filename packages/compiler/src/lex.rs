@@ -125,9 +125,9 @@ pub enum BlockType {
     With,
 }
 
-impl Display for BlockType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let s = match self {
+impl BlockType {
+    fn as_str(self) -> &'static str {
+        match self {
             BlockType::Do => "do",
             BlockType::Else => "else",
             BlockType::Match => "match",
@@ -136,9 +136,13 @@ impl Display for BlockType {
             BlockType::Record => "record",
             BlockType::Where => "where",
             BlockType::With => "with",
-        };
+        }
+    }
+}
 
-        f.write_str(s)
+impl Display for BlockType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -303,16 +307,19 @@ pub fn lexer<'src, Extra>() -> impl Parser<'src, &'src str, Block<'src>, Extra>
 where
     Extra: ParserExtra<'src, &'src str>,
 {
-    let open_layout_block = choice((
-        just("do").to(BlockType::Do),
-        just("else").to(BlockType::Else),
-        just("match").to(BlockType::Match),
-        just("loop").to(BlockType::Loop),
-        just("then").to(BlockType::Then),
-        just("record").to(BlockType::Record),
-        just("where").to(BlockType::Where),
-        just("with").to(BlockType::With),
-    ));
+    let open_layout_block = choice(
+        [
+            BlockType::Do,
+            BlockType::Else,
+            BlockType::Match,
+            BlockType::Loop,
+            BlockType::Then,
+            BlockType::Record,
+            BlockType::Where,
+            BlockType::With,
+        ]
+        .map(|block_type: BlockType| just(block_type.as_str()).to(block_type)),
+    );
     let ident = ident().map(|ident: &str| {
         let token = match ident.try_into() {
             Ok(kw) => Token::Keyword(kw),
