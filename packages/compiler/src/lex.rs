@@ -24,13 +24,7 @@ pub struct Line<'src>(Vec<Spanned<TokenTree<'src>>>);
 
 impl<'src> Line<'src> {
     pub fn spanned(&self) -> SpannedInput<TokenTree> {
-        let end_of_input = if let Some((_, last_span)) = self.0.last() {
-            span::Span::to_end(last_span)
-        } else {
-            SimpleSpan::new(0, 0)
-        };
-
-        self.0.spanned(end_of_input)
+        self.0.spanned(end_of_input(&self.0))
     }
 
     fn is_continuation(&self) -> bool {
@@ -61,9 +55,17 @@ impl<'src> Line<'src> {
     }
 
     fn tokens(mut self) -> Vec<Spanned<TokenTree<'src>>> {
-        let span = span::Span::to_end(&self.0.last().expect("Unexpected empty line").1);
-        self.0.push((TokenTree::Token(Token::EndOfLine), span));
         self.0
+            .push((TokenTree::Token(Token::EndOfLine), end_of_input(&self.0)));
+        self.0
+    }
+}
+
+fn end_of_input(tokens: &[Spanned<TokenTree<'_>>]) -> SimpleSpan {
+    if let Some((_, last_span)) = tokens.last() {
+        span::Span::to_end(last_span)
+    } else {
+        SimpleSpan::new(0, 0)
     }
 }
 
