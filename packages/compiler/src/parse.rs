@@ -1,5 +1,5 @@
 use chumsky::{
-    extra::{self, ParserExtra},
+    extra,
     prelude::{Cheap, Rich},
     primitive::just,
     select, select_ref, IterParser, Parser,
@@ -29,31 +29,28 @@ pub struct Line<'src>(&'src str);
 pub type FastError<'src> = extra::Err<Cheap<Span>>;
 pub type RichError<'src> = extra::Err<Rich<'src, TokenTree<'src>, Span>>;
 
-pub trait TTParser<'src, Output, Extra>:
-    Parser<'src, SpannedInput<'src, TokenTree<'src>>, Output, Extra>
-where
-    Extra: ParserExtra<'src, SpannedInput<'src, TokenTree<'src>>>,
+pub trait TTParser<'src, Output>:
+    Parser<'src, SpannedInput<'src, TokenTree<'src>>, Output, RichError<'src>>
 {
 }
 
-impl<'src, Output, Extra, T> TTParser<'src, Output, Extra> for T
-where
-    T: Parser<'src, SpannedInput<'src, TokenTree<'src>>, Output, Extra>,
-    Extra: ParserExtra<'src, SpannedInput<'src, TokenTree<'src>>>,
+impl<'src, Output, T> TTParser<'src, Output> for T where
+    T: Parser<'src, SpannedInput<'src, TokenTree<'src>>, Output, RichError<'src>>
 {
 }
 
-pub trait TTParserExtra<'src>: ParserExtra<'src, SpannedInput<'src, TokenTree<'src>>> {}
+fn ident<'src>() -> impl TTParser<'src, &'src str> + Copy + Clone {
+    select! { TokenTree::Token(Token::Ident(name)) => name }
+}
 
-impl<'src, T: ParserExtra<'src, SpannedInput<'src, TokenTree<'src>>>> TTParserExtra<'src> for T {}
+fn block<'src>(typ: BlockType) -> impl TTParser<'src, SpannedInput<'src, TokenTree<'src>>> {
+    select_ref! {
+        TokenTree::Block(block_type, block) if typ == *block_type => block.spanned()
+    }
+}
 
-pub fn parser<'src, Extra: TTParserExtra<'src>>() -> impl TTParser<'src, AST<'src>, Extra> {
-    let ident = select! { TokenTree::Token(Token::Ident(name)) => name };
-    let block = |bt| {
-        select_ref! {
-            TokenTree::Block(block_type, block) if bt == *block_type => block.spanned()
-        }
-    };
+pub fn parser<'src>() -> impl TTParser<'src, AST<'src>> {
+    let ident = ident();
     let line = ident.map(Line).then_ignore(just(end_of_line()));
     let body = line.repeated().collect();
     let function = ident
@@ -71,7 +68,7 @@ mod tests {
     use crate::{
         lex::{self, end_of_line},
         lexer,
-        parse::{self, parser, Function, Item, Line, AST},
+        parse::{parser, Function, Item, Line, AST},
     };
 
     #[test]
@@ -87,7 +84,7 @@ my_function do
         );
         assert_eq!(lines.errors().len(), 0);
         println!("{:#?}", lines.output());
-        let ast = parser::<parse::RichError>()
+        let ast = parser()
             .padded_by(just(end_of_line()).repeated())
             .parse(lines.output().unwrap().spanned());
         assert_eq!(
