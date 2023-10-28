@@ -73,6 +73,10 @@ fn end_of_input(tokens: &[Spanned<TokenTree<'_>>]) -> SimpleSpan {
 pub struct Block<'src>(Vec<Spanned<TokenTree<'src>>>);
 
 impl<'src> Block<'src> {
+    pub fn spanned(&self) -> SpannedInput<TokenTree> {
+        self.0.spanned(end_of_input(&self.0))
+    }
+
     fn new(line: Line<'src>) -> Self {
         Self(line.tokens())
     }
