@@ -49,11 +49,15 @@ impl<'src, T: ParserExtra<'src, SpannedInput<'src, TokenTree<'src>>>> TTParserEx
 
 pub fn parser<'src, Extra: TTParserExtra<'src>>() -> impl TTParser<'src, AST<'src>, Extra> {
     let ident = select! { TokenTree::Token(Token::Ident(name)) => name };
-    let do_block = select_ref! { TokenTree::Block(BlockType::Do, block) => block.spanned() };
+    let block = |bt| {
+        select_ref! {
+            TokenTree::Block(block_type, block) if bt == *block_type => block.spanned()
+        }
+    };
     let line = ident.map(Line).then_ignore(just(end_of_line()));
     let body = line.repeated().collect();
     let function = ident
-        .then(body.nested_in(do_block))
+        .then(body.nested_in(block(BlockType::Do)))
         .map(|(name, body)| Function { name, body });
     let item = function.map(Item::Function);
 
