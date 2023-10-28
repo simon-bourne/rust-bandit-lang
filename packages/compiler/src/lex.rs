@@ -23,19 +23,15 @@ pub type SpannedInput<'src, T> = input::SpannedInput<T, Span, &'src [(T, Span)]>
 #[derive(Default, Clone, Debug)]
 pub struct Line<'src>(Vec<Spanned<TokenTree<'src>>>);
 
-fn spanned<T>(slice: &[Spanned<T>]) -> SpannedInput<T> {
-    let end_of_input = if let Some((_, last_span)) = slice.last() {
-        span::Span::to_end(last_span)
-    } else {
-        SimpleSpan::new(0, 0)
-    };
-
-    slice.spanned(end_of_input)
-}
-
 impl<'src> Line<'src> {
     pub fn spanned(&self) -> SpannedInput<TokenTree> {
-        spanned(&self.0)
+        let end_of_input = if let Some((_, last_span)) = self.0.last() {
+            span::Span::to_end(last_span)
+        } else {
+            SimpleSpan::new(0, 0)
+        };
+
+        self.0.spanned(end_of_input)
     }
 
     fn is_continuation(&self) -> bool {
@@ -67,21 +63,17 @@ impl<'src> Line<'src> {
 }
 
 #[derive(Default, Clone, Debug)]
-pub struct Block<'src>(Vec<Spanned<Line<'src>>>);
+pub struct Block<'src>(Vec<Line<'src>>);
 
 impl<'src> Block<'src> {
-    pub fn spanned(&self) -> SpannedInput<Line> {
-        spanned(&self.0)
-    }
-
-    fn new(line: Spanned<Line<'src>>) -> Self {
+    fn new(line: Line<'src>) -> Self {
         Self(vec![line])
     }
 
     fn pretty(&self, indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
         for line in &self.0 {
             pretty_indent(indent, f)?;
-            line.0.pretty(indent + 1, f)?;
+            line.pretty(indent + 1, f)?;
             f.write_char('\n')?;
         }
 
@@ -95,11 +87,11 @@ impl<'src> Display for Block<'src> {
     }
 }
 
-impl<'src> Container<Spanned<Line<'src>>> for Block<'src> {
-    fn push(&mut self, line: Spanned<Line<'src>>) {
+impl<'src> Container<Line<'src>> for Block<'src> {
+    fn push(&mut self, line: Line<'src>) {
         if let Some(last) = self.0.last_mut() {
-            if line.0.is_continuation() {
-                last.0 .0.extend(line.0 .0);
+            if line.is_continuation() {
+                last.0.extend(line.0);
                 return;
             }
         }
@@ -345,9 +337,7 @@ pub fn lexer<'src>() -> impl RichParser<'src, &'src str, Block<'src>> {
                         .collect()
                         .map(Line),
                 )
-                .map_with(|(block_type, line), extra| {
-                    TokenTree::Block(block_type, Block::new((line, extra.span())))
-                })
+                .map(|(block_type, line)| TokenTree::Block(block_type, Block::new(line)))
         });
         let token_tree = recursive(|token_tree| {
             let delimited = |open, close, delimiter| {
@@ -368,10 +358,7 @@ pub fn lexer<'src>() -> impl RichParser<'src, &'src str, Block<'src>> {
             ))
             .map_with(|tt, extra| (tt, extra.span()))
         });
-        let line = token_tree
-            .separated_by(token_separator)
-            .collect()
-            .map_with(|line, extra| (Line(line), extra.span()));
+        let line = token_tree.separated_by(token_separator).collect().map(Line);
 
         whitespace()
             .count()
