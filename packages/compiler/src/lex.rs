@@ -59,21 +59,27 @@ impl<'src> Line<'src> {
 
         Ok(())
     }
+
+    fn tokens(mut self) -> Vec<Spanned<TokenTree<'src>>> {
+        let span = span::Span::to_end(&self.0.last().expect("Unexpected empty line").1);
+        self.0.push((TokenTree::Token(Token::EndOfLine), span));
+        self.0
+    }
 }
 
 #[derive(Default, Clone, Debug)]
-pub struct Block<'src>(Vec<Line<'src>>);
+pub struct Block<'src>(Vec<Spanned<TokenTree<'src>>>);
 
 impl<'src> Block<'src> {
     fn new(line: Line<'src>) -> Self {
-        Self(vec![line])
+        Self(line.tokens())
     }
 
     fn pretty(&self, indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
-        for line in &self.0 {
-            pretty_indent(indent, f)?;
-            line.pretty(indent + 1, f)?;
-            f.write_char('\n')?;
+        pretty_indent(indent, f)?;
+
+        for token in &self.0 {
+            token.0.pretty(indent, f)?;
         }
 
         Ok(())
@@ -88,14 +94,16 @@ impl<'src> Display for Block<'src> {
 
 impl<'src> Container<Line<'src>> for Block<'src> {
     fn push(&mut self, line: Line<'src>) {
-        if let Some(last) = self.0.last_mut() {
-            if line.is_continuation() {
-                last.0.extend(line.0);
-                return;
-            }
+        if line.is_continuation() {
+            let end_of_line = self.0.pop();
+
+            assert!(matches!(
+                end_of_line.unwrap().0,
+                TokenTree::Token(Token::EndOfLine)
+            ));
         }
 
-        self.0.push(line)
+        self.0.extend(line.tokens())
     }
 
     fn with_capacity(n: usize) -> Self {
@@ -213,16 +221,21 @@ pub enum Token<'src> {
     Lambda,
     Operator(&'src str),
     Lifetime(&'src str),
+    EndOfLine,
 }
 
-impl<'src> Display for Token<'src> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl<'src> Token<'src> {
+    fn pretty(&self, indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Token::Ident(t) => write!(f, "id:{t}"),
-            Token::Keyword(kw) => write!(f, "kw:{kw}"),
-            Token::Lambda => f.write_str("lambda:\\"),
-            Token::Operator(op) => write!(f, "op:{op}"),
-            Token::Lifetime(lt) => write!(f, "'lt:{lt}"),
+            Token::Ident(t) => write!(f, "id:{t} "),
+            Token::Keyword(kw) => write!(f, "kw:{kw} "),
+            Token::Lambda => f.write_str("lambda:\\ "),
+            Token::Operator(op) => write!(f, "op:{op} "),
+            Token::Lifetime(lt) => write!(f, "'lt:{lt} "),
+            Token::EndOfLine => {
+                f.write_char('\n')?;
+                pretty_indent(indent, f)
+            }
         }
     }
 }
@@ -241,13 +254,12 @@ impl<'src> TokenTree<'src> {
 
     fn pretty(&self, indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            TokenTree::Token(t) => write!(f, "{t} "),
+            TokenTree::Token(t) => t.pretty(indent, f),
             TokenTree::Block(block_type, block) => {
                 f.write_char('\n')?;
-                pretty_indent(indent, f)?;
+                pretty_indent(indent + 1, f)?;
                 writeln!(f, "{block_type}")?;
-                block.pretty(indent + 1, f)?;
-                pretty_indent(indent, f)
+                block.pretty(indent + 2, f)
             }
             TokenTree::Delimited(delimiter, line) => match delimiter {
                 Delimiter::Parentheses => write_brackets(f, indent, '(', ')', line),
