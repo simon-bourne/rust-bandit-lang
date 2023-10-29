@@ -3,6 +3,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughpu
 use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq)]
+#[logos(skip r"[ \t]+")]
 enum Token {
     #[token("do", |_| BlockType::Do)]
     #[token("else", |_| BlockType::Else)]
@@ -51,8 +52,6 @@ enum Token {
     // Whitespace
     #[regex(r"[\n\f][ \t]*")]
     Indentation,
-    #[regex(r"[ \t]+")]
-    Whitespace,
 }
 
 pub fn basic(c: &mut Criterion) {
