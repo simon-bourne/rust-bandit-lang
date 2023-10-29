@@ -7,10 +7,10 @@ use logos::Logos;
 enum Token {
     #[token("do", |_| BlockType::Do)]
     #[token("else", |_| BlockType::Else)]
-    #[token("match", |_| BlockType::Match)]
     #[token("loop", |_| BlockType::Loop)]
-    #[token("then", |_| BlockType::Then)]
+    #[token("match", |_| BlockType::Match)]
     #[token("record", |_| BlockType::Record)]
+    #[token("then", |_| BlockType::Then)]
     #[token("where", |_| BlockType::Where)]
     #[token("with", |_| BlockType::With)]
     Block(BlockType),
