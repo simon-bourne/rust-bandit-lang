@@ -25,18 +25,18 @@ enum Token {
     #[token("}", |_| Delimiter::Braces)]
     Close(Delimiter),
 
-    #[token("if", |_| Keyword::If)]
-    #[token("return", |_| Keyword::Return)]
-    #[token("while", |_| Keyword::While)]
     #[token("alias", |_| Keyword::Alias)]
     #[token("forall", |_| Keyword::Forall)]
+    #[token("if", |_| Keyword::If)]
     #[token("infer", |_| Keyword::Infer)]
-    #[token("module", |_| Keyword::Module)]
     #[token("let", |_| Keyword::Let)]
+    #[token("module", |_| Keyword::Module)]
+    #[token("return", |_| Keyword::Return)]
     #[token("Self", |_| Keyword::SelfType)]
     #[token("trait", |_| Keyword::Trait)]
     #[token("type", |_| Keyword::Type)]
     #[token("use", |_| Keyword::Use)]
+    #[token("while", |_| Keyword::While)]
     Keyword(Keyword),
 
     #[token("\\")]
