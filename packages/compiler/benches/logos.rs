@@ -4,6 +4,7 @@ use logos::Logos;
 #[derive(Logos, Debug, PartialEq)]
 #[logos(skip r"[ \t\n\f]+")]
 enum Token {
+    // Block start tokens
     #[token("do")]
     Do,
     #[token("else")]
@@ -20,6 +21,22 @@ enum Token {
     Where,
     #[token("with")]
     With,
+
+    // Delimiters
+    #[token("(")]
+    OpenParenthesis,
+    #[token(")")]
+    CloseParenthesis,
+    #[token("[")]
+    OpenBracket,
+    #[token("]")]
+    CloseBracket,
+    #[token("{")]
+    OpenBrace,
+    #[token("}")]
+    CloseBrace,
+
+    // Keywords
     #[token("if")]
     If,
     #[token("return")]
@@ -45,21 +62,9 @@ enum Token {
     #[token("use")]
     Use,
 
+    // Other identifiers
     #[token("\\")]
     Lambda,
-
-    #[token("(")]
-    OpenParenthesis,
-    #[token(")")]
-    CloseParenthesis,
-    #[token("[")]
-    OpenBracket,
-    #[token("]")]
-    CloseBracket,
-    #[token("{")]
-    OpenBrace,
-    #[token("}")]
-    CloseBrace,
 
     #[regex(r"[_a-zA-Z][_a-zA-Z0-9]*")]
     Ident,
