@@ -1,67 +1,43 @@
+use bandit_compiler::lex::{BlockType, Delimiter, Keyword};
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq)]
 enum Token {
-    // Block start tokens
-    #[token("do")]
-    Do,
-    #[token("else")]
-    Else,
-    #[token("match")]
-    Match,
-    #[token("loop")]
-    Loop,
-    #[token("then")]
-    Then,
-    #[token("record")]
-    Record,
-    #[token("where")]
-    Where,
-    #[token("with")]
-    With,
+    #[token("do", |_| BlockType::Do)]
+    #[token("else", |_| BlockType::Else)]
+    #[token("match", |_| BlockType::Match)]
+    #[token("loop", |_| BlockType::Loop)]
+    #[token("then", |_| BlockType::Then)]
+    #[token("record", |_| BlockType::Record)]
+    #[token("where", |_| BlockType::Where)]
+    #[token("with", |_| BlockType::With)]
+    Block(BlockType),
 
-    // Delimiters
-    #[token("(")]
-    OpenParenthesis,
-    #[token(")")]
-    CloseParenthesis,
-    #[token("[")]
-    OpenBracket,
-    #[token("]")]
-    CloseBracket,
-    #[token("{")]
-    OpenBrace,
-    #[token("}")]
-    CloseBrace,
+    #[token("(", |_| Delimiter::Parentheses)]
+    #[token("[", |_| Delimiter::Brackets)]
+    #[token("{", |_| Delimiter::Braces)]
+    Open(Delimiter),
 
-    // Keywords
-    #[token("if")]
-    If,
-    #[token("return")]
-    Return,
-    #[token("while")]
-    While,
-    #[token("alias")]
-    Alias,
-    #[token("forall")]
-    Forall,
-    #[token("infer")]
-    Infer,
-    #[token("module")]
-    Module,
-    #[token("let")]
-    Let,
-    #[token("Self")]
-    SelfType,
-    #[token("trait")]
-    Trait,
-    #[token("type")]
-    Type,
-    #[token("use")]
-    Use,
+    #[token(")", |_| Delimiter::Parentheses)]
+    #[token("]", |_| Delimiter::Brackets)]
+    #[token("}", |_| Delimiter::Braces)]
+    Close(Delimiter),
 
-    // Other identifiers
+    #[token("if", |_| Keyword::If)]
+    #[token("return", |_| Keyword::Return)]
+    #[token("while", |_| Keyword::While)]
+    #[token("alias", |_| Keyword::Alias)]
+    #[token("forall", |_| Keyword::Forall)]
+    #[token("infer", |_| Keyword::Infer)]
+    #[token("module", |_| Keyword::Module)]
+    #[token("let", |_| Keyword::Let)]
+    #[token("Self", |_| Keyword::SelfType)]
+    #[token("trait", |_| Keyword::Trait)]
+    #[token("type", |_| Keyword::Type)]
+    #[token("use", |_| Keyword::Use)]
+    Keyword(Keyword),
+
     #[token("\\")]
     Lambda,
 
