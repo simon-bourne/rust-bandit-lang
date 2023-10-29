@@ -106,9 +106,9 @@ expr do expr expr do
 
     group.bench_function("logos", |b| {
         b.iter(|| {
-            let mut lexer = Token::lexer(&input);
+            let lexer = Token::lexer(&input);
 
-            for token in lexer.by_ref() {
+            for token in lexer {
                 black_box(&token.unwrap());
             }
         })
