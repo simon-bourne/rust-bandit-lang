@@ -2,7 +2,6 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughpu
 use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq)]
-#[logos(skip r"[ \t\n\f]+")]
 enum Token {
     // Block start tokens
     #[token("do")]
@@ -67,11 +66,17 @@ enum Token {
     Lambda,
 
     #[regex(r"[_a-zA-Z][_a-zA-Z0-9]*")]
-    Ident,
+    Identifier,
     #[regex(r"'[_a-zA-Z][_a-zA-Z0-9]*")]
     Lifetime,
     #[regex(r"\$%\&\*\+\./<=>@\^\-\~\|")]
     Operator,
+
+    // Whitespace
+    #[regex(r"[\n\f][ \t]*")]
+    Indentation,
+    #[regex(r"[ \t]+")]
+    Whitespace,
 }
 
 pub fn basic(c: &mut Criterion) {
