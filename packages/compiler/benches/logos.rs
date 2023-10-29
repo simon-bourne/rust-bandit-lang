@@ -3,6 +3,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughpu
 use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq)]
+#[logos(subpattern ident = r"(\p{XID_Start}|_)\p{XID_Continue}*")]
 enum Token {
     #[token("do", |_| BlockType::Do)]
     #[token("else", |_| BlockType::Else)]
@@ -41,9 +42,9 @@ enum Token {
     #[token("\\")]
     Lambda,
 
-    #[regex(r"[_a-zA-Z][_a-zA-Z0-9]*")]
+    #[regex(r"(?&ident)")]
     Identifier,
-    #[regex(r"'[_a-zA-Z][_a-zA-Z0-9]*")]
+    #[regex(r"'(?&ident)")]
     Lifetime,
     #[regex(r"\$%\&\*\+\./<=>@\^\-\~\|")]
     Operator,
