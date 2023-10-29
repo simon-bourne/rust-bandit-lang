@@ -28,21 +28,7 @@ impl<'src> Line<'src> {
     }
 
     fn is_continuation(&self) -> bool {
-        self.0.first().is_some_and(|t| match t.0 {
-            TokenTree::Token(_) | TokenTree::Delimited(_, _) => false,
-            TokenTree::Block(block_type, _) => match block_type {
-                // We merge these block types so you can put the block start on a new line. None of
-                // these block types can start a line.
-                BlockType::Do
-                | BlockType::Else
-                | BlockType::Match
-                | BlockType::Then
-                | BlockType::Record
-                | BlockType::Where => true,
-                // Loop can start a line, so it can't be merged.
-                BlockType::Loop => false,
-            },
-        })
+        self.0.first().is_some_and(|t| t.0.is_continuation())
     }
 
     fn pretty(&self, indent: usize, f: &mut Formatter<'_>) -> fmt::Result {
@@ -133,6 +119,14 @@ impl BlockType {
             BlockType::Then => "then",
             BlockType::Record => "record",
             BlockType::Where => "where",
+        }
+    }
+
+    fn is_continuation(self) -> bool {
+        match self {
+            Self::Do | Self::Else | Self::Match | Self::Then | Self::Record | Self::Where => true,
+            // Loop can start a line, so it can't be merged.
+            Self::Loop => false,
         }
     }
 }
@@ -259,6 +253,13 @@ pub fn end_of_line() -> TokenTree<'static> {
 }
 
 impl<'src> TokenTree<'src> {
+    fn is_continuation(&self) -> bool {
+        match self {
+            Self::Token(_) | Self::Delimited(_, _) => false,
+            Self::Block(block_type, _) => block_type.is_continuation(),
+        }
+    }
+
     fn delimited(delimiter: Delimiter, line: Vec<Spanned<TokenTree<'src>>>) -> Self {
         Self::Delimited(delimiter, Line(line))
     }
