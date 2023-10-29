@@ -10,7 +10,12 @@ chumsky.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
+logos.workspace = true
 
 [[bench]]
 name = "lexer"
+harness = false
+
+[[bench]]
+name = "logos"
 harness = false
