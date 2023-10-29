@@ -155,18 +155,18 @@ pub enum Delimiter {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Keyword {
-    If,
-    Return,
-    While,
     Alias,
     Forall,
+    If,
     Infer,
-    Module,
     Let,
+    Module,
+    Return,
     SelfType,
     Trait,
     Type,
     Use,
+    While,
 }
 
 impl AsRef<str> for Keyword {
@@ -174,18 +174,18 @@ impl AsRef<str> for Keyword {
         use Keyword as K;
 
         match self {
-            K::If => "if",
-            K::Return => "return",
-            K::While => "while",
             K::Alias => "alias",
             K::Forall => "forall",
+            K::If => "if",
             K::Infer => "infer",
-            K::Module => "module",
             K::Let => "let",
+            K::Module => "module",
+            K::Return => "return",
             K::SelfType => "Self",
             K::Trait => "trait",
             K::Type => "type",
             K::Use => "use",
+            K::While => "while",
         }
     }
 }
