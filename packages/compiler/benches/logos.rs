@@ -12,7 +12,6 @@ enum Token {
     #[token("record", |_| BlockType::Record)]
     #[token("then", |_| BlockType::Then)]
     #[token("where", |_| BlockType::Where)]
-    #[token("with", |_| BlockType::With)]
     Block(BlockType),
 
     #[token("(", |_| Delimiter::Parentheses)]
@@ -31,12 +30,14 @@ enum Token {
     #[token("infer", |_| Keyword::Infer)]
     #[token("let", |_| Keyword::Let)]
     #[token("module", |_| Keyword::Module)]
+    #[token("provide", |_| Keyword::Provide)]
     #[token("return", |_| Keyword::Return)]
     #[token("Self", |_| Keyword::SelfType)]
     #[token("trait", |_| Keyword::Trait)]
     #[token("type", |_| Keyword::Type)]
     #[token("use", |_| Keyword::Use)]
     #[token("while", |_| Keyword::While)]
+    #[token("with", |_| Keyword::With)]
     Keyword(Keyword),
 
     #[token("\\")]

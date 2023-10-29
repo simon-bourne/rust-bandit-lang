@@ -38,8 +38,7 @@ impl<'src> Line<'src> {
                 | BlockType::Match
                 | BlockType::Then
                 | BlockType::Record
-                | BlockType::Where
-                | BlockType::With => true,
+                | BlockType::Where => true,
                 // Loop can start a line, so it can't be merged.
                 BlockType::Loop => false,
             },
@@ -122,7 +121,6 @@ pub enum BlockType {
     Then,
     Record,
     Where,
-    With,
 }
 
 impl BlockType {
@@ -135,7 +133,6 @@ impl BlockType {
             BlockType::Then => "then",
             BlockType::Record => "record",
             BlockType::Where => "where",
-            BlockType::With => "with",
         }
     }
 }
@@ -161,12 +158,14 @@ pub enum Keyword {
     Infer,
     Let,
     Module,
+    Provide,
     Return,
     SelfType,
     Trait,
     Type,
     Use,
     While,
+    With,
 }
 
 impl AsRef<str> for Keyword {
@@ -180,12 +179,14 @@ impl AsRef<str> for Keyword {
             K::Infer => "infer",
             K::Let => "let",
             K::Module => "module",
+            K::Provide => "provide",
             K::Return => "return",
             K::SelfType => "Self",
             K::Trait => "trait",
             K::Type => "type",
             K::Use => "use",
             K::While => "while",
+            K::With => "with",
         }
     }
 }
@@ -316,7 +317,6 @@ where
             BlockType::Then,
             BlockType::Record,
             BlockType::Where,
-            BlockType::With,
         ]
         .map(|block_type: BlockType| just(block_type.as_str()).to(block_type)),
     );
