@@ -152,6 +152,7 @@ where
             return None;
         };
 
+        // TODO: This needs to go on the stack for continued lines with nested blocks.
         let continue_on_indent = self.continue_on_indent;
         self.continue_on_indent = true;
 
@@ -174,6 +175,7 @@ where
                 match current_indent.cmp(this_indent) {
                     Ordering::Less => {
                         if continue_on_indent {
+                            // TODO: Put this in a loop, rather than on the stack.
                             return self.next();
                         }
 
