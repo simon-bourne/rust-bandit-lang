@@ -142,6 +142,7 @@ pub enum Delimiter {
     Parentheses,
     Brackets,
     Braces,
+    Indent,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -277,6 +278,7 @@ impl<'src> TokenTree<'src> {
                 Delimiter::Parentheses => write_brackets(f, indent, '(', ')', line),
                 Delimiter::Brackets => write_brackets(f, indent, '[', ']', line),
                 Delimiter::Braces => write_brackets(f, indent, '{', '}', line),
+                Delimiter::Indent => todo!(),
             },
         }
     }

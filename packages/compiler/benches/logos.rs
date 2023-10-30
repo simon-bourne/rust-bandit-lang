@@ -1,6 +1,5 @@
 use bandit_compiler::logos_lex::Token;
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
-use logos::Logos;
 
 pub fn basic(c: &mut Criterion) {
     let mut input = String::new();
@@ -34,10 +33,11 @@ expr do expr expr do
 
     group.bench_function("logos", |b| {
         b.iter(|| {
-            let lexer = Token::lexer(&input);
+            let lexer = Token::tokens(&input);
 
             for token in lexer {
-                black_box(&token.unwrap());
+                assert!(token.0 != Token::Error);
+                black_box(&token);
             }
         })
     });
