@@ -102,12 +102,33 @@ impl Token {
     }
 }
 
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum IndentType {
+    Block,
+    LineContinuation,
+}
+
+#[derive(Copy, Clone)]
+struct Indent<'src> {
+    typ: IndentType,
+    indent: &'src str,
+}
+
+impl<'src> Indent<'src> {
+    fn block(indent: &'src str) -> Self {
+        Self {
+            typ: IndentType::Block,
+            indent,
+        }
+    }
+}
+
 struct TokenIter<'src, I> {
     source: &'src str,
     flat_iter: I,
-    continue_on_indent: bool,
-    indent_stack: Vec<&'src str>,
-    current_indent: (&'src str, Span),
+    indent_type: IndentType,
+    indent_stack: Vec<Indent<'src>>,
+    current_indent: (Indent<'src>, Span),
 }
 
 impl<'src, I> TokenIter<'src, I> {
@@ -115,9 +136,9 @@ impl<'src, I> TokenIter<'src, I> {
         Self {
             source,
             flat_iter,
-            continue_on_indent: false,
+            indent_type: IndentType::Block,
             indent_stack: Vec::new(),
-            current_indent: ("\n", Span::new(0, 0)),
+            current_indent: (Indent::block("\n"), Span::new(0, 0)),
         }
     }
 }
@@ -132,35 +153,51 @@ where
         use FlatToken as FT;
         use Token as T;
 
-        let (current_indent, current_indent_span) = self.current_indent;
+        // Close any blocks more indented than the current indent
+        while let Some(top) = self.indent_stack.last() {
+            let (current_indent, current_indent_span) = self.current_indent;
 
-        if Some(current_indent) <= self.indent_stack.last().copied() {
+            if current_indent.indent > top.indent {
+                break;
+            }
+
+            let indent_type = current_indent.typ;
+            self.current_indent.0 = *top;
             self.indent_stack.pop();
-            return Some((T::Close(Delimiter::Indent), current_indent_span));
+
+            if indent_type == IndentType::Block {
+                return Some((T::Close(Delimiter::Indent), current_indent_span));
+            }
         }
 
-        let Some((token, span)) = self.flat_iter.next() else {
-            if self.indent_stack.pop().is_some() {
-                let source_len = self.source.len();
+        let current_indent = self.current_indent.0;
 
-                return Some((
-                    T::Close(Delimiter::Indent),
-                    Span::new(source_len, source_len),
-                ));
+        // Clean up when we run out of tokens.
+        let Some((token, span)) = self.flat_iter.next() else {
+            // TODO: Don't forget about current indent
+            while let Some(last_indent) = self.indent_stack.pop() {
+                if last_indent.typ == IndentType::Block {
+                    let source_len = self.source.len();
+
+                    return Some((
+                        T::Close(Delimiter::Indent),
+                        Span::new(source_len, source_len),
+                    ));
+                }
             }
 
             return None;
         };
 
         // TODO: This needs to go on the stack for continued lines with nested blocks.
-        let continue_on_indent = self.continue_on_indent;
-        self.continue_on_indent = true;
+        let last_indent_type = self.indent_type;
+        self.indent_type = match token {
+            FT::Block(_) => IndentType::Block,
+            _ => IndentType::LineContinuation,
+        };
 
         let token = match token {
-            FT::Block(block_type) => {
-                self.continue_on_indent = false;
-                T::Block(block_type)
-            }
+            FT::Block(block_type) => T::Block(block_type),
             FT::Open(delimiter) => T::Open(delimiter),
             FT::Close(delimiter) => T::Close(delimiter),
             FT::Keyword(keyword) => T::Keyword(keyword),
@@ -169,25 +206,31 @@ where
             FT::Lifetime => T::Lifetime,
             FT::Operator => T::Operator,
             FT::Indentation => {
-                let this_indent = self.source.get(span.into_range()).unwrap();
+                let new_indent = Indent {
+                    typ: last_indent_type,
+                    indent: self.source.get(span.into_range()).unwrap(),
+                };
 
                 // TODO: Handle inconsistent indentation (add an `Indent` struct).
-                match current_indent.cmp(this_indent) {
+                match current_indent.indent.cmp(new_indent.indent) {
                     Ordering::Less => {
-                        if continue_on_indent {
-                            // TODO: Put this in a loop, rather than on the stack.
+                        self.current_indent = (new_indent, span);
+                        self.indent_stack.push(current_indent);
+
+                        if last_indent_type == IndentType::LineContinuation {
                             return self.next();
                         }
 
-                        self.indent_stack.push(current_indent);
-                        self.current_indent = (this_indent, span);
                         T::Open(Delimiter::Indent)
                     }
                     Ordering::Equal => T::LineStart,
                     Ordering::Greater => {
-                        self.current_indent = (this_indent, span);
-                        self.indent_stack.pop();
-                        T::Close(Delimiter::Indent)
+                        self.current_indent = (self.indent_stack.pop().unwrap(), span);
+
+                        match current_indent.typ {
+                            IndentType::Block => T::Close(Delimiter::Indent),
+                            IndentType::LineContinuation => T::LineStart,
+                        }
                     }
                 }
             }
@@ -249,6 +292,7 @@ mod tests {
                 Token::Close(_) => print!("Close "),
                 Token::LineStart => {
                     print_indent(indent);
+                    print!(":");
                 }
                 Token::Keyword(_) => print!("Keyword "),
                 Token::Lambda => print!("Lambda "),
