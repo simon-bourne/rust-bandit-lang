@@ -15,6 +15,5 @@ debug = 0
 chumsky = "1.0.0-alpha.6"
 criterion = "0.5.1"
 logos = "0.13.0"
-nonempty = "0.8.1"
 num-bigint = "0.4.4"
 xtask-base = { git = "https://github.com/simon-bourne/rust-xtask-base" }
