@@ -111,6 +111,7 @@ dependencies = [
  "chumsky",
  "criterion",
  "logos",
+ "nonempty",
 ]
 
 [[package]]
@@ -660,6 +661,12 @@ checksum = "5a634b1c61a95585bd15607c6ab0c4e5b226e695ff2800ba0cdccddf208c406c"
 dependencies = [
  "autocfg",
 ]
+
+[[package]]
+name = "nonempty"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aeaf4ad7403de93e699c191202f017118df734d3850b01e13a3a8b2e6953d3c9"
 
 [[package]]
 name = "num-traits"
