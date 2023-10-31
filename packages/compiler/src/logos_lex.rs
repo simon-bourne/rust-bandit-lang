@@ -213,7 +213,14 @@ where
         None
     }
 
-    fn handle_indent(&mut self, new_indent: TypedIndent, span: Span) -> Option<Spanned<Token>> {
+    fn handle_indent(
+        &mut self,
+        last_indent_type: IndentType,
+        span: Span,
+    ) -> Option<Spanned<Token>> {
+        let indent = Indent::from_source(self.source, span);
+        let new_indent = TypedIndent::new(last_indent_type, indent);
+
         let current_indent = self.current_indent.0;
         let item = match current_indent.indent.cmp(&new_indent.indent) {
             Ordering::Less => {
@@ -272,10 +279,7 @@ where
             FT::Identifier => T::Identifier,
             FT::Lifetime => T::Lifetime,
             FT::Operator => T::Operator,
-            FT::Indentation => {
-                let indent = Indent::from_source(self.source, span);
-                return self.handle_indent(TypedIndent::new(last_indent_type, indent), span);
-            }
+            FT::Indentation => return self.handle_indent(last_indent_type, span),
             FT::Error => T::Error,
         };
 
