@@ -259,8 +259,8 @@ where
             return Some(value);
         }
 
-        // Clean up when we run out of tokens.
         let Some((token, span)) = self.flat_iter.next() else {
+            // Clean up when we run out of tokens.
             return self.close_final_blocks();
         };
 
