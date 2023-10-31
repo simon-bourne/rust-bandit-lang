@@ -151,7 +151,6 @@ pub enum BlockType {
     Where,
 }
 
-// TODO: Remove this
 impl BlockType {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -162,14 +161,6 @@ impl BlockType {
             BlockType::Then => "then",
             BlockType::Record => "record",
             BlockType::Where => "where",
-        }
-    }
-
-    pub fn is_continuation(self) -> bool {
-        match self {
-            Self::Do | Self::Else | Self::Match | Self::Then | Self::Record | Self::Where => true,
-            // Loop can start a line, so it can't be merged.
-            Self::Loop => false,
         }
     }
 }
