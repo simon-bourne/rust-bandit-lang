@@ -109,7 +109,7 @@ impl FlatToken {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum Token {
     Block(BlockType),
 
