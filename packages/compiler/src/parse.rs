@@ -80,7 +80,6 @@ mod tests {
     #[test]
     fn basic() {
         // TODO: indoc
-        // TODO: This generates an end of line at the end, with a span of (0, 0).
         const SRC: &str = r#"
 my_function do
     call1
