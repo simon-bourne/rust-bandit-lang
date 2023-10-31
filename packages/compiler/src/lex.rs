@@ -151,9 +151,9 @@ pub enum BlockType {
     Where,
 }
 
-impl BlockType {
-    pub fn as_str(self) -> &'static str {
-        match self {
+impl From<BlockType> for &'static str {
+    fn from(value: BlockType) -> Self {
+        match value {
             BlockType::Do => "do",
             BlockType::Else => "else",
             BlockType::Match => "match",
@@ -167,7 +167,7 @@ impl BlockType {
 
 impl Display for BlockType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
+        f.write_str(<&str>::from(*self))
     }
 }
 
@@ -197,11 +197,11 @@ pub enum Keyword {
     With,
 }
 
-impl AsRef<str> for Keyword {
-    fn as_ref(&self) -> &str {
+impl From<Keyword> for &'static str {
+    fn from(value: Keyword) -> Self {
         use Keyword as K;
 
-        match self {
+        match value {
             K::Alias => "alias",
             K::Forall => "forall",
             K::If => "if",
@@ -222,7 +222,7 @@ impl AsRef<str> for Keyword {
 
 impl Display for Keyword {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_ref())
+        f.write_str(<&str>::from(*self))
     }
 }
 
