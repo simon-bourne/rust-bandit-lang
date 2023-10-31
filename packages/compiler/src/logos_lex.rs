@@ -144,7 +144,10 @@ struct TokenIter<'src, I> {
     current_indent: (Indent<'src>, Span),
 }
 
-impl<'src, I> TokenIter<'src, I> {
+impl<'src, I> TokenIter<'src, I>
+where
+    I: Iterator<Item = Spanned<FlatToken>>,
+{
     fn new(source: &'src str, flat_iter: I) -> Self {
         Self {
             source,
@@ -189,6 +192,39 @@ impl<'src, I> TokenIter<'src, I> {
 
         None
     }
+
+    fn handle_indent(
+        &mut self,
+        last_indent_type: IndentType,
+        span: Span,
+    ) -> Option<Spanned<Token>> {
+        // TODO: Handle inconsistent indentation (add an `Indent` struct).
+        let current_indent = self.current_indent.0;
+        let new_indent = Indent::from_source(last_indent_type, self.source, span);
+        let item = match current_indent.indent.cmp(new_indent.indent) {
+            Ordering::Less => {
+                self.current_indent = (new_indent, span);
+                self.indent_stack.push(current_indent);
+
+                if last_indent_type == IndentType::LineContinuation {
+                    return self.next();
+                }
+
+                Token::Open(Delimiter::Indent)
+            }
+            Ordering::Equal => Token::LineStart,
+            Ordering::Greater => {
+                self.current_indent = (self.indent_stack.pop().unwrap(), span);
+
+                match current_indent.typ {
+                    IndentType::Block => Token::Close(Delimiter::Indent),
+                    IndentType::LineContinuation => Token::LineStart,
+                }
+            }
+        };
+
+        Some((item, span))
+    }
 }
 
 impl<'src, I> Iterator for TokenIter<'src, I>
@@ -198,9 +234,6 @@ where
     type Item = Spanned<Token>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        use FlatToken as FT;
-        use Token as T;
-
         if let Some(value) = self.close_dangling_blocks() {
             return Some(value);
         }
@@ -210,9 +243,11 @@ where
             return self.close_final_blocks();
         };
 
-        let current_indent = self.current_indent.0;
         let last_indent_type = self.indent_type;
         self.indent_type = token.indent_type();
+
+        use FlatToken as FT;
+        use Token as T;
 
         let token = match token {
             FT::Block(block_type) => T::Block(block_type),
@@ -223,32 +258,7 @@ where
             FT::Identifier => T::Identifier,
             FT::Lifetime => T::Lifetime,
             FT::Operator => T::Operator,
-            FT::Indentation => {
-                let new_indent = Indent::from_source(last_indent_type, self.source, span);
-
-                // TODO: Handle inconsistent indentation (add an `Indent` struct).
-                match current_indent.indent.cmp(new_indent.indent) {
-                    Ordering::Less => {
-                        self.current_indent = (new_indent, span);
-                        self.indent_stack.push(current_indent);
-
-                        if last_indent_type == IndentType::LineContinuation {
-                            return self.next();
-                        }
-
-                        T::Open(Delimiter::Indent)
-                    }
-                    Ordering::Equal => T::LineStart,
-                    Ordering::Greater => {
-                        self.current_indent = (self.indent_stack.pop().unwrap(), span);
-
-                        match current_indent.typ {
-                            IndentType::Block => T::Close(Delimiter::Indent),
-                            IndentType::LineContinuation => T::LineStart,
-                        }
-                    }
-                }
-            }
+            FT::Indentation => return self.handle_indent(last_indent_type, span),
             FT::Error => T::Error,
         };
 
