@@ -270,6 +270,7 @@ where
     }
 
     fn close_dangling_blocks(&mut self) -> Option<Spanned<Token>> {
+        // TODO: Check current indent is consistent with stack
         while let Some(top) = self.indent_stack.last() {
             let (current_indent, current_indent_span) = self.current_indent;
 
