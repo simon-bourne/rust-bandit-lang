@@ -290,6 +290,9 @@ where
     }
 
     fn close_final_blocks(&mut self) -> Option<Spanned<Token>> {
+        // TODO: What about current indent? Need to return a close for current indent,
+        // then set current indent to the top of the stack. Also need to put spans on
+        // the indent stack.
         while let Some(last_indent) = self.indent_stack.pop() {
             if last_indent.typ == IndentType::Block {
                 let source_len = self.source.len();
