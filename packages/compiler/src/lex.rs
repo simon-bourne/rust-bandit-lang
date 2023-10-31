@@ -229,30 +229,6 @@ impl AsRef<str> for Keyword {
     }
 }
 
-impl<'a> TryFrom<&'a str> for Keyword {
-    type Error = ();
-
-    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        use Keyword as K;
-
-        match value {
-            "if" => Ok(K::If),
-            "return" => Ok(K::Return),
-            "while" => Ok(K::While),
-            "alias" => Ok(K::Alias),
-            "forall" => Ok(K::Forall),
-            "infer" => Ok(K::Infer),
-            "module" => Ok(K::Module),
-            "let" => Ok(K::Let),
-            "Self" => Ok(K::SelfType),
-            "trait" => Ok(K::Trait),
-            "type" => Ok(K::Type),
-            "use" => Ok(K::Use),
-            _ => Err(()),
-        }
-    }
-}
-
 impl Display for Keyword {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_ref())
