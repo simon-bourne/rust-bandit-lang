@@ -4,10 +4,10 @@ use logos::{Filter, Lexer, Logos};
 
 use crate::lex::{BlockType, Delimiter, Keyword, Span, Spanned};
 
-#[derive(Logos, Debug, PartialEq)]
+#[derive(Logos, Debug, PartialEq, Eq)]
 #[logos(skip r"[ \t\r\f]+")]
 #[logos(subpattern ident = r"(\p{XID_Start}|_)\p{XID_Continue}*")]
-pub enum FlatToken {
+enum FlatToken {
     #[token("do", |_| BlockType::Do)]
     #[token("else", |_| BlockType::Else)]
     #[token("loop", |_| BlockType::Loop)]
@@ -60,10 +60,36 @@ pub enum FlatToken {
 }
 
 fn indentation(token: &mut Lexer<FlatToken>) -> Filter<()> {
+    // It's really convenient to check the next token here, as the source is a
+    // slice. Any work done here also slows down the lexer, so we do as little as
+    // possible, and build the `Indent` later.
     if token.remainder().starts_with(['\n', '\r', '\x0C']) {
         Filter::Skip
     } else {
         Filter::Emit(())
+    }
+}
+
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, PartialOrd, Ord)]
+struct Indent {
+    width: usize,
+}
+
+impl Indent {
+    fn from_source(source: &str, span: Span) -> Self {
+        let token = source.get(span.into_range()).unwrap();
+
+        let width = if token.contains('\t') {
+            // TODO: Add an error saying only spaces are allowed for indents
+            let tabs = token.matches('\t').count();
+            let spaces = token.matches(' ').count();
+
+            4 * tabs + spaces
+        } else {
+            token.len() - 1
+        };
+
+        Self { width }
     }
 }
 
@@ -116,19 +142,17 @@ enum IndentType {
 }
 
 #[derive(Copy, Clone)]
-struct Indent<'src> {
+struct TypedIndent {
     typ: IndentType,
-    indent: &'src str,
+    indent: Indent,
 }
 
-impl<'src> Indent<'src> {
-    fn from_source(typ: IndentType, source: &'src str, span: Span) -> Self {
-        let indent = source.get(span.into_range()).unwrap();
-
+impl TypedIndent {
+    fn new(typ: IndentType, indent: Indent) -> Self {
         Self { typ, indent }
     }
 
-    fn block(indent: &'src str) -> Self {
+    fn block(indent: Indent) -> Self {
         Self {
             typ: IndentType::Block,
             indent,
@@ -140,8 +164,8 @@ struct TokenIter<'src, I> {
     source: &'src str,
     flat_iter: I,
     indent_type: IndentType,
-    indent_stack: Vec<Indent<'src>>,
-    current_indent: (Indent<'src>, Span),
+    indent_stack: Vec<TypedIndent>,
+    current_indent: (TypedIndent, Span),
 }
 
 impl<'src, I> TokenIter<'src, I>
@@ -154,7 +178,7 @@ where
             flat_iter,
             indent_type: IndentType::Block,
             indent_stack: Vec::new(),
-            current_indent: (Indent::block("\n"), Span::new(0, 0)),
+            current_indent: (TypedIndent::block(Indent::default()), Span::new(0, 0)),
         }
     }
 
@@ -193,20 +217,14 @@ where
         None
     }
 
-    fn handle_indent(
-        &mut self,
-        last_indent_type: IndentType,
-        span: Span,
-    ) -> Option<Spanned<Token>> {
-        // TODO: Handle inconsistent indentation (add an `Indent` struct).
+    fn handle_indent(&mut self, new_indent: TypedIndent, span: Span) -> Option<Spanned<Token>> {
         let current_indent = self.current_indent.0;
-        let new_indent = Indent::from_source(last_indent_type, self.source, span);
-        let item = match current_indent.indent.cmp(new_indent.indent) {
+        let item = match current_indent.indent.cmp(&new_indent.indent) {
             Ordering::Less => {
                 self.current_indent = (new_indent, span);
                 self.indent_stack.push(current_indent);
 
-                if last_indent_type == IndentType::LineContinuation {
+                if new_indent.typ == IndentType::LineContinuation {
                     return self.next();
                 }
 
@@ -258,7 +276,10 @@ where
             FT::Identifier => T::Identifier,
             FT::Lifetime => T::Lifetime,
             FT::Operator => T::Operator,
-            FT::Indentation => return self.handle_indent(last_indent_type, span),
+            FT::Indentation => {
+                let indent = Indent::from_source(self.source, span);
+                return self.handle_indent(TypedIndent::new(last_indent_type, indent), span);
+            }
             FT::Error => T::Error,
         };
 
