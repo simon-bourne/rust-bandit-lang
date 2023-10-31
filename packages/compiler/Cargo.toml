@@ -15,7 +15,3 @@ criterion.workspace = true
 [[bench]]
 name = "lexer"
 harness = false
-
-[[bench]]
-name = "logos"
-harness = false

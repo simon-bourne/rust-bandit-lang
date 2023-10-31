@@ -1,5 +1,4 @@
-use bandit_compiler::{lex::FastError, lexer};
-use chumsky::Parser;
+use bandit_compiler::logos_lex::Token;
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 
 pub fn basic(c: &mut Criterion) {
@@ -32,11 +31,14 @@ expr do expr expr do
     let mut group = c.benchmark_group("valid");
     group.throughput(Throughput::Bytes(input.len() as u64));
 
-    group.bench_function("parse", |b| {
-        let lexer = lexer::<FastError>().padded();
-
+    group.bench_function("logos", |b| {
         b.iter(|| {
-            lexer.parse(black_box(&input));
+            let lexer = Token::tokens(&input);
+
+            for token in lexer {
+                assert!(token.0 != Token::Error);
+                black_box(&token);
+            }
         })
     });
 }
