@@ -1,8 +1,9 @@
 use std::cmp::Ordering;
 
+use chumsky::span::SimpleSpan;
 use logos::{Filter, Lexer, Logos};
 
-use crate::lex::{BlockType, Delimiter, Keyword, Span, Spanned};
+use crate::lex::{BlockType, Delimiter, Keyword};
 
 #[derive(Logos, Debug, PartialEq, Eq)]
 #[logos(skip r"[ \t\r\f]+")]
@@ -108,6 +109,9 @@ impl FlatToken {
         }
     }
 }
+
+pub type Span = SimpleSpan<usize>;
+pub type Spanned<T> = (T, Span);
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum Token {

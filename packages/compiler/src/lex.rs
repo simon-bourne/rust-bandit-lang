@@ -15,8 +15,8 @@ use chumsky::{
     ConfigIterParser, IterParser, Parser,
 };
 
-pub type Span = SimpleSpan<usize>;
-pub type Spanned<T> = (T, Span);
+use crate::logos_lex::{Span, Spanned};
+
 pub type SpannedInput<'src, T> = input::SpannedInput<T, Span, &'src [(T, Span)]>;
 
 #[derive(Default, Clone, Debug, Eq, PartialEq)]

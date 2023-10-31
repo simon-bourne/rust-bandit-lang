@@ -6,8 +6,8 @@ use chumsky::{
 };
 
 use crate::{
-    lex::{BlockType, Delimiter, Span, SpannedInput},
-    logos_lex::Token,
+    lex::{BlockType, Delimiter, SpannedInput},
+    logos_lex::{Span, Token},
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -74,8 +74,7 @@ mod tests {
     use chumsky::{prelude::Input, primitive::just, Parser};
 
     use crate::{
-        lex::Span,
-        logos_lex::Token,
+        logos_lex::{Span, Token},
         parse::{parser, Function, Ident, Item, Line, AST},
     };
 
