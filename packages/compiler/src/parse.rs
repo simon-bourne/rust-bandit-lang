@@ -5,7 +5,7 @@ use chumsky::{
     select, IterParser, Parser,
 };
 
-use crate::logos_lex::{BlockType, Delimiter, Span, Token};
+use crate::lex::{BlockType, Delimiter, Span, Token};
 
 pub type SpannedInput<'src, T> = input::SpannedInput<T, Span, &'src [(T, Span)]>;
 
@@ -73,7 +73,7 @@ mod tests {
     use chumsky::{prelude::Input, primitive::just, Parser};
 
     use crate::{
-        logos_lex::{Span, Token},
+        lex::{Span, Token},
         parse::{parser, Function, Ident, Item, Line, AST},
     };
 

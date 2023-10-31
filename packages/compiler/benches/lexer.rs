@@ -1,4 +1,4 @@
-use bandit_compiler::logos_lex::Token;
+use bandit_compiler::lex::Token;
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 
 pub fn basic(c: &mut Criterion) {

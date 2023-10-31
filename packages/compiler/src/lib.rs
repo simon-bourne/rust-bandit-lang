@@ -1,2 +1,2 @@
-pub mod logos_lex;
+pub mod lex;
 pub mod parse;
