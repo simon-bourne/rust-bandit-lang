@@ -158,7 +158,7 @@ struct TokenIter<'src, I> {
     flat_iter: I,
     indent_type: IndentType,
     indent_stack: Vec<TypedIndent>,
-    current_indent: (TypedIndent, Span),
+    current_indent: Spanned<TypedIndent>,
 }
 
 impl<'src, I> TokenIter<'src, I>
