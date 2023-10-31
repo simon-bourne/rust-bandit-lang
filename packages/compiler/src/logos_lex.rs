@@ -151,13 +151,6 @@ impl TypedIndent {
     fn new(typ: IndentType, indent: Indent) -> Self {
         Self { typ, indent }
     }
-
-    fn block(indent: Indent) -> Self {
-        Self {
-            typ: IndentType::Block,
-            indent,
-        }
-    }
 }
 
 struct TokenIter<'src, I> {
@@ -178,7 +171,10 @@ where
             flat_iter,
             indent_type: IndentType::Block,
             indent_stack: Vec::new(),
-            current_indent: (TypedIndent::block(Indent::default()), Span::new(0, 0)),
+            current_indent: (
+                TypedIndent::new(IndentType::Block, Indent::default()),
+                Span::new(0, 0),
+            ),
         }
     }
 
