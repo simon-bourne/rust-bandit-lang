@@ -1,14 +1,13 @@
 use chumsky::{
-    extra,
+    extra, input,
     prelude::{Cheap, Rich},
     primitive::just,
     select, IterParser, Parser,
 };
 
-use crate::{
-    lex::{BlockType, Delimiter, SpannedInput},
-    logos_lex::{Span, Token},
-};
+use crate::logos_lex::{BlockType, Delimiter, Span, Token};
+
+pub type SpannedInput<'src, T> = input::SpannedInput<T, Span, &'src [(T, Span)]>;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AST {

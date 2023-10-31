@@ -3,7 +3,6 @@ use std::fmt::{self, Display, Formatter, Write};
 use chumsky::{
     container::Container,
     extra::{self, ParserExtra},
-    input,
     prelude::{Cheap, Input, Rich},
     primitive::{choice, just, one_of},
     recursive::recursive,
@@ -15,9 +14,10 @@ use chumsky::{
     ConfigIterParser, IterParser, Parser,
 };
 
-use crate::logos_lex::{Span, Spanned};
-
-pub type SpannedInput<'src, T> = input::SpannedInput<T, Span, &'src [(T, Span)]>;
+use crate::{
+    logos_lex::{Span, Spanned, Keyword, BlockType, Delimiter},
+    parse::SpannedInput,
+};
 
 #[derive(Default, Clone, Debug, Eq, PartialEq)]
 pub struct Line<'src>(Vec<Spanned<TokenTree<'src>>>);
@@ -95,124 +95,6 @@ impl<'src> Container<Line<'src>> for Block<'src> {
 
     fn with_capacity(n: usize) -> Self {
         Self(Vec::with_capacity(n))
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum BlockType {
-    Do,
-    Else,
-    Match,
-    Loop,
-    Then,
-    Record,
-    Where,
-}
-
-impl BlockType {
-    fn as_str(self) -> &'static str {
-        match self {
-            BlockType::Do => "do",
-            BlockType::Else => "else",
-            BlockType::Match => "match",
-            BlockType::Loop => "loop",
-            BlockType::Then => "then",
-            BlockType::Record => "record",
-            BlockType::Where => "where",
-        }
-    }
-
-    fn is_continuation(self) -> bool {
-        match self {
-            Self::Do | Self::Else | Self::Match | Self::Then | Self::Record | Self::Where => true,
-            // Loop can start a line, so it can't be merged.
-            Self::Loop => false,
-        }
-    }
-}
-
-impl Display for BlockType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Delimiter {
-    Parentheses,
-    Brackets,
-    Braces,
-    Indent,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Keyword {
-    Alias,
-    Forall,
-    If,
-    Infer,
-    Let,
-    Module,
-    Provide,
-    Return,
-    SelfType,
-    Trait,
-    Type,
-    Use,
-    While,
-    With,
-}
-
-impl AsRef<str> for Keyword {
-    fn as_ref(&self) -> &str {
-        use Keyword as K;
-
-        match self {
-            K::Alias => "alias",
-            K::Forall => "forall",
-            K::If => "if",
-            K::Infer => "infer",
-            K::Let => "let",
-            K::Module => "module",
-            K::Provide => "provide",
-            K::Return => "return",
-            K::SelfType => "Self",
-            K::Trait => "trait",
-            K::Type => "type",
-            K::Use => "use",
-            K::While => "while",
-            K::With => "with",
-        }
-    }
-}
-
-impl<'a> TryFrom<&'a str> for Keyword {
-    type Error = ();
-
-    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        use Keyword as K;
-
-        match value {
-            "if" => Ok(K::If),
-            "return" => Ok(K::Return),
-            "while" => Ok(K::While),
-            "alias" => Ok(K::Alias),
-            "forall" => Ok(K::Forall),
-            "infer" => Ok(K::Infer),
-            "module" => Ok(K::Module),
-            "let" => Ok(K::Let),
-            "Self" => Ok(K::SelfType),
-            "trait" => Ok(K::Trait),
-            "type" => Ok(K::Type),
-            "use" => Ok(K::Use),
-            _ => Err(()),
-        }
-    }
-}
-
-impl Display for Keyword {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_ref())
     }
 }
 
