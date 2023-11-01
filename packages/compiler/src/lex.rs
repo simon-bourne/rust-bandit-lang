@@ -332,6 +332,11 @@ where
             }
             Ordering::Equal => {
                 self.current_indent.span = span;
+
+                if self.current_indent.typ == IndentType::LineContinuation {
+                    return self.next();
+                }
+
                 Token::LineStart
             }
             Ordering::Greater => {
