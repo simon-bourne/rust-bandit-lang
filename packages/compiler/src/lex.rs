@@ -242,11 +242,12 @@ enum IndentType {
 struct Indent {
     typ: IndentType,
     indent: IndentToken,
+    span: Span,
 }
 
 impl Indent {
-    fn new(typ: IndentType, indent: IndentToken) -> Self {
-        Self { typ, indent }
+    fn new(typ: IndentType, indent: IndentToken, span: Span) -> Self {
+        Self { typ, indent, span }
     }
 }
 
@@ -255,7 +256,7 @@ struct TokenIter<'src, I> {
     flat_iter: I,
     indent_type: IndentType,
     indent_stack: Vec<Indent>,
-    current_indent: Spanned<Indent>,
+    current_indent: Indent,
 }
 
 impl<'src, I> TokenIter<'src, I>
@@ -268,28 +269,26 @@ where
             flat_iter,
             indent_type: IndentType::Block,
             indent_stack: Vec::new(),
-            current_indent: (
-                Indent::new(IndentType::Block, IndentToken::default()),
-                Span::new(0, 0),
-            ),
+            current_indent: Indent::new(IndentType::Block, IndentToken::default(), Span::new(0, 0)),
         }
     }
 
     fn close_dangling_blocks(&mut self) -> Option<Spanned<Token>> {
         // TODO: Check current indent is consistent with stack
         while let Some(top) = self.indent_stack.last() {
-            let (current_indent, current_indent_span) = self.current_indent;
+            let current_indent = self.current_indent;
 
             if current_indent.indent > top.indent {
                 break;
             }
 
             let indent_type = current_indent.typ;
-            self.current_indent.0 = *top;
+            self.current_indent = *top;
             self.indent_stack.pop();
 
             if indent_type == IndentType::Block {
-                return Some((Token::Close(Delimiter::Indent), current_indent_span));
+                // TODO: Fix span
+                return Some((Token::Close(Delimiter::Indent), current_indent.span));
             }
         }
 
@@ -298,8 +297,8 @@ where
 
     fn close_final_blocks(&mut self) -> Option<Spanned<Token>> {
         while let Some(last_indent) = self.indent_stack.pop() {
-            let current_indent_type = self.current_indent.0.typ;
-            self.current_indent.0 = last_indent;
+            let current_indent_type = self.current_indent.typ;
+            self.current_indent = last_indent;
 
             if current_indent_type == IndentType::Block {
                 let source_len = self.source.len();
@@ -320,12 +319,12 @@ where
         span: Span,
     ) -> Option<Spanned<Token>> {
         let indent = IndentToken::from_source(self.source, span);
-        let new_indent = Indent::new(last_indent_type, indent);
+        let new_indent = Indent::new(last_indent_type, indent, span);
 
-        let current_indent = self.current_indent.0;
+        let current_indent = self.current_indent;
         let item = match current_indent.indent.cmp(&new_indent.indent) {
             Ordering::Less => {
-                self.current_indent = (new_indent, span);
+                self.current_indent = new_indent;
                 self.indent_stack.push(current_indent);
 
                 if new_indent.typ == IndentType::LineContinuation {
@@ -336,7 +335,7 @@ where
             }
             Ordering::Equal => Token::LineStart,
             Ordering::Greater => {
-                self.current_indent = (self.indent_stack.pop().unwrap(), span);
+                self.current_indent = self.indent_stack.pop().unwrap();
 
                 match current_indent.typ {
                     IndentType::Block => Token::Close(Delimiter::Indent),
