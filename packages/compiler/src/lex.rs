@@ -73,11 +73,11 @@ fn indentation(token: &mut Lexer<FlatToken>) -> Filter<()> {
 }
 
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq, PartialOrd, Ord)]
-struct Indent {
+struct IndentToken {
     width: usize,
 }
 
-impl Indent {
+impl IndentToken {
     fn from_source(source: &str, span: Span) -> Self {
         let token = source.get(span.into_range()).unwrap();
 
@@ -98,7 +98,7 @@ impl Indent {
 impl FlatToken {
     fn tokens(source: &str) -> impl Iterator<Item = Spanned<Self>> + '_ {
         let is_empty_indent =
-            |token: &Spanned<Self>| Indent::from_source(source, token.1).width == 0;
+            |token: &Spanned<Self>| IndentToken::from_source(source, token.1).width == 0;
 
         Self::lexer(source)
             .spanned()
@@ -241,11 +241,11 @@ enum IndentType {
 #[derive(Copy, Clone)]
 struct TypedIndent {
     typ: IndentType,
-    indent: Indent,
+    indent: IndentToken,
 }
 
 impl TypedIndent {
-    fn new(typ: IndentType, indent: Indent) -> Self {
+    fn new(typ: IndentType, indent: IndentToken) -> Self {
         Self { typ, indent }
     }
 }
@@ -269,7 +269,7 @@ where
             indent_type: IndentType::Block,
             indent_stack: Vec::new(),
             current_indent: (
-                TypedIndent::new(IndentType::Block, Indent::default()),
+                TypedIndent::new(IndentType::Block, IndentToken::default()),
                 Span::new(0, 0),
             ),
         }
@@ -319,7 +319,7 @@ where
         last_indent_type: IndentType,
         span: Span,
     ) -> Option<Spanned<Token>> {
-        let indent = Indent::from_source(self.source, span);
+        let indent = IndentToken::from_source(self.source, span);
         let new_indent = TypedIndent::new(last_indent_type, indent);
 
         let current_indent = self.current_indent.0;
