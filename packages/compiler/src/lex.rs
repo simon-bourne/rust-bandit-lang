@@ -340,6 +340,7 @@ where
                 Token::LineStart
             }
             Ordering::Greater => {
+                // TODO: Fix this
                 self.current_indent = self.indent_stack.pop().unwrap();
                 self.current_indent.span = span;
 
