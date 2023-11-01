@@ -333,9 +333,13 @@ where
 
                 Token::Open(Delimiter::Indent)
             }
-            Ordering::Equal => Token::LineStart,
+            Ordering::Equal => {
+                self.current_indent.span = span;
+                Token::LineStart
+            }
             Ordering::Greater => {
                 self.current_indent = self.indent_stack.pop().unwrap();
+                self.current_indent.span = span;
 
                 match current_indent.typ {
                     IndentType::Block => Token::Close(Delimiter::Indent),
