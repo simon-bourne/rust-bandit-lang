@@ -239,12 +239,12 @@ enum IndentType {
 }
 
 #[derive(Copy, Clone)]
-struct TypedIndent {
+struct Indent {
     typ: IndentType,
     indent: IndentToken,
 }
 
-impl TypedIndent {
+impl Indent {
     fn new(typ: IndentType, indent: IndentToken) -> Self {
         Self { typ, indent }
     }
@@ -254,8 +254,8 @@ struct TokenIter<'src, I> {
     source: &'src str,
     flat_iter: I,
     indent_type: IndentType,
-    indent_stack: Vec<TypedIndent>,
-    current_indent: Spanned<TypedIndent>,
+    indent_stack: Vec<Indent>,
+    current_indent: Spanned<Indent>,
 }
 
 impl<'src, I> TokenIter<'src, I>
@@ -269,7 +269,7 @@ where
             indent_type: IndentType::Block,
             indent_stack: Vec::new(),
             current_indent: (
-                TypedIndent::new(IndentType::Block, IndentToken::default()),
+                Indent::new(IndentType::Block, IndentToken::default()),
                 Span::new(0, 0),
             ),
         }
@@ -320,7 +320,7 @@ where
         span: Span,
     ) -> Option<Spanned<Token>> {
         let indent = IndentToken::from_source(self.source, span);
-        let new_indent = TypedIndent::new(last_indent_type, indent);
+        let new_indent = Indent::new(last_indent_type, indent);
 
         let current_indent = self.current_indent.0;
         let item = match current_indent.indent.cmp(&new_indent.indent) {
