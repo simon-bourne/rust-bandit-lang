@@ -1,11 +1,12 @@
 use chumsky::{
+    combinator::DelimitedBy,
     extra, input,
     prelude::{Cheap, Rich},
-    primitive::just,
+    primitive::{just, Just},
     select, IterParser, Parser,
 };
 
-use crate::lex::{BlockType, Delimiter, Span, Token};
+use crate::lex::{Delimiter, Span, Token};
 
 pub type SpannedInput<'src, T> = input::SpannedInput<T, Span, &'src [(T, Span)]>;
 
@@ -34,9 +35,20 @@ pub struct Ident(Span);
 pub type FastError<'src> = extra::Err<Cheap<Span>>;
 pub type RichError<'src> = extra::Err<Rich<'src, Token, Span>>;
 
+pub type JustToken<'src> = Just<Token, SpannedInput<'src, Token>, RichError<'src>>;
+
 pub trait TTParser<'src, Output>:
     Parser<'src, SpannedInput<'src, Token>, Output, RichError<'src>>
 {
+    fn delimited(
+        self,
+        delimiter: Delimiter,
+    ) -> DelimitedBy<Self, JustToken<'src>, JustToken<'src>, Token, Token>
+    where
+        Self: Sized,
+    {
+        self.delimited_by(just(Token::Open(delimiter)), just(Token::Close(delimiter)))
+    }
 }
 
 impl<'src, Output, T> TTParser<'src, Output> for T where
@@ -48,20 +60,12 @@ fn ident<'src>() -> impl TTParser<'src, Ident> + Copy + Clone {
     select! { Token::Identifier = ext => Ident(ext.span()) }
 }
 
-fn block<'src>(typ: BlockType) -> impl TTParser<'src, ()> {
-    select! { Token::Block(block_type) if typ == block_type => () }
-}
-
 pub fn parser<'src>() -> impl TTParser<'src, AST> {
     let ident = ident();
-    let line = ident.map(Line);
-    let body = line.separated_by(just(Token::LineStart)).collect();
+    let line = ident.map(Line).then_ignore(just(Token::LineEnd));
+    let body = line.repeated().collect();
     let function = ident
-        .then_ignore(block(BlockType::Do))
-        .then(body.delimited_by(
-            just(Token::Open(Delimiter::Indent)),
-            just(Token::Close(Delimiter::Indent)),
-        ))
+        .then(body.delimited(Delimiter::Braces))
         .map(|(name, body)| Function { name, body });
     let item = function.map(Item::Function);
 
@@ -81,9 +85,10 @@ mod tests {
     fn basic() {
         // TODO: indoc
         const SRC: &str = r#"
-my_function do
-    call1
-    call2
+my_function {
+    call1;
+    call2;
+}
 "#;
 
         let tokens = Token::tokens(SRC).collect::<Vec<_>>();
@@ -97,7 +102,7 @@ my_function do
                 items: vec![Item::Function(Function {
                     name: Ident(Span::new(1, 12)),
                     body: vec![
-                        Line(Ident(Span::new(20, 25))),
+                        Line(Ident(Span::new(19, 24))),
                         Line(Ident(Span::new(30, 35)))
                     ]
                 })]
