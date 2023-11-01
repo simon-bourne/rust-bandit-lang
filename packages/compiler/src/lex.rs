@@ -97,10 +97,16 @@ impl Indent {
 
 impl FlatToken {
     fn tokens(source: &str) -> impl Iterator<Item = Spanned<Self>> + '_ {
-        Self::lexer(source).spanned().map(|(tok, span)| match tok {
-            Ok(tok) => (tok, Span::from(span)),
-            Err(()) => (Self::Error, span.into()),
-        })
+        let is_empty_indent =
+            |token: &Spanned<Self>| Indent::from_source(source, token.1).width == 0;
+
+        Self::lexer(source)
+            .spanned()
+            .map(|(tok, span)| match tok {
+                Ok(tok) => (tok, Span::from(span)),
+                Err(()) => (Self::Error, span.into()),
+            })
+            .skip_while(is_empty_indent)
     }
 
     fn indent_type(&self) -> IndentType {

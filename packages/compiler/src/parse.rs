@@ -70,7 +70,7 @@ pub fn parser<'src>() -> impl TTParser<'src, AST> {
 
 #[cfg(test)]
 mod tests {
-    use chumsky::{prelude::Input, primitive::just, Parser};
+    use chumsky::{prelude::Input, Parser};
 
     use crate::{
         lex::{Span, Token},
@@ -87,11 +87,7 @@ my_function do
 "#;
 
         let tokens = Token::tokens(SRC).collect::<Vec<_>>();
-
-        // TODO: What to do about the spurious `LineStart`?
-        let ast = just(Token::LineStart)
-            .ignore_then(parser())
-            .parse(tokens.spanned(Span::new(SRC.len(), SRC.len())));
+        let ast = parser().parse(tokens.spanned(Span::new(SRC.len(), SRC.len())));
 
         // TODO: Pretty print the AST and use golden tests. Assert all the id's
         // are the same in their source to check the spans are correct.
