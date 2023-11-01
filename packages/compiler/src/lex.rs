@@ -282,12 +282,9 @@ where
                 break;
             }
 
-            let indent_type = current_indent.typ;
-            self.current_indent = *top;
             self.indent_stack.pop();
 
-            if indent_type == IndentType::Block {
-                // TODO: Fix span
+            if current_indent.typ == IndentType::Block {
                 return Some((Token::Close(Delimiter::Indent), current_indent.span));
             }
         }
