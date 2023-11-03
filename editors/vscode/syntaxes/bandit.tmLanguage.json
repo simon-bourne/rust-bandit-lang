@@ -40,11 +40,11 @@
 			"patterns": [
 				{
 					"name": "keyword.control.bandit",
-					"match": "\\b(do|else|if|match|loop|return|then|while)\\b"
+					"match": "\\b(else|if|match|loop|return|while)\\b"
 				},
 				{
 					"name": "keyword.other.bandit",
-					"match": "\\b(alias|forall|infer|module|let|record|Self|trait|type|use|where|with)\\b"
+					"match": "\\b(alias|data|forall|infer|module|let|provide|Self|trait|use|where)\\b"
 				}
 			]
 		},

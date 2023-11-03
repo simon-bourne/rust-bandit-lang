@@ -21,19 +21,22 @@ pub enum Token {
     LineEnd,
 
     #[token("alias", |_| Keyword::Alias)]
+    #[token("data", |_| Keyword::Data)]
+    #[token("else", |_| Keyword::Else)]
     #[token("forall", |_| Keyword::Forall)]
     #[token("if", |_| Keyword::If)]
     #[token("infer", |_| Keyword::Infer)]
     #[token("let", |_| Keyword::Let)]
+    #[token("loop", |_| Keyword::Loop)]
+    #[token("match", |_| Keyword::Match)]
     #[token("module", |_| Keyword::Module)]
-    #[token("provide", |_| Keyword::Provide)]
     #[token("return", |_| Keyword::Return)]
+    #[token("provide", |_| Keyword::Provide)]
     #[token("Self", |_| Keyword::SelfType)]
     #[token("trait", |_| Keyword::Trait)]
-    #[token("type", |_| Keyword::Type)]
     #[token("use", |_| Keyword::Use)]
+    #[token("where", |_| Keyword::Where)]
     #[token("while", |_| Keyword::While)]
-    #[token("with", |_| Keyword::With)]
     Keyword(Keyword),
 
     #[token("\\")]
@@ -62,37 +65,6 @@ pub type Span = SimpleSpan<usize>;
 pub type Spanned<T> = (T, Span);
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum BlockType {
-    Do,
-    Else,
-    Match,
-    Loop,
-    Then,
-    Record,
-    Where,
-}
-
-impl From<BlockType> for &'static str {
-    fn from(value: BlockType) -> Self {
-        match value {
-            BlockType::Do => "do",
-            BlockType::Else => "else",
-            BlockType::Match => "match",
-            BlockType::Loop => "loop",
-            BlockType::Then => "then",
-            BlockType::Record => "record",
-            BlockType::Where => "where",
-        }
-    }
-}
-
-impl Display for BlockType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(<&str>::from(*self))
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Delimiter {
     Parentheses,
     Brackets,
@@ -102,19 +74,22 @@ pub enum Delimiter {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Keyword {
     Alias,
+    Data,
+    Else,
     Forall,
     If,
     Infer,
     Let,
+    Loop,
+    Match,
     Module,
     Provide,
     Return,
     SelfType,
     Trait,
-    Type,
     Use,
+    Where,
     While,
-    With,
 }
 
 impl From<Keyword> for &'static str {
@@ -123,19 +98,22 @@ impl From<Keyword> for &'static str {
 
         match value {
             K::Alias => "alias",
+            K::Data => "data",
+            K::Else => "else",
             K::Forall => "forall",
             K::If => "if",
             K::Infer => "infer",
             K::Let => "let",
+            K::Loop => "loop",
+            K::Match => "match",
             K::Module => "module",
             K::Provide => "provide",
             K::Return => "return",
-            K::SelfType => "Self",
+            K::SelfType => "SelfType",
             K::Trait => "trait",
-            K::Type => "type",
             K::Use => "use",
+            K::Where => "where",
             K::While => "while",
-            K::With => "with",
         }
     }
 }
