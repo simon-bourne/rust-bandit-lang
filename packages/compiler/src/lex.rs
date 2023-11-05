@@ -23,6 +23,7 @@ pub enum Token {
     #[token("alias", |_| Keyword::Alias)]
     #[token("data", |_| Keyword::Data)]
     #[token("else", |_| Keyword::Else)]
+    #[token("embody", |_| Keyword::Embody)]
     #[token("forall", |_| Keyword::Forall)]
     #[token("if", |_| Keyword::If)]
     #[token("infer", |_| Keyword::Infer)]
@@ -31,7 +32,6 @@ pub enum Token {
     #[token("match", |_| Keyword::Match)]
     #[token("module", |_| Keyword::Module)]
     #[token("return", |_| Keyword::Return)]
-    #[token("provide", |_| Keyword::Provide)]
     #[token("Self", |_| Keyword::SelfType)]
     #[token("trait", |_| Keyword::Trait)]
     #[token("use", |_| Keyword::Use)]
@@ -76,6 +76,7 @@ pub enum Keyword {
     Alias,
     Data,
     Else,
+    Embody,
     Forall,
     If,
     Infer,
@@ -83,7 +84,6 @@ pub enum Keyword {
     Loop,
     Match,
     Module,
-    Provide,
     Return,
     SelfType,
     Trait,
@@ -100,6 +100,7 @@ impl From<Keyword> for &'static str {
             K::Alias => "alias",
             K::Data => "data",
             K::Else => "else",
+            K::Embody => "embody",
             K::Forall => "forall",
             K::If => "if",
             K::Infer => "infer",
@@ -107,7 +108,6 @@ impl From<Keyword> for &'static str {
             K::Loop => "loop",
             K::Match => "match",
             K::Module => "module",
-            K::Provide => "provide",
             K::Return => "return",
             K::SelfType => "SelfType",
             K::Trait => "trait",
