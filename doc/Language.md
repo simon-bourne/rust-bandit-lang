@@ -11,52 +11,6 @@
 - GADTs.
 - Macro hygiene.
 
-## Layout
-
-Blocks start with the keywords `do`, `then`, `where`, and `match`. If block start keyword is at the start of a line, it can be indented by the same amount as the block header statement without creating a new line. There's no `pass` keyword, or similar, because we can just use the unit type.
-
-```bandit
-block header
-do
-    a statement
-    another statement
-
-    nested block header then
-        a statement
-        do a statement, another statement
-        etc
-    
-    # Empty single line block
-    do ()
-
-    # Empty multi line block
-    do
-        ()
-
-    # 2 blocks on a single line
-    (do x + y) + (do y + z)
-    
-    do
-            statement
-            statement
-        + x
-        + y
-```
-
-If anything appears on the same line after the block keyword, it is a single line block:
-
-```bandit
-start of block do start of another block do statement
-```
-
-Omit the block start keyword for empty statements. We don't use `pass`, like python, as we use keywords to indicate the start of a block, instead of `:`, so it's visually obvious when a block is empty.
-
-```bandit
-trait EmptyTrait
-
-type Void
-```
-
 ## Types
 
 ### Coercion
@@ -89,56 +43,51 @@ There's no such thing as a doctest, just a unit test. The body of a function can
 
 ## Syntax
 
-The syntax is generally Haskell-like, but strict. To make a type into a reference, just add a lifetime. Lifetimes cannot be elided.
+The syntax is generally Haskell-like, but strict with explicit braces. To make a type into a reference, just add a lifetime. Lifetimes cannot be elided.
 
 ## Functions
 
 ```bandit
-my_function1 x = stuff
+simple_assign = stuff
 
-my_function2 : a -> b match
-    x then stuff
+pattern_matching : a -> b = match {
+    1 then stuff,
+    x then stuff,
+}
 
-my_function3 : a -> b =
-    \x do stuff
+simple_arguments : a -> b -> c -> d =
+\x y z => stuff
 
-my_function4 x = \y: stuff
+block_arguments : a -> b -> c -> d =
+\x y z {
+    stuff
+}
 
-my_function5 : forall a b. a -> b match
-    x then stuff
+explicit_quantification : forall a b. a -> b
+= stuff
 
-my_function6 : forall (a : Type) (b : Type). a -> b match
-    some_pattern if condition then stuff
-    another_pattern then other_stuff
-    else more_stuff
+references : a & c -> b & c
+= stuff
 
-my_function7 : a 'b -> a 'b -> a 'b with (Ord + Eq) a match
-    x y then
-        if x > y then x
-        else y
+explicit_typed_quantification : forall (a : Type) (b : Type) (c : Lifetime). a & c -> b & c
+= stuff
 
-my_function8 : Option a -> Option a -> Option a match
+contraints : a -> a -> a where Ord a and Eq a = stuff
+
+type_constructors : Option a -> Option a -> Option a = match {
     (Some x) _ then x
     _ (Some y) then y
-    _ _ then None
+    else None
+}
 
-my_function9 : Option a -> Option a -> Option a match
-    (Some x) _ then x
-    _ (Some y) then y
-    _ _ then None
+multiplicity : Int & 'a 1 -> Int & 'a 1
 
-simple_quantification : forall ('a : Lifetime) (Ord t). t 'a -> t 'a
-
-multiplicity : Int 'a 1 -> Int 'a 1
-
-multiplicity_polymorphism :  Int 'a n ->  Int 'a n
+multiplicity_polymorphism :  Int & 'a n ->  Int & 'a n
 ```
 
-`f do ...` (with no arguments) is short for `f () do`. Similarly for `match`, but not for `=`, as that's for constants. Use `f = do ...` if you want a function that's a block that returns a function.
+The expression `f` will evaluate `f` if it's a function. To keep it as a function, use `&f`.
 
 ## Contexts
-
-The context of a type variable can be defined in the `foreach` or `with` clause. The context of a function can only be specified in the `with` clause. `( Y + Z) X` means traits `Y` and `Z` are implemented for `X`. Functions might want to specify marker traits like `Send`.
 
 Rust:
 
@@ -153,25 +102,39 @@ where
 Bandit:
 
 ```bandit
-f (x : X) : () with
-    (X + Y + 'static) a
-    (X + Z Int) (B a)
-do
-    ...
+f : b -> () where
+    X b,
+    X a, Y a, static a,
+    X (B a), Z (B a) Int,
+\x {...}
+```
+
+To specify constraints on the function type:
+
+```bandit
+f : (a -> b) ~ c where
+    Send c
 ```
 
 ## Lambdas
 
-Lambdas are defined exactly like names functions, but their name is `\`. So:
+```bandit
+\x y => z x y
+\x y { z x y }
+\x y match {...}
+
+(\ => add) : Int -> Int -> Int
+```
+
+Some control flow examples:
 
 ```bandit
-\x y = z x y
-\x y do
-    z xy
-\x y match
-    ...
+xs.for \x {
+    stuff;
+    more_stuff
+}
 
-\ : Int -> Int -> Int = add
+xs.for \x => stuff
 ```
 
 ## Type Application
@@ -208,28 +171,6 @@ my_constant1 : Int = 42
 
 All string literals can be split across multiple lines, like Rust.
 
-## Closures
-
-```bandit
-\x y z = stuff
-\(x : Int) (y : Int) : Int = stuff
-\x y z do
-    stuff
-    more_stuff
-```
-
-There are no zero argument functions. `\do` is short for `\() do`.
-
-Some control flow examples:
-
-```bandit
-xs.for \x do
-    stuff
-    more_stuff
-
-xs.for \x = stuff
-```
-
 ## Data Types
 
 ### Tuples
@@ -256,43 +197,51 @@ x = apply f (1 :: Int, (2 :: Int, ()))
 can be written as:
 
 ```bandit
-trait Apply a r where
-    apply : self -> a -> r
+trait Apply a r {
+    apply : self -> a -> r;
+}
 
-Apply (arg -> f_tail) (arg, tuple_tail) result
-with Apply f_tail tuple_tail result
-    apply self (fst, snd) = apply (f fst) snd
+embody Apply (arg -> f_tail) (arg, tuple_tail) result
+where
+    Apply f_tail tuple_tail result
+{
+    apply self (fst, snd) = apply (f fst) snd;
+}
 
-Apply (() -> result) () result where
-  apply self () = self ()
+embody Apply (() -> result) () result {
+  apply self () = self ();
+}
 
-f : Int -> Int -> Int = (+)
+f : Int -> Int -> Int = add;
 
-g : Int = f.apply (1 : Int, 2 : Int)
+g : Int = f.apply (1 : Int, 2 : Int);
 ```
 
 ### Sums
 
 ```bandit
-type MySum where
-    MyEmptyVariant
-    MySumOfProduct record field1 field2 : U32
-    MyVariant U32 U64
+data MySum {
+    MyEmptyVariant,
+    MySumOfProduct { field1 : U32, field2 : U32 },
+    MyVariant U32 U64,
+}
 
-type MyGenericSum a b where
-    Single a
-    Pair record first : a, second : b
+data MyGenericSum a b {
+    Single a,
+    Pair { first : a, second : b }
+}
 
-type Term a where
-    Empty with a = ()
-    Literal a
-    Equal b b with Compare b, a = Bool
-    Pair record first : f, second : s with a = (f, s)
-    ExplicitlyQuantifiedPair forall f s. record
-        first : f
-        second : s
-    with
-        a = (f, s)
+data Term a {
+    Empty : Self (),
+    Literal a,
+    Equal b -> b -> Term Bool where Compare b,
+    Pair { first : f, second : s } -> Term (f, s),
+    ExplicitlyQuantifiedPair forall f s. {
+        first : f,
+        second : s,
+    }
+    -> Term (f, s)
+}
 ```
 
 Type constructors are namespaced under their type. For example, `MySum::EmptyVariant`.
@@ -304,12 +253,13 @@ GADTs are not very easy to map to Rust. For example, the `Equal` variant needs t
 With GADTs, we can use the more specific result type in a pattern match:
 
 ```bandit
-eval : Term a -> a match
+eval : Term a -> a = match {
     Empty then ()
     Literal i then i
     Equal i j then i == j
     Pair x then (x.first, x.second)
     ExplicitlyQuantifiedPair first, second then (f, s)
+}
 ```
 
 This is where things diverge from Haskell. Record syntax is not just sugar. So `x` in `Pair x` above is the entire record, which can be accessed with `.` notation.
@@ -321,23 +271,27 @@ Products are just sums with only 1 variant. It's suggested to use the name `New`
 For example:
 
 ```bandit
-type MyUnit where New
-type MyType where New U32
-type MyProduct where New record field1 field2 : U32
-type MyGenericProduct a where
-    New record
-        field1 : U32
-        field2 : a
+data MyUnit { New }
+data MyType { New U32 }
+data MyProduct { New { field1 field2 : U32 }}
+data MyGenericProduct a {
+    New {
+        field1 : U32,
+        field2 : a,
+    }
+}
 ```
 
 ### Higher Kinded Types
 
 ```bandit
-type Wrapper (container : Type -> Type) (element : Type) where New (container element)
+data Wrapper (container : Type -> Type) (element : Type) { New (container element) }
 
 hkt : forall (container : Type -> Type) (element : Type).
     container element -> ()
-    with MyTrait container
+    where MyTrait container
+{
+}
 ```
 
 ## Dot Notation
@@ -369,53 +323,63 @@ Like Haskell.
 TODO: Do we want the Haskell style ambiguity check?
 
 ```bandit
-trait MyTrait where
-    alias MyType
+trait MyTrait {
+    alias MyType;
 
-    f : Int
+    f : Int;
+}
 ```
 
 Both `MyType` and `f` are ambiguous and so can never be called.
 
 ```bandit
-trait A a where
-    alias R a
-    f : R a
+trait A a {
+    alias R a;
+    f : R a;
+}
 
-trait B a where
-    f : forall a. Int
+trait B a {
+    f : forall a. Int;
+}
 
-type X
+data X { New }
 
-A X where
-    alias R X = Int
-    f = 1
+embody A X {
+    alias R X = Int;
+    f = 1;
+}
 
-B X where
-    f = 2
+embody B X {
+    f = 2;
+}
 
-g : Int = f @ X
+g : Int = f @ X;
 
-data Y a = New a
+data Y a { New a }
 
-A (Y a) where
-    alias R (Y a) = Int
-    f = 1
+embody A (Y a) {
+    alias R (Y a) = Int;
+    f = 1;
+}
 
-B (Y a) where
-    f = 1
+embody B (Y a) {
+    f = 1;
+}
 
-data Z = New Int
+data Z { New Int }
 
-A Z where
-    alias R Z = Int
-    f = 1
+embody A Z {
+    alias R Z = Int;
+    f = 1;
+}
 
-h : Y t -> R (Y t) match
-    _ then f @ (Y t)
+h : Y t -> R (Y t) = match {
+    _ then f @ (Y t);
+}
 
-j : Z -> Z::R match
+j : Z -> Z::R = match {
     _ then f @ Z
+}
 ```
 
 `h` is equivalent to the Rust code:
