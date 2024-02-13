@@ -44,7 +44,7 @@
 				},
 				{
 					"name": "keyword.other.bandit",
-					"match": "\\b(alias|and|data|embody|forall|infer|module|not|let|or|Self|then|trait|use|where)\\b"
+					"match": "\\b(alias|and|embody|forall|infer|module|not|let|or|record|Self|then|trait|union|use|variant|where)\\b"
 				}
 			]
 		},
