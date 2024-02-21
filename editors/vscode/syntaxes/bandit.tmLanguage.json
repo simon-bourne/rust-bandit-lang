@@ -43,8 +43,12 @@
 					"match": "\\b(else|if|match|loop|return|while)\\b"
 				},
 				{
+					"name": "keyword.operator.bandit",
+					"match": "\\b(and|not|or)\\b"
+				},
+				{
 					"name": "keyword.other.bandit",
-					"match": "\\b(alias|and|data|embody|forall|infer|module|not|let|or|Self|then|trait|use|when|where)\\b"
+					"match": "\\b(alias|data|do|embody|forall|infer|module|let|Self|then|trait|use|when|where)\\b"
 				}
 			]
 		},
