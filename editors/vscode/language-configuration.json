@@ -11,6 +11,15 @@
     ],
     // symbols that are auto closed when typing
     "autoClosingPairs": [
+        ["embody", ";"],
+        ["if", ";"],
+        ["match", ";"],
+        ["loop", ";"],
+        ["data", ";"],
+        ["do", ";"],
+        ["embody", ";"],
+        ["record", ";"],
+        ["trait", ";"],
         ["{", "}"],
         ["[", "]"],
         ["(", ")"],
