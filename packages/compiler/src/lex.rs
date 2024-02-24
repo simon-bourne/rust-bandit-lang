@@ -14,7 +14,7 @@ pub enum Token {
     #[token("]", |_| Delimiter::Brackets)]
     #[token("}", |_| Delimiter::Braces)]
     Close(Delimiter),
-    
+
     #[token(",")]
     Comma,
 
