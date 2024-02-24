@@ -1,5 +1,3 @@
-use std::fmt::{self, Display, Formatter};
-
 use chumsky::span::SimpleSpan;
 use logos::Logos;
 
@@ -20,23 +18,34 @@ pub enum Token {
     #[token(";")]
     LineEnd,
 
-    #[token("alias", |_| Keyword::Alias)]
-    #[token("data", |_| Keyword::Data)]
+    #[token("break", |_| Keyword::Break)]
+    #[token("continue", |_| Keyword::Continue)]
     #[token("else", |_| Keyword::Else)]
+    #[token("if", |_| Keyword::If)]
+    #[token("match", |_| Keyword::Match)]
+    #[token("loop", |_| Keyword::Loop)]
+    #[token("return", |_| Keyword::Return)]
+    #[token("while", |_| Keyword::While)]
+    #[token("and", |_| Keyword::And)]
+    #[token("not", |_| Keyword::Not)]
+    #[token("or", |_| Keyword::Or)]
+    #[token("data", |_| Keyword::Data)]
+    #[token("do", |_| Keyword::Do)]
     #[token("embody", |_| Keyword::Embody)]
     #[token("forall", |_| Keyword::Forall)]
-    #[token("if", |_| Keyword::If)]
     #[token("infer", |_| Keyword::Infer)]
     #[token("let", |_| Keyword::Let)]
-    #[token("loop", |_| Keyword::Loop)]
-    #[token("match", |_| Keyword::Match)]
-    #[token("module", |_| Keyword::Module)]
-    #[token("return", |_| Keyword::Return)]
+    #[token("move", |_| Keyword::Move)]
+    #[token("mut", |_| Keyword::Mut)]
+    #[token("record", |_| Keyword::Record)]
+    #[token("require", |_| Keyword::Require)]
+    #[token("self", |_| Keyword::SelfValue)]
     #[token("Self", |_| Keyword::SelfType)]
+    #[token("then", |_| Keyword::Then)]
     #[token("trait", |_| Keyword::Trait)]
     #[token("use", |_| Keyword::Use)]
+    #[token("with", |_| Keyword::With)]
     #[token("where", |_| Keyword::Where)]
-    #[token("while", |_| Keyword::While)]
     Keyword(Keyword),
 
     #[token("\\")]
@@ -73,53 +82,32 @@ pub enum Delimiter {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Keyword {
-    Alias,
-    Data,
+    Break,
+    Continue,
     Else,
+    If,
+    Match,
+    Loop,
+    Return,
+    While,
+    And,
+    Not,
+    Or,
+    Data,
+    Do,
     Embody,
     Forall,
-    If,
     Infer,
     Let,
-    Loop,
-    Match,
-    Module,
-    Return,
+    Move,
+    Mut,
+    Record,
+    Require,
     SelfType,
+    SelfValue,
+    Then,
     Trait,
     Use,
+    With,
     Where,
-    While,
-}
-
-impl From<Keyword> for &'static str {
-    fn from(value: Keyword) -> Self {
-        use Keyword as K;
-
-        match value {
-            K::Alias => "alias",
-            K::Data => "data",
-            K::Else => "else",
-            K::Embody => "embody",
-            K::Forall => "forall",
-            K::If => "if",
-            K::Infer => "infer",
-            K::Let => "let",
-            K::Loop => "loop",
-            K::Match => "match",
-            K::Module => "module",
-            K::Return => "return",
-            K::SelfType => "SelfType",
-            K::Trait => "trait",
-            K::Use => "use",
-            K::Where => "where",
-            K::While => "while",
-        }
-    }
-}
-
-impl Display for Keyword {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(<&str>::from(*self))
-    }
 }
