@@ -40,7 +40,7 @@
 			"patterns": [
 				{
 					"name": "keyword.control.bandit",
-					"match": "\\b(else|if|match|loop|return|while)\\b"
+					"match": "\\b(break|continue|else|if|match|loop|return|while)\\b"
 				},
 				{
 					"name": "keyword.operator.bandit",
@@ -48,7 +48,7 @@
 				},
 				{
 					"name": "keyword.other.bandit",
-					"match": "\\b(alias|data|do|embody|forall|infer|module|let|record|require|self|Self|then|trait|use|with|where)\\b"
+					"match": "\\b(data|do|embody|forall|infer|let|move|mut|record|require|self|Self|then|trait|use|with|where)\\b"
 				}
 			]
 		},
