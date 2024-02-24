@@ -62,7 +62,7 @@ fn ident<'src>() -> impl TTParser<'src, Ident> + Copy {
 
 pub fn parser<'src>() -> impl TTParser<'src, AST> {
     let ident = ident();
-    let line = ident.map(Line).then_ignore(just(Token::LineEnd));
+    let line = ident.map(Line);
     let body = line.repeated().collect();
     let function = ident
         .then(body.delimited(Delimiter::Braces))

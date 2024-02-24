@@ -2,7 +2,7 @@ use chumsky::span::SimpleSpan;
 use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq, Eq, Copy, Clone)]
-#[logos(skip r"[ \t\r\n\f]+")]
+#[logos(skip r"[ \t\r\f]+")]
 #[logos(subpattern ident = r"(\p{XID_Start}|_)\p{XID_Continue}*")]
 pub enum Token {
     #[token("(", |_| Delimiter::Parentheses)]
@@ -14,9 +14,15 @@ pub enum Token {
     #[token("]", |_| Delimiter::Brackets)]
     #[token("}", |_| Delimiter::Braces)]
     Close(Delimiter),
+    
+    #[token(",")]
+    Comma,
+
+    #[token("\n")]
+    LineEnd,
 
     #[token(";")]
-    LineEnd,
+    StatementEnd,
 
     #[token("break", |_| Keyword::Break)]
     #[token("continue", |_| Keyword::Continue)]
@@ -48,14 +54,14 @@ pub enum Token {
     #[token("where", |_| Keyword::Where)]
     Keyword(Keyword),
 
-    #[token("\\")]
-    Lambda,
+    #[token("|")]
+    LambdaDelimiter,
 
     #[regex(r"(?&ident)")]
     Identifier,
     #[regex(r"'(?&ident)")]
     Lifetime,
-    #[regex(r"\$%\&\*\+\./<=>@\^\-\~\|")]
+    #[regex(r"[\$%\&\*\+\./<=>@\^\-\~]+")]
     Operator,
 
     Error,
