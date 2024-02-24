@@ -56,7 +56,7 @@ impl<'src, Output, T> TTParser<'src, Output> for T where
 {
 }
 
-fn ident<'src>() -> impl TTParser<'src, Ident> + Copy + Clone {
+fn ident<'src>() -> impl TTParser<'src, Ident> + Copy {
     select! { Token::Identifier = ext => Ident(ext.span()) }
 }
 
