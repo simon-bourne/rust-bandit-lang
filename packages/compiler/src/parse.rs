@@ -10,27 +10,27 @@ use crate::lex::{Delimiter, Keyword, Span, Token};
 pub type SpannedInput<'src, T> = input::SpannedInput<T, Span, &'src [(T, Span)]>;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AST {
-    pub items: Vec<Item>,
+pub struct AST<'src> {
+    pub items: Vec<Item<'src>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Item {
-    Function(Function),
+pub enum Item<'src> {
+    Function(Function<'src>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Function {
-    pub name: Identifier,
+pub struct Function<'src> {
+    pub name: Identifier<'src>,
 }
 
 pub type FastError<'src> = extra::Err<Cheap<Span>>;
-pub type RichError<'src> = extra::Err<Rich<'src, Token, Span>>;
+pub type RichError<'src> = extra::Err<Rich<'src, Token<'src>, Span>>;
 
-pub type JustToken<'src> = Just<Token, SpannedInput<'src, Token>, RichError<'src>>;
+pub type JustToken<'src> = Just<Token<'src>, SpannedInput<'src, Token<'src>>, RichError<'src>>;
 
 pub trait TTParser<'src, Output>:
-    Parser<'src, SpannedInput<'src, Token>, Output, RichError<'src>> + Sized + 'src
+    Parser<'src, SpannedInput<'src, Token<'src>>, Output, RichError<'src>> + Sized + 'src
 {
     fn kw(self, keyword: Keyword) -> impl TTParser<'src, Output> {
         self.then_ignore(
@@ -66,7 +66,7 @@ pub trait TTParser<'src, Output>:
 
 impl<'src, Output, T> TTParser<'src, Output> for T
 where
-    T: Parser<'src, SpannedInput<'src, Token>, Output, RichError<'src>>,
+    T: Parser<'src, SpannedInput<'src, Token<'src>>, Output, RichError<'src>>,
     T: 'src,
 {
 }
@@ -74,10 +74,13 @@ where
 macro_rules! lexeme {
     ($name:ident, $label:literal, $token:ident) => {
         #[derive(Clone, Debug, Eq, PartialEq)]
-        pub struct $token(Span);
+        pub struct $token<'src> {
+            name: &'src str,
+            span: Span,
+        }
 
-        fn $name<'src>() -> impl TTParser<'src, $token> + Copy {
-            select! { Token::$token = ext => $token(ext.span()) }.labelled($label)
+        fn $name<'src>() -> impl TTParser<'src, $token<'src>> + Copy {
+            select! { Token::$token(name) = ext => $token{name, span: ext.span()} }.labelled($label)
         }
     };
 }
@@ -96,7 +99,7 @@ macro_rules! token {
 token!(line_end, "\\n", LineEnd);
 token!(statement_end, ";", StatementEnd);
 
-pub fn parser<'src>() -> impl TTParser<'src, AST> {
+pub fn parser<'src>() -> impl TTParser<'src, AST<'src>> {
     line_end().repeated().ignore_then(
         function()
             .map(Item::Function)
@@ -106,13 +109,12 @@ pub fn parser<'src>() -> impl TTParser<'src, AST> {
     )
 }
 
-fn function<'src>() -> impl TTParser<'src, Function> {
-    // TODO: Parse this as an expression
+fn function<'src>() -> impl TTParser<'src, Function<'src>> {
     let name = ident()
         .open(Delimiter::Parentheses)
         .close(Delimiter::Parentheses)
         .skip_line_ends()
-        .then_ignore(operator())
+        .then_ignore(operator().filter(|op| op.name == "=").labelled("="))
         .skip_line_ends()
         .kw(Keyword::Do)
         .statement_end();
@@ -144,7 +146,10 @@ mod tests {
             ast.unwrap(),
             AST {
                 items: vec![Item::Function(Function {
-                    name: Identifier(Span::new(13, 24)),
+                    name: Identifier {
+                        name: "my_function",
+                        span: Span::new(13, 24)
+                    },
                 })]
             }
         )

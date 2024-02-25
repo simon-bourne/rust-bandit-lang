@@ -4,7 +4,7 @@ use logos::Logos;
 #[derive(Logos, Debug, PartialEq, Eq, Copy, Clone)]
 #[logos(skip r"[ \t\r\f]+")]
 #[logos(subpattern ident = r"(\p{XID_Start}|_)\p{XID_Continue}*")]
-pub enum Token {
+pub enum Token<'src> {
     #[token("(", |_| Delimiter::Parentheses)]
     #[token("[", |_| Delimiter::Brackets)]
     #[token("{", |_| Delimiter::Braces)]
@@ -57,18 +57,18 @@ pub enum Token {
     #[token("|")]
     LambdaDelimiter,
 
-    #[regex(r"(?&ident)")]
-    Identifier,
-    #[regex(r"'(?&ident)")]
-    Lifetime,
-    #[regex(r"[\$%\&\*\+\./<=>@\^\-\~]+")]
-    Operator,
+    #[regex(r"(?&ident)", |lex| lex.slice())]
+    Identifier(&'src str),
+    #[regex(r"'(?&ident)", |lex| lex.slice())]
+    Lifetime(&'src str),
+    #[regex(r"[\$%\&\*\+\./<=>@\^\-\~]+", |lex| lex.slice())]
+    Operator(&'src str),
 
     Error,
 }
 
-impl Token {
-    pub fn tokens(source: &str) -> impl Iterator<Item = Spanned<Self>> + '_ {
+impl<'src> Token<'src> {
+    pub fn tokens(source: &'src str) -> impl Iterator<Item = Spanned<Self>> + '_ {
         Self::lexer(source).spanned().map(|(tok, span)| match tok {
             Ok(tok) => (tok, Span::from(span)),
             Err(()) => (Self::Error, span.into()),
