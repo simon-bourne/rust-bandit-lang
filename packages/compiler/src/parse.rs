@@ -51,7 +51,7 @@ macro_rules! lexeme {
         pub struct $token(Span);
 
         fn $name<'src>() -> impl TTParser<'src, $token> + Copy {
-            select! { Token::$token = ext => $token(ext.span()) }
+            select! { Token::$token = ext => $token(ext.span()) }.labelled(stringify!($name))
         }
     };
 }
@@ -62,7 +62,7 @@ lexeme!(operator, Operator);
 macro_rules! token {
     ($name:ident, $token:ident) => {
         fn $name<'src>() -> impl TTParser<'src, ()> + Copy {
-            select! { Token::$token => () }
+            select! { Token::$token => () }.labelled(stringify!($name))
         }
     };
 }
@@ -70,14 +70,17 @@ macro_rules! token {
 token!(line_end, LineEnd);
 token!(statement_end, StatementEnd);
 
+// TODO: labelled
 fn kw<'src>(keyword: Keyword) -> impl TTParser<'src, ()> {
     primitive::select(move |x, _| (x == Token::Keyword(keyword)).then_some(())).skip_line_ends()
 }
 
+// TODO: labelled
 fn open<'src>(delimiter: Delimiter) -> impl TTParser<'src, ()> {
     primitive::select(move |x, _| (x == Token::Open(delimiter)).then_some(())).skip_line_ends()
 }
 
+// TODO: labelled
 fn close<'src>(delimiter: Delimiter) -> impl TTParser<'src, ()> {
     primitive::select(move |x, _| (x == Token::Close(delimiter)).then_some(()))
 }
