@@ -2,7 +2,7 @@ use chumsky::{
     extra, input,
     prelude::{Cheap, Rich},
     primitive::{self, Just},
-    select, Boxed, IterParser, Parser,
+    select, IterParser, Parser,
 };
 
 use crate::lex::{Delimiter, Keyword, Span, Token};
@@ -30,18 +30,44 @@ pub type RichError<'src> = extra::Err<Rich<'src, Token, Span>>;
 pub type JustToken<'src> = Just<Token, SpannedInput<'src, Token>, RichError<'src>>;
 
 pub trait TTParser<'src, Output>:
-    Parser<'src, SpannedInput<'src, Token>, Output, RichError<'src>>
+    Parser<'src, SpannedInput<'src, Token>, Output, RichError<'src>> + Sized + 'src
 {
-    fn skip_line_ends(self) -> Boxed<'src, 'src, SpannedInput<'src, Token>, Output, RichError<'src>>
-    where
-        Self: Sized + 'src,
-    {
-        self.then_ignore(line_end().repeated()).boxed()
+    fn kw(self, keyword: Keyword) -> impl TTParser<'src, Output> {
+        self.then_ignore(
+            primitive::select(move |x, _| (x == Token::Keyword(keyword)).then_some(()))
+                .skip_line_ends()
+                .labelled(keyword.as_str()),
+        )
+    }
+
+    fn open(self, delimiter: Delimiter) -> impl TTParser<'src, Output> {
+        self.then_ignore(
+            primitive::select(move |x, _| (x == Token::Open(delimiter)).then_some(()))
+                .skip_line_ends()
+                .labelled(delimiter.open_str()),
+        )
+    }
+
+    fn close(self, delimiter: Delimiter) -> impl TTParser<'src, Output> {
+        self.then_ignore(
+            primitive::select(move |x, _| (x == Token::Close(delimiter)).then_some(()))
+                .labelled(delimiter.close_str()),
+        )
+    }
+
+    fn statement_end(self) -> impl TTParser<'src, Output> {
+        self.then_ignore(statement_end()).skip_line_ends()
+    }
+
+    fn skip_line_ends(self) -> impl TTParser<'src, Output> {
+        self.then_ignore(line_end().repeated())
     }
 }
 
-impl<'src, Output, T> TTParser<'src, Output> for T where
-    T: Parser<'src, SpannedInput<'src, Token>, Output, RichError<'src>>
+impl<'src, Output, T> TTParser<'src, Output> for T
+where
+    T: Parser<'src, SpannedInput<'src, Token>, Output, RichError<'src>>,
+    T: 'src,
 {
 }
 
@@ -70,23 +96,6 @@ macro_rules! token {
 token!(line_end, "\\n", LineEnd);
 token!(statement_end, ";", StatementEnd);
 
-fn kw<'src>(keyword: Keyword) -> impl TTParser<'src, ()> {
-    primitive::select(move |x, _| (x == Token::Keyword(keyword)).then_some(()))
-        .skip_line_ends()
-        .labelled(keyword.as_str())
-}
-
-fn open<'src>(delimiter: Delimiter) -> impl TTParser<'src, ()> {
-    primitive::select(move |x, _| (x == Token::Open(delimiter)).then_some(()))
-        .skip_line_ends()
-        .labelled(delimiter.open_str())
-}
-
-fn close<'src>(delimiter: Delimiter) -> impl TTParser<'src, ()> {
-    primitive::select(move |x, _| (x == Token::Close(delimiter)).then_some(()))
-        .labelled(delimiter.close_str())
-}
-
 pub fn parser<'src>() -> impl TTParser<'src, AST> {
     line_end().repeated().ignore_then(
         function()
@@ -98,15 +107,15 @@ pub fn parser<'src>() -> impl TTParser<'src, AST> {
 }
 
 fn function<'src>() -> impl TTParser<'src, Function> {
+    // TODO: Parse this as an expression
     let name = ident()
-        .skip_line_ends()
-        .then_ignore(open(Delimiter::Parentheses))
-        .then_ignore(close(Delimiter::Parentheses))
+        .open(Delimiter::Parentheses)
+        .close(Delimiter::Parentheses)
         .skip_line_ends()
         .then_ignore(operator())
         .skip_line_ends()
-        .then_ignore(kw(Keyword::Do))
-        .then_ignore(statement_end().skip_line_ends());
+        .kw(Keyword::Do)
+        .statement_end();
     name.map(|name| Function { name })
 }
 
