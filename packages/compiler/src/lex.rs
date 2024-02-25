@@ -86,6 +86,24 @@ pub enum Delimiter {
     Braces,
 }
 
+impl Delimiter {
+    pub fn open_str(self) -> &'static str {
+        match self {
+            Delimiter::Parentheses => "(",
+            Delimiter::Brackets => "[",
+            Delimiter::Braces => "{",
+        }
+    }
+
+    pub fn close_str(self) -> &'static str {
+        match self {
+            Delimiter::Parentheses => ")",
+            Delimiter::Brackets => "]",
+            Delimiter::Braces => "}",
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Keyword {
     Break,
@@ -116,4 +134,41 @@ pub enum Keyword {
     Use,
     With,
     Where,
+}
+
+impl Keyword {
+    pub fn as_str(self) -> &'static str {
+        use Keyword as KW;
+
+        match self {
+            KW::Break => "break",
+            KW::Continue => "continue",
+            KW::Else => "else",
+            KW::If => "if",
+            KW::Match => "match",
+            KW::Loop => "loop",
+            KW::Return => "return",
+            KW::While => "while",
+            KW::And => "and",
+            KW::Not => "not",
+            KW::Or => "or",
+            KW::Data => "data",
+            KW::Do => "do",
+            KW::Embody => "embody",
+            KW::Forall => "forall",
+            KW::Infer => "infer",
+            KW::Let => "let",
+            KW::Move => "move",
+            KW::Mut => "mut",
+            KW::Record => "record",
+            KW::Require => "require",
+            KW::SelfType => "Self",
+            KW::SelfValue => "self",
+            KW::Then => "then",
+            KW::Trait => "trait",
+            KW::Use => "use",
+            KW::With => "with",
+            KW::Where => "where",
+        }
+    }
 }

@@ -46,43 +46,45 @@ impl<'src, Output, T> TTParser<'src, Output> for T where
 }
 
 macro_rules! lexeme {
-    ($name:ident, $token:ident) => {
+    ($name:ident, $label:literal, $token:ident) => {
         #[derive(Clone, Debug, Eq, PartialEq)]
         pub struct $token(Span);
 
         fn $name<'src>() -> impl TTParser<'src, $token> + Copy {
-            select! { Token::$token = ext => $token(ext.span()) }.labelled(stringify!($name))
+            select! { Token::$token = ext => $token(ext.span()) }.labelled($label)
         }
     };
 }
 
-lexeme!(ident, Identifier);
-lexeme!(operator, Operator);
+lexeme!(ident, "<identifier>", Identifier);
+lexeme!(operator, "<operator>", Operator);
 
 macro_rules! token {
-    ($name:ident, $token:ident) => {
+    ($name:ident, $label:literal, $token:ident) => {
         fn $name<'src>() -> impl TTParser<'src, ()> + Copy {
-            select! { Token::$token => () }.labelled(stringify!($name))
+            select! { Token::$token => () }.labelled($label)
         }
     };
 }
 
-token!(line_end, LineEnd);
-token!(statement_end, StatementEnd);
+token!(line_end, "\\n", LineEnd);
+token!(statement_end, ";", StatementEnd);
 
-// TODO: labelled
 fn kw<'src>(keyword: Keyword) -> impl TTParser<'src, ()> {
-    primitive::select(move |x, _| (x == Token::Keyword(keyword)).then_some(())).skip_line_ends()
+    primitive::select(move |x, _| (x == Token::Keyword(keyword)).then_some(()))
+        .skip_line_ends()
+        .labelled(keyword.as_str())
 }
 
-// TODO: labelled
 fn open<'src>(delimiter: Delimiter) -> impl TTParser<'src, ()> {
-    primitive::select(move |x, _| (x == Token::Open(delimiter)).then_some(())).skip_line_ends()
+    primitive::select(move |x, _| (x == Token::Open(delimiter)).then_some(()))
+        .skip_line_ends()
+        .labelled(delimiter.open_str())
 }
 
-// TODO: labelled
 fn close<'src>(delimiter: Delimiter) -> impl TTParser<'src, ()> {
     primitive::select(move |x, _| (x == Token::Close(delimiter)).then_some(()))
+        .labelled(delimiter.close_str())
 }
 
 pub fn parser<'src>() -> impl TTParser<'src, AST> {
@@ -119,11 +121,10 @@ mod tests {
 
     #[test]
     fn basic() {
-        // TODO: indoc
         const SRC: &str = r#"
-my_function() = do
-;
-"#;
+            my_function() = do
+            ;
+        "#;
 
         let tokens = Token::tokens(SRC).collect::<Vec<_>>();
         let ast = parser().parse(tokens.spanned(Span::new(SRC.len(), SRC.len())));
@@ -134,7 +135,7 @@ my_function() = do
             ast.unwrap(),
             AST {
                 items: vec![Item::Function(Function {
-                    name: Identifier(Span::new(1, 12)),
+                    name: Identifier(Span::new(13, 24)),
                 })]
             }
         )
