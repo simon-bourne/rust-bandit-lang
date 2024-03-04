@@ -45,7 +45,7 @@
 				},
 				{
 					"name": "keyword.other.bandit",
-					"match": "\\b(data|do|embody|forall|infer|let|move|mut|record|require|self|Self|then|trait|use|with|where)\\b"
+					"match": "\\b(data|do|embody|forall|infer|let|move|mut|record|self|Self|then|trait|use|with|where)\\b"
 				}
 			]
 		},
