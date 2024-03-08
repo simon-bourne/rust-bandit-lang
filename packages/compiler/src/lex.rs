@@ -147,10 +147,9 @@ where
 
             return if self.indent_stack.is_empty() {
                 None
-            }
-            else {
+            } else {
                 self.next()
-            }
+            };
         };
 
         let span = token.1;
