@@ -23,9 +23,6 @@ pub enum Token<'src> {
     #[regex(r"[ \t\r\f\n]*\n[ \t]*")]
     LineSeparator,
 
-    #[token(":")]
-    OpenBlock,
-
     #[token(";")]
     CloseBlock,
 
@@ -36,6 +33,7 @@ pub enum Token<'src> {
     #[token("match", |_| Keyword::Match)]
     #[token("loop", |_| Keyword::Loop)]
     #[token("return", |_| Keyword::Return)]
+    #[token("scope", |_| Keyword::Scope)]
     #[token("while", |_| Keyword::While)]
     #[token("and", |_| Keyword::And)]
     #[token("not", |_| Keyword::Not)]
@@ -80,8 +78,28 @@ impl<'src> Token<'src> {
         })
     }
 
+    fn is_block_open(&self) -> bool {
+        if let Token::Keyword(kw) = self {
+            matches!(
+                kw,
+                Keyword::Else
+                    | Keyword::Loop
+                    | Keyword::Scope
+                    | Keyword::Do
+                    | Keyword::Then
+                    | Keyword::Where
+            )
+        } else {
+            false
+        }
+    }
+
     fn can_start_line(&self) -> bool {
-        !matches!(self, Token::OpenBlock | Token::Close(_))
+        match self {
+            Token::Close(_) => false,
+            Token::Keyword(kw) => matches!(kw, Keyword::Loop | Keyword::Scope),
+            _ => true,
+        }
     }
 }
 
@@ -144,7 +162,7 @@ where
         let new_indent = if token.0 == Token::LineSeparator {
             Indent::new_line(self.src, span)
         } else {
-            if matches!(token.0, Token::OpenBlock) {
+            if token.0.is_block_open() {
                 self.open_block();
             }
             return Some(token);
@@ -230,6 +248,7 @@ pub enum Keyword {
     Match,
     Loop,
     Return,
+    Scope,
     While,
     And,
     Not,
@@ -265,6 +284,7 @@ impl Keyword {
             KW::Match => "match",
             KW::Loop => "loop",
             KW::Return => "return",
+            KW::Scope => "scope",
             KW::While => "while",
             KW::And => "and",
             KW::Not => "not",
@@ -299,35 +319,33 @@ mod tests {
     fn layout() {
         test(
             r#"
-if a:
+if a then
     x
-else:
+else
     y
 "#,
         );
         test(
             r#"
-if a:
+if a then
     x
-else if b:
+else if b then
     y
-else:
+else
     z
 "#,
         );
         test(
             r#"
-if a: x
-else if b: y
-else: z
+if a then x
+else y
 "#,
         );
         test(
             r#"
-if a: if b: if c:
+if a then if b then if c then
     x
 else
-:
     y(
         a
         b
