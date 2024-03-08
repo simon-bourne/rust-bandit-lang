@@ -45,15 +45,7 @@
 				},
 				{
 					"name": "keyword.other.bandit",
-					"match": "\\b(alias|data|do|embody|forall|infer|let|move|mut|private|public|record|self|Self|trait|use|where)\\b"
-				}
-			]
-		},
-		"storage": {
-			"patterns": [
-				{
-					"name": "storage.modifier.mut.bandit",
-					"match": "\\b(mut)\\b"
+					"match": "\\b(alias|data|do|embody|forall|let|move|private|public|record|self|trait|use|where)\\b"
 				}
 			]
 		},
