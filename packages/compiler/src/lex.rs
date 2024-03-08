@@ -303,7 +303,7 @@ if a then
     x
 else
     y
-        "#,
+"#,
         );
         test(
             r#"
@@ -313,7 +313,7 @@ else if b then
     y
 else
     z
-        "#,
+"#,
         );
     }
 
