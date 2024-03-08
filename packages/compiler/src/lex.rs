@@ -125,9 +125,8 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
         }
     }
 
-    fn close_block(&mut self, new_indent: Indent, span: Span) -> Option<SrcToken<'src>> {
+    fn close_block(&mut self, new_indent: Indent) {
         self.current_indent = new_indent;
-        Some((Token::CloseBlock, span))
     }
 }
 
@@ -145,7 +144,13 @@ where
 
         let Some(token) = self.iter.next() else {
             self.current_indent = Indent::MIN;
-            return self.next();
+
+            return if self.indent_stack.is_empty() {
+                None
+            }
+            else {
+                self.next()
+            }
         };
 
         let span = token.1;
@@ -159,7 +164,10 @@ where
         };
 
         match new_indent.cmp(&self.current_indent) {
-            Ordering::Less => self.close_block(new_indent, span),
+            Ordering::Less => {
+                self.close_block(new_indent);
+                self.next()
+            }
             Ordering::Equal => match self.iter.peek() {
                 Some(next_token) if next_token.0.can_start_line() => Some(token),
                 _ => self.next(),
@@ -279,5 +287,50 @@ impl Keyword {
             KW::With => "with",
             KW::Where => "where",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // TODO: Proper tests
+    #[test]
+    fn layout() {
+        test(
+            r#"
+if a then
+    x
+else
+    y
+        "#,
+        );
+        test(
+            r#"
+if a then
+    x
+else if b then
+    y
+else
+    z
+        "#,
+        );
+    }
+
+    fn test(src: &str) {
+        print!("Source:\n\n{src}\n\nTokens: ");
+        let tokens = LayoutIter::new(Token::tokens(src), src);
+
+        for (token, span) in tokens {
+            let s = match token {
+                Token::CloseBlock => ";",
+                Token::LineSeparator => ",",
+                _ => &src[span.into_range()],
+            };
+
+            print!("{s} ");
+        }
+
+        println!("\n");
     }
 }
