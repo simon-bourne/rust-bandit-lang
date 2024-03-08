@@ -79,5 +79,5 @@ macro_rules! token {
     };
 }
 
-token!(line_end, "\\n", LineEnd);
-token!(statement_end, ";", StatementEnd);
+token!(line_end, "\\n", LineSeparator);
+token!(statement_end, ";", CloseBlock);

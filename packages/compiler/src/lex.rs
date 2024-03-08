@@ -1,3 +1,5 @@
+use std::{cmp::Ordering, iter::Peekable};
+
 use chumsky::span::SimpleSpan;
 use logos::Logos;
 
@@ -18,11 +20,11 @@ pub enum Token<'src> {
     #[token(",")]
     Comma,
 
-    #[token("\n")]
-    LineEnd,
+    #[regex(r"[ \t\r\f\n]*\n[ \t]*")]
+    LineSeparator,
 
     #[token(";")]
-    StatementEnd,
+    CloseBlock,
 
     #[token("break", |_| Keyword::Break)]
     #[token("continue", |_| Keyword::Continue)]
@@ -68,16 +70,123 @@ pub enum Token<'src> {
 }
 
 impl<'src> Token<'src> {
-    pub fn tokens(source: &'src str) -> impl Iterator<Item = Spanned<Self>> + '_ {
+    pub fn tokens(source: &'src str) -> impl Iterator<Item = SrcToken<'src>> + '_ {
         Self::lexer(source).spanned().map(|(tok, span)| match tok {
             Ok(tok) => (tok, Span::from(span)),
             Err(()) => (Self::Error, span.into()),
         })
     }
+
+    fn is_block_open(&self) -> bool {
+        if let Token::Keyword(kw) = self {
+            matches!(
+                kw,
+                Keyword::Else | Keyword::Loop | Keyword::Do | Keyword::Then | Keyword::Where
+            )
+        } else {
+            false
+        }
+    }
+
+    fn can_start_line(&self) -> bool {
+        match self {
+            Token::Close(_) => false,
+            Token::Keyword(kw) => matches!(kw, Keyword::Loop),
+            _ => true,
+        }
+    }
+}
+
+pub struct LayoutIter<'src, I: Iterator<Item = SrcToken<'src>>> {
+    iter: Peekable<I>,
+    src: &'src str,
+    current_indent: Indent,
+    indent_stack: Vec<Indent>,
+}
+
+impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
+    pub fn new(iter: I, src: &'src str) -> Self {
+        Self {
+            iter: iter.peekable(),
+            src,
+            current_indent: Indent::Line(0),
+            indent_stack: Vec::new(),
+        }
+    }
+
+    fn open_block(&mut self) {
+        self.indent_stack.push(self.current_indent);
+
+        if let Some((Token::LineSeparator, span)) = self.iter.peek() {
+            self.current_indent = Indent::line(self.src, *span);
+            self.iter.next();
+        } else {
+            self.current_indent = Indent::SingleLine;
+        }
+    }
+
+    fn close_block(&mut self, new_indent: Indent, span: Span) -> Option<SrcToken<'src>> {
+        self.current_indent = new_indent;
+        Some((Token::CloseBlock, span))
+    }
+}
+
+impl<'src, I> Iterator for LayoutIter<'src, I>
+where
+    I: Iterator<Item = SrcToken<'src>>,
+{
+    type Item = SrcToken<'src>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if Some(&self.current_indent) <= self.indent_stack.last() {
+            self.indent_stack.pop();
+            return Some((Token::CloseBlock, Span::splat(self.src.len())));
+        }
+
+        let Some(token) = self.iter.next() else {
+            self.current_indent = Indent::MIN;
+            return self.next();
+        };
+
+        let span = token.1;
+        let new_indent = if token.0 == Token::LineSeparator {
+            Indent::line(self.src, span)
+        } else {
+            if token.0.is_block_open() {
+                self.open_block();
+            }
+            return Some(token);
+        };
+
+        match new_indent.cmp(&self.current_indent) {
+            Ordering::Less => self.close_block(new_indent, span),
+            Ordering::Equal => match self.iter.peek() {
+                Some(next_token) if next_token.0.can_start_line() => Some(token),
+                _ => self.next(),
+            },
+            Ordering::Greater => self.next(),
+        }
+    }
+}
+
+#[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
+enum Indent {
+    Line(usize),
+    SingleLine,
+}
+
+impl Indent {
+    const MIN: Self = Self::Line(0);
+
+    fn line(src: &str, span: Span) -> Self {
+        let s = &src[span.into_range()];
+        Self::Line(s.rfind('\n').map(|pos| (s.len() - pos) - 1).unwrap_or(0))
+    }
 }
 
 pub type Span = SimpleSpan<usize>;
 pub type Spanned<T> = (T, Span);
+pub type SrcToken<'src> = Spanned<Token<'src>>;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Delimiter {
