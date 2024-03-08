@@ -23,6 +23,9 @@ pub enum Token<'src> {
     #[regex(r"[ \t\r\f\n]*\n[ \t]*")]
     LineSeparator,
 
+    #[token(":")]
+    OpenBlock,
+
     #[token(";")]
     CloseBlock,
 
@@ -77,23 +80,8 @@ impl<'src> Token<'src> {
         })
     }
 
-    fn is_block_open(&self) -> bool {
-        if let Token::Keyword(kw) = self {
-            matches!(
-                kw,
-                Keyword::Else | Keyword::Loop | Keyword::Do | Keyword::Then | Keyword::Where
-            )
-        } else {
-            false
-        }
-    }
-
     fn can_start_line(&self) -> bool {
-        match self {
-            Token::Close(_) => false,
-            Token::Keyword(kw) => matches!(kw, Keyword::Loop),
-            _ => true,
-        }
+        !matches!(self, Token::OpenBlock | Token::Close(_))
     }
 }
 
@@ -109,7 +97,7 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
         Self {
             iter: iter.peekable(),
             src,
-            current_indent: Indent::Line(0),
+            current_indent: Indent::MIN,
             indent_stack: Vec::new(),
         }
     }
@@ -118,10 +106,10 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
         self.indent_stack.push(self.current_indent);
 
         if let Some((Token::LineSeparator, span)) = self.iter.peek() {
-            self.current_indent = Indent::line(self.src, *span);
+            self.current_indent = Indent::new_line(self.src, *span);
             self.iter.next();
         } else {
-            self.current_indent = Indent::SingleLine;
+            self.current_indent = Indent::same_line(self.current_indent);
         }
     }
 
@@ -154,9 +142,9 @@ where
 
         let span = token.1;
         let new_indent = if token.0 == Token::LineSeparator {
-            Indent::line(self.src, span)
+            Indent::new_line(self.src, span)
         } else {
-            if token.0.is_block_open() {
+            if matches!(token.0, Token::OpenBlock) {
                 self.open_block();
             }
             return Some(token);
@@ -177,17 +165,30 @@ where
 }
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
-enum Indent {
-    Line(usize),
-    SingleLine,
+struct Indent {
+    next_line: usize,
+    same_line: usize,
 }
 
 impl Indent {
-    const MIN: Self = Self::Line(0);
+    const MIN: Self = Self {
+        next_line: 0,
+        same_line: 0,
+    };
 
-    fn line(src: &str, span: Span) -> Self {
+    fn new_line(src: &str, span: Span) -> Self {
         let s = &src[span.into_range()];
-        Self::Line(s.rfind('\n').map(|pos| (s.len() - pos) - 1).unwrap_or(0))
+        Self {
+            next_line: s.rfind('\n').map(|pos| (s.len() - pos) - 1).unwrap_or(0),
+            same_line: 0,
+        }
+    }
+
+    fn same_line(indent: Self) -> Self {
+        Self {
+            next_line: indent.next_line,
+            same_line: indent.same_line + 1,
+        }
     }
 }
 
@@ -298,20 +299,40 @@ mod tests {
     fn layout() {
         test(
             r#"
-if a then
+if a:
     x
-else
+else:
     y
 "#,
         );
         test(
             r#"
-if a then
+if a:
     x
-else if b then
+else if b:
     y
-else
+else:
     z
+"#,
+        );
+        test(
+            r#"
+if a: x
+else if b: y
+else: z
+"#,
+        );
+        test(
+            r#"
+if a: if b: if c:
+    x
+else
+:
+    y(
+        a
+        b
+    )
+    c
 "#,
         );
     }
