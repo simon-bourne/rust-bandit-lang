@@ -33,8 +33,6 @@ pub enum Token<'src> {
     #[token("data", |_| Keyword::Data)]
     #[token("do", |_| Keyword::Do)]
     #[token("else", |_| Keyword::Else)]
-    // This avoids the dangling `else` problem. Alternatives are:
-    // - Add a `:` to start a block everywhere
     #[regex("else[ \t]+if", |_| Keyword::ElseIf)]
     #[token("embody", |_| Keyword::Embody)]
     #[token("forall", |_| Keyword::Forall)]
