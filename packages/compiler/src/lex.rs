@@ -72,12 +72,17 @@ pub enum Token<'src> {
     Error,
 }
 
+// TODO: What can we make private in this module?
 impl<'src> Token<'src> {
     pub fn tokens(source: &'src str) -> impl Iterator<Item = SrcToken<'src>> + '_ {
         Self::lexer(source).spanned().map(|(tok, span)| match tok {
             Ok(tok) => (tok, Span::from(span)),
             Err(()) => (Self::Error, span.into()),
         })
+    }
+
+    pub fn layout(source: &'src str) -> impl Iterator<Item = SrcToken<'src>> + '_ {
+        LayoutIter::new(Self::tokens(source), source)
     }
 
     fn is_block_open(&self) -> bool {
@@ -359,7 +364,7 @@ else
 
     fn test(src: &str) {
         print!("Source:\n\n{src}\n\nTokens: ");
-        let tokens = LayoutIter::new(Token::tokens(src), src);
+        let tokens = Token::layout(src);
 
         for (token, span) in tokens {
             let s = match token {
