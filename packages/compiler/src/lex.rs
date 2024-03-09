@@ -163,9 +163,8 @@ where
             };
         };
 
-        let span = token.1;
         let new_indent = if token.0 == Token::LineSeparator {
-            Indent::new_line(self.src, span)
+            Indent::new_line(self.src, token.1)
         } else {
             if token.0.is_block_open() {
                 self.open_block();
