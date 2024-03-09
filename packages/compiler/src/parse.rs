@@ -44,8 +44,8 @@ pub trait TTParser<'src, Output>:
         )
     }
 
-    fn statement_end(self) -> impl TTParser<'src, Output> {
-        self.then_ignore(statement_end()).skip_line_ends()
+    fn close_block(self) -> impl TTParser<'src, Output> {
+        self.then_ignore(close_block()).skip_line_ends()
     }
 
     fn skip_line_ends(self) -> impl TTParser<'src, Output> {
@@ -80,4 +80,4 @@ macro_rules! token {
 }
 
 token!(line_end, "\\n", LineSeparator);
-token!(statement_end, ";", CloseBlock);
+token!(close_block, ";", CloseBlock);

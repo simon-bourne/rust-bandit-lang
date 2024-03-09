@@ -2,29 +2,25 @@ use chumsky::{IterParser, Parser};
 
 use super::{
     ast::{Function, Item, AST},
-    ident, line_end, operator, TTParser,
+    ident, operator, TTParser,
 };
-use crate::lex::{Delimiter, Keyword};
+use crate::lex::Delimiter;
 
 pub fn parser<'src>() -> impl TTParser<'src, AST<'src>> {
-    line_end().repeated().ignore_then(
-        function()
-            .map(Item::Function)
-            .repeated()
-            .collect()
-            .map(|items| AST { items }),
-    )
+    function()
+        .map(Item::Function)
+        .repeated()
+        .collect()
+        .map(|items| AST { items })
 }
 
 fn function<'src>() -> impl TTParser<'src, Function<'src>> {
     let name = ident()
         .open(Delimiter::Parentheses)
         .close(Delimiter::Parentheses)
-        .skip_line_ends()
         .then_ignore(operator().filter(|op| op.name == "=").labelled("="))
-        .skip_line_ends()
-        .kw(Keyword::Do)
-        .statement_end();
+        .open(Delimiter::Parentheses)
+        .close(Delimiter::Parentheses);
     name.map(|name| Function { name })
 }
 
@@ -43,11 +39,10 @@ mod tests {
     #[test]
     fn basic() {
         const SRC: &str = r#"
-            my_function() = do
-            ;
+my_function() = ()
         "#;
 
-        let tokens = Token::tokens(SRC).collect::<Vec<_>>();
+        let tokens = Token::layout(SRC).collect::<Vec<_>>();
         let ast = parser().parse(tokens.spanned(Span::new(SRC.len(), SRC.len())));
 
         // TODO: Pretty print the AST and use golden tests. Assert all the id's
@@ -58,7 +53,7 @@ mod tests {
                 items: vec![Item::Function(Function {
                     name: Identifier {
                         name: "my_function",
-                        span: Span::new(13, 24)
+                        span: Span::new(1, 12)
                     },
                 })]
             }

@@ -47,7 +47,6 @@ pub enum Token<'src> {
     #[token("public", |_| Keyword::Public)]
     #[token("record", |_| Keyword::Record)]
     #[token("return", |_| Keyword::Return)]
-    #[token("scope", |_| Keyword::Scope)]
     #[token("self", |_| Keyword::SelfValue)]
     #[token("then", |_| Keyword::Then)]
     #[token("trait", |_| Keyword::Trait)]
@@ -87,12 +86,7 @@ impl<'src> Token<'src> {
         if let Token::Keyword(kw) = self {
             matches!(
                 kw,
-                Keyword::Else
-                    | Keyword::Loop
-                    | Keyword::Scope
-                    | Keyword::Do
-                    | Keyword::Then
-                    | Keyword::Where
+                Keyword::Else | Keyword::Loop | Keyword::Do | Keyword::Then | Keyword::Where
             )
         } else {
             false
@@ -100,11 +94,7 @@ impl<'src> Token<'src> {
     }
 
     fn can_start_line(&self) -> bool {
-        match self {
-            Token::Close(_) => false,
-            Token::Keyword(kw) => matches!(kw, Keyword::Loop | Keyword::Scope),
-            _ => true,
-        }
+        !matches!(self, Token::Close(_) | Token::Operator("="))
     }
 }
 
@@ -117,10 +107,19 @@ pub struct LayoutIter<'src, I: Iterator<Item = SrcToken<'src>>> {
 
 impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
     pub fn new(iter: I, src: &'src str) -> Self {
+        let mut iter = iter.peekable();
+        let current_indent = if let Some((Token::LineSeparator, indent)) = iter.peek() {
+            let indent = *indent;
+            iter.next();
+            Indent::new_line(src, indent)
+        } else {
+            Indent::MIN
+        };
+
         Self {
-            iter: iter.peekable(),
+            iter,
             src,
-            current_indent: Indent::MIN,
+            current_indent,
             indent_stack: Vec::new(),
         }
     }
@@ -266,7 +265,6 @@ pub enum Keyword {
     Public,
     Record,
     Return,
-    Scope,
     SelfValue,
     Then,
     Trait,
@@ -302,7 +300,6 @@ impl Keyword {
             KW::Public => "public",
             KW::Record => "record",
             KW::Return => "return",
-            KW::Scope => "scope",
             KW::SelfValue => "self",
             KW::Then => "then",
             KW::Trait => "trait",
@@ -321,6 +318,11 @@ mod tests {
     // TODO: Proper tests
     #[test]
     fn layout() {
+        test(
+            r#"
+f() = x
+"#,
+        );
         test(
             r#"
 if a then
