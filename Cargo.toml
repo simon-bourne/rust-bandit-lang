@@ -14,6 +14,8 @@ debug = 0
 [workspace.dependencies]
 chumsky = "1.0.0-alpha.6"
 criterion = "0.5.1"
+indoc="2.0.4"
+itertools="0.12.1"
 logos = "0.13.0"
 num-bigint = "0.4.4"
 xtask-base = { git = "https://github.com/simon-bourne/rust-xtask-base" }

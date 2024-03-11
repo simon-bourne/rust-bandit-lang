@@ -313,68 +313,98 @@ impl Keyword {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use indoc::indoc;
+    use itertools::Itertools;
 
-    // TODO: Proper tests
+    use super::SrcToken;
+    use crate::lex::Token;
+
     #[test]
-    fn layout() {
+    fn function() {
+        test(r#"f() = x"#, "f ( ) = x");
+    }
+
+    #[test]
+    fn if_then_else() {
         test(
-            r#"
-f() = x
-"#,
-        );
-        test(
-            r#"
-if a then
-    x
-else
-    y
-"#,
-        );
-        test(
-            r#"
-if a then
-    x
-else if b then
-    y
-else
-    z
-"#,
-        );
-        test(
-            r#"
-if a then x
-else y
-"#,
-        );
-        test(
-            r#"
-if a then if b then if c then
-    x
-else
-    y(
-        a
-        b
-    )
-    c
-"#,
+            indoc!(
+                r#"
+                    if a then
+                        x
+                    else
+                        y
+                "#
+            ),
+            "if a then x ; else y ;",
         );
     }
 
-    fn test(src: &str) {
-        print!("Source:\n\n{src}\n\nTokens: ");
-        let tokens = Token::layout(src);
+    #[test]
+    fn dangling_else() {
+        test(
+            indoc!(
+                r#"
+                    if a then
+                        x
+                    else if b then
+                        y
+                    else
+                        z
+                "#
+            ),
+            "if a then x ; else if b then y ; else z ;",
+        );
+    }
 
-        for (token, span) in tokens {
-            let s = match token {
+    #[test]
+    fn compact_if_else() {
+        // TODO:
+        // test(
+        //     indoc!(
+        //         r#"
+        //             if a then x
+        //             else y
+        //         "#
+        //     ),
+        //     "if a then x ; else y ;",
+        // );
+    }
+
+    #[test]
+    fn multi() {
+        test(
+            indoc!(
+                r#"
+                    if a then if b then if c then
+                        x
+                    else
+                        y(
+                            a
+                            b
+                        )
+                        c
+                "#
+            ),
+            "if a then if b then if c then x ; ; ; else y ( a b ) , c ;",
+        );
+    }
+
+    fn test(src: &str, expected: &str) {
+        print!("Source:\n\n{src}\n");
+        let result = unlex(Token::layout(src), src);
+
+        assert_eq!(expected, result);
+        // TODO:
+        // assert_eq!(expected, unlex(Token::layout(&result), &result));
+    }
+
+    fn unlex<'a>(layout: impl Iterator<Item = SrcToken<'a>>, src: &str) -> String {
+        layout
+            .map(|(token, span)| match token {
                 Token::CloseBlock => ";",
                 Token::LineSeparator => ",",
                 _ => &src[span.into_range()],
-            };
-
-            print!("{s} ");
-        }
-
-        println!("\n");
+            })
+            .join(" ")
     }
 }

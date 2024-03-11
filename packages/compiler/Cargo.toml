@@ -8,6 +8,8 @@ publish = false
 chumsky = { workspace = true, features = ["label"] }
 logos.workspace = true
 derive_more.workspace = true
+indoc.workspace = true
+itertools.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
