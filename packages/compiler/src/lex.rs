@@ -100,6 +100,7 @@ impl<'src> Token<'src> {
 pub struct LayoutIter<'src, I: Iterator<Item = SrcToken<'src>>> {
     iter: Peekable<I>,
     src: &'src str,
+    last_span: Span,
     current_indent: Indent,
     indent_stack: Vec<Indent>,
 }
@@ -118,6 +119,7 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
         Self {
             iter,
             src,
+            last_span: Span::splat(0),
             current_indent,
             indent_stack: Vec::new(),
         }
@@ -190,13 +192,14 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.needs_block_close() {
-            // TODO: Span is wrong
-            return self.close_block(Span::splat(self.src.len()));
+            return self.close_block(self.last_span);
         }
 
         let Some(token) = self.iter.next() else {
             return self.finish();
         };
+
+        self.last_span = token.1;
 
         if let Some(t) = self.combine_else_if(token) {
             return Some(t);
