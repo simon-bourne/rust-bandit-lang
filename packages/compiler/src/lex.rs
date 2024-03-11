@@ -170,6 +170,10 @@ where
             }
         }
 
+        if token.0 == Token::CloseBlock {
+            self.indent_stack.pop();
+        }
+
         let new_indent = if token.0 == Token::LineSeparator {
             Indent::new_line(self.src, token.1)
         } else {
@@ -401,8 +405,7 @@ mod tests {
         let result = unlex(Token::layout(src), src);
 
         assert_eq!(expected, result);
-        // TODO:
-        // assert_eq!(expected, unlex(Token::layout(&result), &result));
+        assert_eq!(expected, unlex(Token::layout(&result), &result));
     }
 
     fn unlex<'a>(layout: impl Iterator<Item = SrcToken<'a>>, src: &str) -> String {
