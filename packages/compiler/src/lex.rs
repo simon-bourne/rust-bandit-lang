@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, iter::Peekable};
 
-use chumsky::span::SimpleSpan;
+use chumsky::span::{SimpleSpan, Span as _};
 use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq, Eq, Copy, Clone)]
@@ -33,7 +33,6 @@ pub enum Token<'src> {
     #[token("data", |_| Keyword::Data)]
     #[token("do", |_| Keyword::Do)]
     #[token("else", |_| Keyword::Else)]
-    #[regex("else[ \t]+if", |_| Keyword::ElseIf)]
     #[token("embody", |_| Keyword::Embody)]
     #[token("forall", |_| Keyword::Forall)]
     #[token("if", |_| Keyword::If)]
@@ -162,6 +161,15 @@ where
             };
         };
 
+        let next = self.iter.peek().copied();
+
+        if token.0 == Token::Keyword(Keyword::Else) {
+            if let Some((Token::Keyword(Keyword::If), if_span)) = next {
+                self.iter.next();
+                return Some((Token::Keyword(Keyword::ElseIf), if_span.union(token.1)));
+            }
+        }
+
         let new_indent = if token.0 == Token::LineSeparator {
             Indent::new_line(self.src, token.1)
         } else {
@@ -176,7 +184,7 @@ where
                 self.close_block(new_indent);
                 self.next()
             }
-            Ordering::Equal => match self.iter.peek() {
+            Ordering::Equal => match next {
                 Some(next_token) if next_token.0.can_start_line() => Some(token),
                 _ => self.next(),
             },
@@ -358,16 +366,15 @@ mod tests {
 
     #[test]
     fn compact_if_else() {
-        // TODO:
-        // test(
-        //     indoc!(
-        //         r#"
-        //             if a then x
-        //             else y
-        //         "#
-        //     ),
-        //     "if a then x ; else y ;",
-        // );
+        test(
+            indoc!(
+                r#"
+                    if a then x
+                    else y
+                "#
+            ),
+            "if a then x ; else y ;",
+        );
     }
 
     #[test]
@@ -399,7 +406,10 @@ mod tests {
     }
 
     fn unlex<'a>(layout: impl Iterator<Item = SrcToken<'a>>, src: &str) -> String {
+        let layout: Vec<_> = layout.collect();
+        println!("Tokens: {layout:?}");
         layout
+            .into_iter()
             .map(|(token, span)| match token {
                 Token::CloseBlock => ";",
                 Token::LineSeparator => ",",
