@@ -134,8 +134,51 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
         }
     }
 
-    fn close_block(&mut self, new_indent: Indent) {
-        self.current_indent = new_indent;
+    fn needs_block_close(&self) -> bool {
+        Some(&self.current_indent) <= self.indent_stack.last()
+    }
+
+    fn close_block(&mut self, span: Span) -> Option<SrcToken<'src>> {
+        self.indent_stack.pop();
+        Some((Token::CloseBlock, span))
+    }
+
+    // TODO: type alias for return type
+    fn finish(&mut self) -> Option<SrcToken<'src>> {
+        self.current_indent = Indent::MIN;
+
+        if self.indent_stack.is_empty() {
+            None
+        } else {
+            self.next()
+        }
+    }
+
+    fn combine_else_if(&mut self, token: SrcToken<'src>) -> Option<SrcToken<'src>> {
+        if token.0 == Token::Keyword(Keyword::Else) {
+            if let Some((Token::Keyword(Keyword::If), if_span)) = self.iter.peek().copied() {
+                self.iter.next();
+                return Some((Token::Keyword(Keyword::ElseIf), if_span.union(token.1)));
+            }
+        }
+
+        None
+    }
+
+    fn handle_indent(&mut self, token: SrcToken<'src>) -> Option<SrcToken<'src>> {
+        let new_indent = Indent::new_line(self.src, token.1);
+
+        match new_indent.cmp(&self.current_indent) {
+            Ordering::Less => {
+                self.current_indent = new_indent;
+                self.next()
+            }
+            Ordering::Equal => match self.iter.peek() {
+                Some(next_token) if next_token.0.can_start_line() => Some(token),
+                _ => self.next(),
+            },
+            Ordering::Greater => self.next(),
+        }
     }
 }
 
@@ -146,53 +189,29 @@ where
     type Item = SrcToken<'src>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if Some(&self.current_indent) <= self.indent_stack.last() {
-            self.indent_stack.pop();
-            return Some((Token::CloseBlock, Span::splat(self.src.len())));
+        if self.needs_block_close() {
+            // TODO: Span is wrong
+            return self.close_block(Span::splat(self.src.len()));
         }
 
         let Some(token) = self.iter.next() else {
-            self.current_indent = Indent::MIN;
-
-            return if self.indent_stack.is_empty() {
-                None
-            } else {
-                self.next()
-            };
+            return self.finish();
         };
 
-        let next = self.iter.peek().copied();
-
-        if token.0 == Token::Keyword(Keyword::Else) {
-            if let Some((Token::Keyword(Keyword::If), if_span)) = next {
-                self.iter.next();
-                return Some((Token::Keyword(Keyword::ElseIf), if_span.union(token.1)));
-            }
+        if let Some(t) = self.combine_else_if(token) {
+            return Some(t);
         }
 
-        if token.0 == Token::CloseBlock {
-            self.indent_stack.pop();
-        }
+        match token.0 {
+            Token::CloseBlock => self.close_block(token.1),
+            Token::LineSeparator => self.handle_indent(token),
+            _ => {
+                if token.0.is_block_open() {
+                    self.open_block();
+                }
 
-        let new_indent = if token.0 == Token::LineSeparator {
-            Indent::new_line(self.src, token.1)
-        } else {
-            if token.0.is_block_open() {
-                self.open_block();
+                Some(token)
             }
-            return Some(token);
-        };
-
-        match new_indent.cmp(&self.current_indent) {
-            Ordering::Less => {
-                self.close_block(new_indent);
-                self.next()
-            }
-            Ordering::Equal => match next {
-                Some(next_token) if next_token.0.can_start_line() => Some(token),
-                _ => self.next(),
-            },
-            Ordering::Greater => self.next(),
         }
     }
 }
