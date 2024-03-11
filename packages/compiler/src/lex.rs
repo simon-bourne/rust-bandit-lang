@@ -68,17 +68,14 @@ pub enum Token<'src> {
     Error,
 }
 
-// TODO: What can we make private in this module?
 impl<'src> Token<'src> {
-    pub fn tokens(source: &'src str) -> impl Iterator<Item = SrcToken<'src>> + '_ {
-        Self::lexer(source).spanned().map(|(tok, span)| match tok {
+    pub fn layout(source: &'src str) -> impl Iterator<Item = SrcToken<'src>> + '_ {
+        let tokens = Self::lexer(source).spanned().map(|(tok, span)| match tok {
             Ok(tok) => (tok, Span::from(span)),
             Err(()) => (Self::Error, span.into()),
-        })
-    }
+        });
 
-    pub fn layout(source: &'src str) -> impl Iterator<Item = SrcToken<'src>> + '_ {
-        LayoutIter::new(Self::tokens(source), source)
+        LayoutIter::new(tokens, source)
     }
 
     fn is_block_open(&self) -> bool {
@@ -97,7 +94,7 @@ impl<'src> Token<'src> {
     }
 }
 
-pub struct LayoutIter<'src, I: Iterator<Item = SrcToken<'src>>> {
+struct LayoutIter<'src, I: Iterator<Item = SrcToken<'src>>> {
     iter: Peekable<I>,
     src: &'src str,
     last_span: Span,
@@ -145,7 +142,6 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
         Some((Token::CloseBlock, span))
     }
 
-    // TODO: type alias for return type
     fn finish(&mut self) -> Option<SrcToken<'src>> {
         self.current_indent = Indent::MIN;
 
