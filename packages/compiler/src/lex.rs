@@ -37,7 +37,6 @@ pub enum Token<'src> {
     #[token("forall", |_| Keyword::Forall)]
     #[token("if", |_| Keyword::If)]
     #[token("let", |_| Keyword::Let)]
-    #[token("loop", |_| Keyword::Loop)]
     #[token("match", |_| Keyword::Match)]
     #[token("move", |_| Keyword::Move)]
     #[token("not", |_| Keyword::Not)]
@@ -84,7 +83,6 @@ impl<'src> Token<'src> {
                 kw,
                 Keyword::Do
                     | Keyword::Else
-                    | Keyword::Loop
                     | Keyword::Private
                     | Keyword::Public
                     | Keyword::Then
@@ -97,64 +95,15 @@ impl<'src> Token<'src> {
 
     fn continues_line(&self) -> bool {
         match self {
-            // TODO: I think we need a `scope` keyword, to avoid ambiguity.
-            // e.g. Is `z` in `while f x y do z` part of the condition or the loop body?
-            // Or we could always put `do` on a new line like `while f x y ; do z`
-            // Or adopt pythons `:`, and use `do:` for standalone blocks, and `is` for type
-            // assignment. What if block start keywords always start new lines?
-            //
-            // Options:
+            // `do` can appear anywhere in an expression, including the start of a line. This does
+            // mean we can't use `do` as a separator, so `while` needs to use `then` as a separator:
             //
             // ```bandit
-            // // This is the favourite, but requires a `scope` keyword.
-            // while f x y do
-            //      pass
-            //
-            // while f x y:
-            //      pass
-            //
-            // while f x y
-            //      (
-            //          a
-            //          very
-            //          long
-            //          line
-            //      )
-            //
-            //
-            // while f x y
-            //      (a
-            //          very
-            //          long
-            //          line
-            //      )
-            //      another // This has problems if we want to put it in an `if` or `while` condition.
-            //          .very
-            //          .long
-            //          .line
-            //      a
-            //      | very
-            //      | long
-            //      | line
-            //      a
-            //      ^ very
-            //      ^ long
-            //      ^ line
-            //
-            // while f x y; do
-            //      pass
-            //
-            // while (f x y) expr
-            //
-            // while f x y {
-            //      pass
-            // }
+            // while
+            //      my-expression
+            // then
+            //     ...
             // ```
-            //
-            // We need: scope resolution, infix named operators (`.name`), type assignment, block
-            // start.
-
-            // `do` and `loop` always begin a line.
             Self::Keyword(kw) => matches!(
                 kw,
                 Keyword::Else | Keyword::Private | Keyword::Public | Keyword::Then | Keyword::Where
@@ -356,7 +305,6 @@ pub enum Keyword {
     Forall,
     If,
     Let,
-    Loop,
     Match,
     Move,
     Not,
@@ -391,7 +339,6 @@ impl Keyword {
             KW::Forall => "forall",
             KW::If => "if",
             KW::Let => "let",
-            KW::Loop => "loop",
             KW::Match => "match",
             KW::Move => "move",
             KW::Not => "not",
