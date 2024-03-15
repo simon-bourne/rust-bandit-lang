@@ -82,15 +82,85 @@ impl<'src> Token<'src> {
         if let Token::Keyword(kw) = self {
             matches!(
                 kw,
-                Keyword::Else | Keyword::Loop | Keyword::Do | Keyword::Then | Keyword::Where
+                Keyword::Do
+                    | Keyword::Else
+                    | Keyword::Loop
+                    | Keyword::Private
+                    | Keyword::Public
+                    | Keyword::Then
+                    | Keyword::Where
             )
         } else {
             false
         }
     }
 
-    fn can_start_line(&self) -> bool {
-        !matches!(self, Token::Close(_) | Token::Operator("="))
+    fn continues_line(&self) -> bool {
+        match self {
+            // TODO: I think we need a `scope` keyword, to avoid ambiguity.
+            // e.g. Is `z` in `while f x y do z` part of the condition or the loop body?
+            // Or we could always put `do` on a new line like `while f x y ; do z`
+            // Or adopt pythons `:`, and use `do:` for standalone blocks, and `is` for type
+            // assignment. What if block start keywords always start new lines?
+            //
+            // Options:
+            //
+            // ```bandit
+            // // This is the favourite, but requires a `scope` keyword.
+            // while f x y do
+            //      pass
+            //
+            // while f x y:
+            //      pass
+            //
+            // while f x y
+            //      (
+            //          a
+            //          very
+            //          long
+            //          line
+            //      )
+            //
+            //
+            // while f x y
+            //      (a
+            //          very
+            //          long
+            //          line
+            //      )
+            //      another // This has problems if we want to put it in an `if` or `while` condition.
+            //          .very
+            //          .long
+            //          .line
+            //      a
+            //      | very
+            //      | long
+            //      | line
+            //      a
+            //      ^ very
+            //      ^ long
+            //      ^ line
+            //
+            // while f x y; do
+            //      pass
+            //
+            // while (f x y) expr
+            //
+            // while f x y {
+            //      pass
+            // }
+            // ```
+            //
+            // We need: scope resolution, infix named operators (`.name`), type assignment, block
+            // start.
+
+            // `do` and `loop` always begin a line.
+            Self::Keyword(kw) => matches!(
+                kw,
+                Keyword::Else | Keyword::Private | Keyword::Public | Keyword::Then | Keyword::Where
+            ),
+            _ => matches!(self, Token::Close(_) | Token::Operator("=")),
+        }
     }
 }
 
@@ -172,7 +242,7 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
                 self.next()
             }
             Ordering::Equal => match self.iter.peek() {
-                Some(next_token) if next_token.0.can_start_line() => Some(token),
+                Some(next_token) if !next_token.0.continues_line() => Some(token),
                 _ => self.next(),
             },
             Ordering::Greater => self.next(),
@@ -359,7 +429,9 @@ mod tests {
         test(
             indoc!(
                 r#"
-                    if a then
+                    if
+                        a
+                    then
                         x
                     else
                         y
