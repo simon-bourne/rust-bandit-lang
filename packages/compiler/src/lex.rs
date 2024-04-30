@@ -94,22 +94,7 @@ impl<'src> Token<'src> {
     }
 
     fn continues_line(&self) -> bool {
-        match self {
-            // `do` can appear anywhere in an expression, including the start of a line. This does
-            // mean we can't use `do` as a separator, so `while` needs to use `then` as a separator:
-            //
-            // ```bandit
-            // while
-            //      my-expression
-            // then
-            //     ...
-            // ```
-            Self::Keyword(kw) => matches!(
-                kw,
-                Keyword::Else | Keyword::Private | Keyword::Public | Keyword::Then | Keyword::Where
-            ),
-            _ => matches!(self, Token::Close(_) | Token::Operator("=")),
-        }
+        matches!(self, Token::Close(_))
     }
 }
 
@@ -384,7 +369,7 @@ mod tests {
                         y
                 "#
             ),
-            "if a then x ; else y ;",
+            "if a , then x ; else y ;",
         );
     }
 
