@@ -79,7 +79,7 @@
 				{
 					"comment": "double-quoted raw strings and raw byte strings",
 					"name": "string.quoted.double.bandit",
-					"begin": "(b?r)(#*)(\")",
+					"begin": "`([^\\(\\)]*)\\(",
 					"beginCaptures": {
 						"1": {
 							"name": "string.quoted.byte.raw.bandit"
@@ -91,7 +91,7 @@
 							"name": "punctuation.definition.string.bandit"
 						}
 					},
-					"end": "(\")(\\2)",
+					"end": "\\)(\\1)`",
 					"endCaptures": {
 						"1": {
 							"name": "punctuation.definition.string.bandit"
