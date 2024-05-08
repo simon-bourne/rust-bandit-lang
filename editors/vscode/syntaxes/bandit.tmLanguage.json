@@ -55,18 +55,15 @@
 				{
 					"comment": "double-quoted strings and byte strings",
 					"name": "string.quoted.double.bandit",
-					"begin": "(b?)(\")",
+					"begin": "(\")",
 					"beginCaptures": {
 						"1": {
-							"name": "string.quoted.byte.raw.bandit"
-						},
-						"2": {
 							"name": "punctuation.definition.string.bandit"
 						}
 					},
-					"end": "\"",
+					"end": "(\")",
 					"endCaptures": {
-						"0": {
+						"1": {
 							"name": "punctuation.definition.string.bandit"
 						}
 					},
@@ -77,29 +74,10 @@
 					]
 				},
 				{
-					"comment": "double-quoted raw strings and raw byte strings",
-					"name": "string.quoted.double.bandit",
-					"begin": "`([^\\(\\)]*)\\(",
-					"beginCaptures": {
-						"1": {
-							"name": "string.quoted.byte.raw.bandit"
-						},
-						"2": {
-							"name": "punctuation.definition.string.raw.bandit"
-						},
-						"3": {
-							"name": "punctuation.definition.string.bandit"
-						}
-					},
-					"end": "\\)(\\1)`",
-					"endCaptures": {
-						"1": {
-							"name": "punctuation.definition.string.bandit"
-						},
-						"2": {
-							"name": "punctuation.definition.string.raw.bandit"
-						}
-					}
+					"comment": "double-quoted raw strings",
+					"name": "string.quoted.other.raw.bandit",
+					"begin": "(\\$*)`",
+					"end": "`\\1"
 				}
 			]
 		},
