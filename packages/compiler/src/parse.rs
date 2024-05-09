@@ -51,6 +51,14 @@ pub trait TTParser<'src, Output>:
     fn skip_line_ends(self) -> impl TTParser<'src, Output> {
         self.then_ignore(line_end().repeated())
     }
+
+    fn skip_operator(self, required_name: &'static str)  -> impl TTParser<'src, Output> {
+        self.then_ignore(    select! {
+            Token::Operator(name) = ext if name == required_name => Operator::new(name,ext.span())
+        }
+        .labelled(required_name)
+        )
+    }
 }
 
 impl<'src, Output, T> TTParser<'src, Output> for T
@@ -62,7 +70,7 @@ where
 
 macro_rules! lexeme {
     ($name:ident, $label:literal, $token:ident) => {
-        fn $name<'src>() -> impl TTParser<'src, $token<'src>> + Copy {
+        pub fn $name<'src>() -> impl TTParser<'src, $token<'src>> + Copy {
             select! { Token::$token(name) = ext => $token::new(name, ext.span()) }.labelled($label)
         }
     };

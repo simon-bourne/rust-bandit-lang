@@ -2,7 +2,7 @@ use chumsky::{IterParser, Parser};
 
 use super::{
     ast::{Function, Item, AST},
-    ident, operator, TTParser,
+    ident, TTParser,
 };
 use crate::lex::Delimiter;
 
@@ -18,7 +18,7 @@ fn function<'src>() -> impl TTParser<'src, Function<'src>> {
     let name = ident()
         .open(Delimiter::Parentheses)
         .close(Delimiter::Parentheses)
-        .then_ignore(operator().filter(|op| op.name == "=").labelled("="))
+        .skip_operator("=")
         .open(Delimiter::Parentheses)
         .close(Delimiter::Parentheses);
     name.map(|name| Function { name })
