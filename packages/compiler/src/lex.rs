@@ -26,7 +26,6 @@ pub enum Token<'src> {
     #[token(";")]
     CloseBlock,
 
-    #[token("alias", |_| Keyword::Alias)]
     #[token("and", |_| Keyword::And)]
     #[token("break", |_| Keyword::Break)]
     #[token("continue", |_| Keyword::Continue)]
@@ -37,17 +36,19 @@ pub enum Token<'src> {
     #[token("forall", |_| Keyword::Forall)]
     #[token("if", |_| Keyword::If)]
     #[token("let", |_| Keyword::Let)]
+    #[token("loop", |_| Keyword::Loop)]
     #[token("match", |_| Keyword::Match)]
     #[token("move", |_| Keyword::Move)]
     #[token("not", |_| Keyword::Not)]
+    #[token("of", |_| Keyword::Of)]
     #[token("or", |_| Keyword::Or)]
     #[token("private", |_| Keyword::Private)]
     #[token("public", |_| Keyword::Public)]
-    #[token("record", |_| Keyword::Record)]
     #[token("return", |_| Keyword::Return)]
     #[token("self", |_| Keyword::SelfValue)]
     #[token("then", |_| Keyword::Then)]
     #[token("trait", |_| Keyword::Trait)]
+    #[token("type", |_| Keyword::Type)]
     #[token("use", |_| Keyword::Use)]
     #[token("where", |_| Keyword::Where)]
     #[token("while", |_| Keyword::While)]
@@ -278,7 +279,6 @@ impl Delimiter {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Keyword {
-    Alias,
     And,
     Break,
     Continue,
@@ -290,17 +290,19 @@ pub enum Keyword {
     Forall,
     If,
     Let,
+    Loop,
     Match,
     Move,
     Not,
+    Of,
     Or,
     Private,
     Public,
-    Record,
     Return,
     SelfValue,
     Then,
     Trait,
+    Type,
     Use,
     Where,
     While,
@@ -312,7 +314,6 @@ impl Keyword {
         use Keyword as KW;
 
         match self {
-            KW::Alias => "alias",
             KW::And => "and",
             KW::Break => "break",
             KW::Continue => "continue",
@@ -324,17 +325,19 @@ impl Keyword {
             KW::Forall => "forall",
             KW::If => "if",
             KW::Let => "let",
+            KW::Loop => "loop",
             KW::Match => "match",
             KW::Move => "move",
             KW::Not => "not",
+            KW::Of => "of",
             KW::Or => "or",
             KW::Private => "private",
             KW::Public => "public",
-            KW::Record => "record",
             KW::Return => "return",
             KW::SelfValue => "self",
             KW::Then => "then",
             KW::Trait => "trait",
+            KW::Type => "type",
             KW::Use => "use",
             KW::Where => "where",
             KW::While => "while",
