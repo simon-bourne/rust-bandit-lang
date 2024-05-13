@@ -94,7 +94,7 @@ impl<'src> Token<'src> {
     }
 
     fn continues_line(&self) -> bool {
-        matches!(self, Token::Close(_))
+        matches!(self, Token::Close(_) | Token::Operator("="))
     }
 }
 
