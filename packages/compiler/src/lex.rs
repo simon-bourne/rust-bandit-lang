@@ -63,7 +63,7 @@ pub enum Token<'src> {
     Identifier(&'src str),
     #[regex(r"'(?&ident)", |lex| lex.slice())]
     Lifetime(&'src str),
-    #[regex(r"[\$%\&\*\+\./<=>@\^\-\~]+", |lex| lex.slice())]
+    #[regex(r"[\$%\&\*\+\./<=>@\^\-\~:]+", |lex| lex.slice())]
     Operator(&'src str),
 
     Error,
@@ -88,6 +88,7 @@ impl<'src> Token<'src> {
                     | Keyword::Private
                     | Keyword::Public
                     | Keyword::Then
+                    | Keyword::Use
                     | Keyword::Where
             )
         } else {
@@ -425,6 +426,29 @@ mod tests {
                 "#
             ),
             "if a then if b then if c then x ; ; ; else y ( a b ) , c ;",
+        );
+    }
+
+    #[test]
+    fn single_line_imports() {
+        test(
+            r#"use Child1, Child2 from Root :: Parent"#,
+            r#"use Child1 , Child2 from Root :: Parent"#,
+        );
+    }
+
+    #[test]
+    fn multi_line_imports() {
+        test(
+            indoc!(
+                r#"
+                    use
+                        Child1
+                        Child2
+                    from Root :: Parent
+                "#
+            ),
+            "use Child1 , Child2 ; from Root :: Parent",
         );
     }
 
