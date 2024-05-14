@@ -34,6 +34,7 @@ pub enum Token<'src> {
     #[token("else", |_| Keyword::Else)]
     #[token("embody", |_| Keyword::Embody)]
     #[token("forall", |_| Keyword::Forall)]
+    #[token("from", |_| Keyword::From)]
     #[token("if", |_| Keyword::If)]
     #[token("let", |_| Keyword::Let)]
     #[token("loop", |_| Keyword::Loop)]
@@ -288,6 +289,7 @@ pub enum Keyword {
     ElseIf,
     Embody,
     Forall,
+    From,
     If,
     Let,
     Loop,
@@ -323,6 +325,7 @@ impl Keyword {
             KW::ElseIf => "else if",
             KW::Embody => "embody",
             KW::Forall => "forall",
+            KW::From => "from",
             KW::If => "if",
             KW::Let => "let",
             KW::Loop => "loop",
