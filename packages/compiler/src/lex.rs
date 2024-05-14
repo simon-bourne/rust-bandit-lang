@@ -432,8 +432,8 @@ mod tests {
     #[test]
     fn single_line_imports() {
         test(
-            r#"use Child1, Child2 from Root :: Parent"#,
-            r#"use Child1 , Child2 from Root :: Parent"#,
+            r#"from Root :: Parent use Child1, Child2"#,
+            r#"from Root :: Parent use Child1 , Child2 ;"#,
         );
     }
 
@@ -442,13 +442,13 @@ mod tests {
         test(
             indoc!(
                 r#"
+                    from Root :: Parent
                     use
                         Child1
                         Child2
-                    from Root :: Parent
                 "#
             ),
-            "use Child1 , Child2 ; from Root :: Parent",
+            "from Root :: Parent , use Child1 , Child2 ;",
         );
     }
 
