@@ -6,7 +6,7 @@ use chumsky::{
 
 use super::{
     ast::{DataDeclaration, Expression, Function, Item, Operator, OperatorName, WhereClause, AST},
-    ident, keyword, open, operator, TTParser,
+    ident, keyword, operator, parenthesized, TTParser,
 };
 use crate::lex::{Delimiter, Keyword};
 
@@ -23,7 +23,7 @@ fn item<'src>() -> impl TTParser<'src, Item<'src>> {
 fn data_item<'src>() -> impl TTParser<'src, DataDeclaration<'src>> {
     keyword(Keyword::Data)
         .ignore_then(ident())
-        .then(expression().repeated().collect())
+        .then(type_parameter().repeated().collect())
         .map(|(name, parameters)| DataDeclaration {
             name,
             parameters,
@@ -41,15 +41,20 @@ fn function<'src>() -> impl TTParser<'src, Function<'src>> {
     name.map(|name| Function { name })
 }
 
-// TODO: We need a parameter parser, because `a b c` would parse as an
-// expression `(a $ b) $ c` (where `$` is function application.)
+/// Parse a type parameter
+///
+/// Like parsing an expression, but the top level is just an identifier or
+/// parathesized expression.
+fn type_parameter<'src>() -> impl TTParser<'src, Expression<'src>> {
+    ident()
+        .map(Expression::Variable)
+        .or(parenthesized(expression()))
+}
+
 fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
     recursive(|expression| {
         let ident = ident().map(Expression::Variable);
-        let parenthesized = open(Delimiter::Parentheses)
-            .ignore_then(expression)
-            .close(Delimiter::Parentheses);
-
+        let parenthesized = parenthesized(expression);
         let atom = ident.or(parenthesized);
 
         // Function application is an implicit operator, and has higher precedence than

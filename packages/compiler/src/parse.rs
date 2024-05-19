@@ -58,6 +58,12 @@ fn open<'src>(delimiter: Delimiter) -> impl TTParser<'src, ()> {
         .labelled(delimiter.open_str())
 }
 
+fn parenthesized<'src, T>(parser: impl TTParser<'src, T>) -> impl TTParser<'src, T> {
+    open(Delimiter::Parentheses)
+        .ignore_then(parser)
+        .close(Delimiter::Parentheses)
+}
+
 impl<'src, Output, T> TTParser<'src, Output> for T where
     T: Parser<'src, SpannedInput<'src, Token<'src>>, Output, RichError<'src>> + Clone + 'src
 {
