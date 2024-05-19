@@ -1,8 +1,8 @@
-use chumsky::{IterParser, Parser};
+use chumsky::{recursive::recursive, IterParser, Parser};
 
 use super::{
-    ast::{DataDeclaration, Function, Item, WhereClause, AST},
-    ident, keyword, TTParser,
+    ast::{DataDeclaration, Expression, Function, Item, WhereClause, AST},
+    ident, keyword, open, TTParser,
 };
 use crate::lex::{Delimiter, Keyword};
 
@@ -19,9 +19,10 @@ fn item<'src>() -> impl TTParser<'src, Item<'src>> {
 fn data_item<'src>() -> impl TTParser<'src, DataDeclaration<'src>> {
     keyword(Keyword::Data)
         .ignore_then(ident())
-        .map(|name| DataDeclaration {
+        .then(expression().repeated().collect())
+        .map(|(name, parameters)| DataDeclaration {
             name,
-            parameters: Vec::new(),
+            parameters,
             where_clause: WhereClause(Vec::new()),
         })
 }
@@ -34,6 +35,19 @@ fn function<'src>() -> impl TTParser<'src, Function<'src>> {
         .open(Delimiter::Parentheses)
         .close(Delimiter::Parentheses);
     name.map(|name| Function { name })
+}
+
+// TODO: We need a parameter parser, because `a b c` would parse as an
+// expression `(a $ b) $ c` (where `$` is function application.)
+fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
+    recursive(|expression| {
+        let ident = ident().map(Expression::Variable);
+        let parenthesized = open(Delimiter::Parentheses)
+            .ignore_then(expression)
+            .close(Delimiter::Parentheses);
+
+        ident.or(parenthesized)
+    })
 }
 
 #[cfg(test)]

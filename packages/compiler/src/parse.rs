@@ -19,18 +19,14 @@ pub type RichError<'src> = extra::Err<Rich<'src, Token<'src>, Span>>;
 pub type JustToken<'src> = Just<Token<'src>, SpannedInput<'src, Token<'src>>, RichError<'src>>;
 
 pub trait TTParser<'src, Output>:
-    Parser<'src, SpannedInput<'src, Token<'src>>, Output, RichError<'src>> + Sized + 'src
+    Parser<'src, SpannedInput<'src, Token<'src>>, Output, RichError<'src>> + Clone + Sized + 'src
 {
     fn keyword(self, kw: Keyword) -> impl TTParser<'src, Output> {
         self.then_ignore(keyword(kw))
     }
 
     fn open(self, delimiter: Delimiter) -> impl TTParser<'src, Output> {
-        self.then_ignore(
-            primitive::select(move |x, _| (x == Token::Open(delimiter)).then_some(()))
-                .skip_line_ends()
-                .labelled(delimiter.open_str()),
-        )
+        self.then_ignore(open(delimiter))
     }
 
     fn close(self, delimiter: Delimiter) -> impl TTParser<'src, Output> {
@@ -57,10 +53,13 @@ pub trait TTParser<'src, Output>:
     }
 }
 
-impl<'src, Output, T> TTParser<'src, Output> for T
-where
-    T: Parser<'src, SpannedInput<'src, Token<'src>>, Output, RichError<'src>>,
-    T: 'src,
+fn open<'src>(delimiter: Delimiter) -> impl TTParser<'src, ()> {
+    primitive::select(move |x, _| (x == Token::Open(delimiter)).then_some(()))
+        .labelled(delimiter.open_str())
+}
+
+impl<'src, Output, T> TTParser<'src, Output> for T where
+    T: Parser<'src, SpannedInput<'src, Token<'src>>, Output, RichError<'src>> + Clone + 'src
 {
 }
 
