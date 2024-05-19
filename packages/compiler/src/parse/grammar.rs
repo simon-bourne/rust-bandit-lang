@@ -113,16 +113,6 @@ mod tests {
         )
     }
 
-    fn parse(name: &str, src: &str) {
-        let tokens = Token::layout(src).collect::<Vec<_>>();
-        let len = src.len();
-        let ast = parser().parse(tokens.spanned(Span::new(len, len)));
-
-        let mut mint = Mint::new("tests/goldenfiles");
-        let mut output = mint.new_goldenfile(format!("{name}.txt")).unwrap();
-        write!(output, "{ast:?}").unwrap();
-    }
-
     #[test]
     fn function() {
         parse(
@@ -131,5 +121,15 @@ mod tests {
 my_function() = ()
         "#,
         );
+    }
+
+    fn parse(name: &str, src: &str) {
+        let tokens = Token::layout(src).collect::<Vec<_>>();
+        let len = src.len();
+        let ast = parser().parse(tokens.spanned(Span::new(len, len)));
+
+        let mut mint = Mint::new("tests/goldenfiles");
+        let mut output = mint.new_goldenfile(format!("{name}.txt")).unwrap();
+        write!(output, "{ast:#?}").unwrap();
     }
 }
