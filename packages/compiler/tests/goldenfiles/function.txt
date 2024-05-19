@@ -6,7 +6,7 @@ ParseResult {
                     Function {
                         name: Identifier {
                             name: "my_function",
-                            span: 1..12,
+                            span: 0..11,
                         },
                     },
                 ),
