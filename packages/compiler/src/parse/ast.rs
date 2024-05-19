@@ -9,6 +9,7 @@ pub struct AST<'src> {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Item<'src> {
+    Data(DataDeclaration<'src>),
     Function(Function<'src>),
 }
 
@@ -45,7 +46,7 @@ pub enum OperatorName<'src> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Constructor)]
-pub struct WhereClause<'src>(Vec<Expression<'src>>);
+pub struct WhereClause<'src>(pub Vec<Expression<'src>>);
 
 #[derive(Clone, Debug, Eq, PartialEq, Constructor)]
 pub struct Identifier<'src> {

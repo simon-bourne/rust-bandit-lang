@@ -1,17 +1,29 @@
 use chumsky::{IterParser, Parser};
 
 use super::{
-    ast::{Function, Item, AST},
-    ident, TTParser,
+    ast::{DataDeclaration, Function, Item, WhereClause, AST},
+    ident, keyword, TTParser,
 };
-use crate::lex::Delimiter;
+use crate::lex::{Delimiter, Keyword};
 
 pub fn parser<'src>() -> impl TTParser<'src, AST<'src>> {
-    function()
-        .map(Item::Function)
-        .repeated()
-        .collect()
-        .map(|items| AST { items })
+    item().repeated().collect().map(|items| AST { items })
+}
+
+fn item<'src>() -> impl TTParser<'src, Item<'src>> {
+    data_item()
+        .map(Item::Data)
+        .or(function().map(Item::Function))
+}
+
+fn data_item<'src>() -> impl TTParser<'src, DataDeclaration<'src>> {
+    keyword(Keyword::Data)
+        .ignore_then(ident())
+        .map(|name| DataDeclaration {
+            name,
+            parameters: Vec::new(),
+            where_clause: WhereClause(Vec::new()),
+        })
 }
 
 fn function<'src>() -> impl TTParser<'src, Function<'src>> {

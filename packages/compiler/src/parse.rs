@@ -21,12 +21,8 @@ pub type JustToken<'src> = Just<Token<'src>, SpannedInput<'src, Token<'src>>, Ri
 pub trait TTParser<'src, Output>:
     Parser<'src, SpannedInput<'src, Token<'src>>, Output, RichError<'src>> + Sized + 'src
 {
-    fn kw(self, keyword: Keyword) -> impl TTParser<'src, Output> {
-        self.then_ignore(
-            primitive::select(move |x, _| (x == Token::Keyword(keyword)).then_some(()))
-                .skip_line_ends()
-                .labelled(keyword.as_str()),
-        )
+    fn kw(self, kw: Keyword) -> impl TTParser<'src, Output> {
+        self.then_ignore(keyword(kw))
     }
 
     fn open(self, delimiter: Delimiter) -> impl TTParser<'src, Output> {
@@ -89,3 +85,7 @@ macro_rules! token {
 
 token!(line_end, "\\n", LineSeparator);
 token!(close_block, ";", CloseBlock);
+
+fn keyword<'src>(kw: Keyword) -> impl TTParser<'src, ()> + Copy {
+    primitive::select(move |x, _| (x == Token::Keyword(kw)).then_some(())).labelled(kw.as_str())
+}
