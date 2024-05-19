@@ -21,7 +21,7 @@ pub type JustToken<'src> = Just<Token<'src>, SpannedInput<'src, Token<'src>>, Ri
 pub trait TTParser<'src, Output>:
     Parser<'src, SpannedInput<'src, Token<'src>>, Output, RichError<'src>> + Sized + 'src
 {
-    fn kw(self, kw: Keyword) -> impl TTParser<'src, Output> {
+    fn keyword(self, kw: Keyword) -> impl TTParser<'src, Output> {
         self.then_ignore(keyword(kw))
     }
 
