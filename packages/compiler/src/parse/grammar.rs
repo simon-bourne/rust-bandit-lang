@@ -1,5 +1,5 @@
 use chumsky::{
-    pratt::{self, right, Associativity, Infix},
+    pratt::{self, left, right, Associativity, Infix},
     recursive::recursive,
     IterParser, Parser,
 };
@@ -54,7 +54,7 @@ fn type_parameter<'src>() -> impl TTParser<'src, Expression<'src>> {
 fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
     recursive(|expression| {
         let ident = ident().map(Expression::Variable);
-        let parenthesized = parenthesized(expression);
+        let parenthesized = parenthesized(expression.clone());
         let atom = ident.or(parenthesized);
 
         // Function application is an implicit operator, and has higher precedence than
@@ -67,9 +67,20 @@ fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
                     right: Box::new(right),
                 });
 
-        application
+        let operators = application
             .clone()
-            .pratt((infix(right(1), "->"), infix(right(0), ":")))
+            .pratt((infix(right(1), "->"), infix(left(5), "+")));
+
+        // TODO: Add quantification and constraints
+        let type_annotated = operators.clone().then(operator(":")).then(expression).map(
+            |((e, op), type_constraint)| Expression::BinaryOperator {
+                name: OperatorName::Named(op),
+                left: Box::new(e),
+                right: Box::new(type_constraint),
+            },
+        );
+
+        type_annotated.or(operators)
     })
 }
 
