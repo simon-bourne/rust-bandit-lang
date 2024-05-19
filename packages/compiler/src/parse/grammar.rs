@@ -46,7 +46,17 @@ fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
             .ignore_then(expression)
             .close(Delimiter::Parentheses);
 
-        ident.or(parenthesized)
+        let atom = ident.or(parenthesized);
+
+        atom.clone()
+            .foldl(atom.repeated(), |left, right| Expression::BinaryOperator {
+                name: super::ast::OperatorName::Apply,
+                left: Box::new(left),
+                right: Box::new(right),
+            })
+
+        // TODO: Parse function application, then pratt parse the expressions.
+        // TODO: Include spans
     })
 }
 

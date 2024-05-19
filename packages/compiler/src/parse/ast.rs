@@ -33,9 +33,10 @@ pub struct DataDeclaration<'src> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expression<'src> {
     Variable(Identifier<'src>),
-    Operator {
+    BinaryOperator {
         name: OperatorName<'src>,
-        arguments: Vec<Expression<'src>>,
+        left: Box<Expression<'src>>,
+        right: Box<Expression<'src>>,
     },
 }
 
