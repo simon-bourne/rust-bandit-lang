@@ -93,7 +93,8 @@ fn infix<'src>(
     )
 }
 
-#[cfg(test)]
+// Windows line endings are a pain, so just skip the parser tests
+#[cfg(all(test, not(target_os = "windows")))]
 mod tests {
     use std::io::Write;
 
