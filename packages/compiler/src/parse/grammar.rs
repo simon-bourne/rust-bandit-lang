@@ -1,8 +1,12 @@
-use chumsky::{recursive::recursive, IterParser, Parser};
+use chumsky::{
+    pratt::{self, right, Associativity, Infix},
+    recursive::recursive,
+    IterParser, Parser,
+};
 
 use super::{
-    ast::{DataDeclaration, Expression, Function, Item, WhereClause, AST},
-    ident, keyword, open, TTParser,
+    ast::{DataDeclaration, Expression, Function, Item, Operator, OperatorName, WhereClause, AST},
+    ident, keyword, open, operator, TTParser,
 };
 use crate::lex::{Delimiter, Keyword};
 
@@ -48,51 +52,79 @@ fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
 
         let atom = ident.or(parenthesized);
 
-        atom.clone()
-            .foldl(atom.repeated(), |left, right| Expression::BinaryOperator {
-                name: super::ast::OperatorName::Apply,
-                left: Box::new(left),
-                right: Box::new(right),
-            })
+        // Function application is an implicit operator, and has higher precedence than
+        // everything else.
+        let application =
+            atom.clone()
+                .foldl(atom.repeated(), |left, right| Expression::BinaryOperator {
+                    name: OperatorName::Apply,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                });
 
-        // TODO: Parse function application, then pratt parse the expressions.
-        // TODO: Include spans
+        application
+            .clone()
+            .pratt((infix(right(0), "->"), infix(right(5), ":")))
     })
+}
+
+fn infix<'src>(
+    associativity: Associativity,
+    name: &'src str,
+) -> Infix<
+    impl TTParser<Operator>,
+    impl Fn(Expression<'src>, Operator<'src>, Expression<'src>) -> Expression<'src> + Clone,
+    Operator<'src>,
+    (Expression<'src>, Operator<'src>, Expression<'src>),
+> {
+    pratt::infix::<_, _, Operator, (Expression, Operator, Expression)>(
+        associativity,
+        operator(name),
+        |left, op, right| Expression::BinaryOperator {
+            name: OperatorName::Named(op),
+            left: Box::new(left),
+            right: Box::new(right),
+        },
+    )
 }
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
     use chumsky::{prelude::Input, Parser};
+    use goldenfile::Mint;
 
     use crate::{
         lex::{Span, Token},
-        parse::{
-            ast::{Function, Identifier, Item, AST},
-            grammar::parser,
-        },
+        parse::grammar::parser,
     };
 
     #[test]
-    fn basic() {
-        const SRC: &str = r#"
-my_function() = ()
-        "#;
-
-        let tokens = Token::layout(SRC).collect::<Vec<_>>();
-        let ast = parser().parse(tokens.spanned(Span::new(SRC.len(), SRC.len())));
-
-        // TODO: Pretty print the AST and use golden tests. Assert all the id's
-        // are the same in their source to check the spans are correct.
-        assert_eq!(
-            ast.unwrap(),
-            AST {
-                items: vec![Item::Function(Function {
-                    name: Identifier {
-                        name: "my_function",
-                        span: Span::new(1, 12)
-                    },
-                })]
-            }
+    fn data_declaration() {
+        parse(
+            "data-declaration",
+            r#"data MyType a (b : Type) (c : Type -> Type -> Type)"#,
         )
+    }
+
+    fn parse(name: &str, src: &str) {
+        let tokens = Token::layout(src).collect::<Vec<_>>();
+        let len = src.len();
+        let ast = parser().parse(tokens.spanned(Span::new(len, len)));
+
+        let mut mint = Mint::new("tests/goldenfiles");
+        let mut output = mint.new_goldenfile(format!("{name}.txt")).unwrap();
+        write!(output, "{ast:?}").unwrap();
+    }
+
+    #[test]
+    fn function() {
+        parse(
+            "function",
+            r#"
+my_function() = ()
+        "#,
+        );
     }
 }

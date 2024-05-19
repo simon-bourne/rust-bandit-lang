@@ -72,7 +72,13 @@ macro_rules! lexeme {
 }
 
 lexeme!(ident, "<identifier>", Identifier);
-lexeme!(operator, "<operator>", Operator);
+
+pub fn operator(name: &str) -> impl TTParser<Operator> + Copy {
+    select! {
+        Token::Operator(op_name) = ext if name == op_name => Operator::new(name,ext.span())
+    }
+    .labelled("<operator>")
+}
 
 macro_rules! token {
     ($name:ident, $label:literal, $token:ident) => {

@@ -43,7 +43,7 @@ pub enum Expression<'src> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum OperatorName<'src> {
     Apply,
-    Named(Identifier<'src>),
+    Named(Operator<'src>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Constructor)]
