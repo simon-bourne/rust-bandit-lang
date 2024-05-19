@@ -54,8 +54,16 @@ pub trait TTParser<'src, Output>:
 }
 
 fn open<'src>(delimiter: Delimiter) -> impl TTParser<'src, ()> {
-    primitive::select(move |x, _| (x == Token::Open(delimiter)).then_some(()))
-        .labelled(delimiter.open_str())
+    token(Token::Open(delimiter), delimiter.open_str())
+}
+
+fn line_separator<'src>() -> impl TTParser<'src, ()> {
+    primitive::select(move |x, _| (x == Token::LineSeparator || x == Token::Comma).then_some(()))
+        .labelled("<line separator>")
+}
+
+fn token<'src>(token: Token<'src>, label: &'static str) -> impl TTParser<'src, ()> {
+    primitive::select(move |x, _| (x == token).then_some(())).labelled(label)
 }
 
 fn parenthesized<'src, T>(parser: impl TTParser<'src, T>) -> impl TTParser<'src, T> {

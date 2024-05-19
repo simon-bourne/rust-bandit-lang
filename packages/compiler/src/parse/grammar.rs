@@ -6,7 +6,7 @@ use chumsky::{
 
 use super::{
     ast::{DataDeclaration, Expression, Function, Item, Operator, OperatorName, WhereClause, AST},
-    ident, keyword, operator, parenthesized, TTParser,
+    ident, keyword, line_separator, operator, parenthesized, TTParser,
 };
 use crate::lex::{Delimiter, Keyword};
 
@@ -71,17 +71,37 @@ fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
             .clone()
             .pratt((infix(right(1), "->"), infix(left(5), "+")));
 
-        // TODO: Add quantification and constraints
-        let type_annotated = operators.clone().then(operator(":")).then(expression).map(
-            |((e, op), type_constraint)| Expression::BinaryOperator {
-                name: OperatorName::Named(op),
-                left: Box::new(e),
-                right: Box::new(type_constraint),
-            },
-        );
+        // TODO: Add quantification
+        let type_annotated = operators
+            .clone()
+            .then_ignore(operator(":"))
+            .then(expression.clone())
+            .then(where_clause(expression))
+            .map(
+                |((e, type_constraint), where_clause)| Expression::TypeAnnotation {
+                    expression: Box::new(e),
+                    type_expression: Box::new(type_constraint),
+                    where_clause,
+                },
+            );
 
         type_annotated.or(operators)
     })
+}
+
+fn where_clause<'src>(
+    expression: impl TTParser<'src, Expression<'src>>,
+) -> impl TTParser<'src, WhereClause<'src>> {
+    keyword(Keyword::Where)
+        .ignore_then(
+            expression
+                .separated_by(line_separator())
+                .allow_trailing()
+                .collect(),
+        )
+        .close_block()
+        .or_not()
+        .map(|where_clause| WhereClause(where_clause.unwrap_or_default()))
 }
 
 fn infix<'src>(

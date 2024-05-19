@@ -15,40 +15,31 @@ ParseResult {
                                     span: 12..13,
                                 },
                             ),
-                            BinaryOperator {
-                                name: Named(
-                                    Operator {
-                                        name: ":",
-                                        span: 17..18,
-                                    },
-                                ),
-                                left: Variable(
+                            TypeAnnotation {
+                                expression: Variable(
                                     Identifier {
                                         name: "b",
                                         span: 15..16,
                                     },
                                 ),
-                                right: Variable(
+                                type_expression: Variable(
                                     Identifier {
                                         name: "Type",
                                         span: 19..23,
                                     },
                                 ),
-                            },
-                            BinaryOperator {
-                                name: Named(
-                                    Operator {
-                                        name: ":",
-                                        span: 28..29,
-                                    },
+                                where_clause: WhereClause(
+                                    [],
                                 ),
-                                left: Variable(
+                            },
+                            TypeAnnotation {
+                                expression: Variable(
                                     Identifier {
                                         name: "c",
                                         span: 26..27,
                                     },
                                 ),
-                                right: BinaryOperator {
+                                type_expression: BinaryOperator {
                                     name: Named(
                                         Operator {
                                             name: "->",
@@ -82,6 +73,9 @@ ParseResult {
                                         ),
                                     },
                                 },
+                                where_clause: WhereClause(
+                                    [],
+                                ),
                             },
                         ],
                         where_clause: WhereClause(

@@ -38,6 +38,11 @@ pub enum Expression<'src> {
         left: Box<Expression<'src>>,
         right: Box<Expression<'src>>,
     },
+    TypeAnnotation {
+        expression: Box<Expression<'src>>,
+        type_expression: Box<Expression<'src>>,
+        where_clause: WhereClause<'src>,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
