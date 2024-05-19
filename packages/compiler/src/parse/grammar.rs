@@ -115,12 +115,7 @@ mod tests {
 
     #[test]
     fn function() {
-        parse(
-            "function",
-            r#"
-my_function() = ()
-        "#,
-        );
+        parse("function", r#"my_function() = ()"#);
     }
 
     fn parse(name: &str, src: &str) {
