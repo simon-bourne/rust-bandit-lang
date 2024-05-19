@@ -69,7 +69,7 @@ fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
 
         application
             .clone()
-            .pratt((infix(right(0), "->"), infix(right(5), ":")))
+            .pratt((infix(right(1), "->"), infix(right(0), ":")))
     })
 }
 
