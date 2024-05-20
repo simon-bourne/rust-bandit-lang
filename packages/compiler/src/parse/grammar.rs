@@ -6,7 +6,7 @@ use chumsky::{
 
 use super::{
     ast::{DataDeclaration, Expression, Function, Item, Operator, OperatorName, WhereClause, AST},
-    ident, keyword, line_separator, operator, parenthesized, TTParser,
+    ident, keyword, line_separator, operator, optional_line_end, parenthesized, TTParser,
 };
 use crate::lex::{Grouping, Keyword};
 
@@ -92,16 +92,18 @@ fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
 fn where_clause<'src>(
     expression: impl TTParser<'src, Expression<'src>>,
 ) -> impl TTParser<'src, WhereClause<'src>> {
-    keyword(Keyword::Where)
-        .ignore_then(
-            expression
-                .separated_by(line_separator())
-                .allow_trailing()
-                .collect(),
-        )
-        .close_block()
-        .or_not()
-        .map(|where_clause| WhereClause(where_clause.unwrap_or_default()))
+    optional_line_end(
+        keyword(Keyword::Where)
+            .ignore_then(
+                expression
+                    .separated_by(line_separator())
+                    .allow_trailing()
+                    .collect(),
+            )
+            .close_block()
+            .or_not()
+            .map(|where_clause| WhereClause(where_clause.unwrap_or_default())),
+    )
 }
 
 fn infix<'src>(
