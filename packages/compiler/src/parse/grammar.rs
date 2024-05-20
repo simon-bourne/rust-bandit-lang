@@ -149,7 +149,7 @@ mod tests {
     fn data_declaration_where() {
         parse(
             "data-declaration-where",
-            r#"data MyType a (b : Type) (c : Type -> Type -> Type where a == b, b == c, Ord a;)"#,
+            r#"data MyType a (b : Type) (c : Type -> Type -> Type where a == b, b == c, Ord a)"#,
         )
     }
 
