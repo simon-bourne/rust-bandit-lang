@@ -24,10 +24,11 @@ fn data_item<'src>() -> impl TTParser<'src, DataDeclaration<'src>> {
     keyword(Keyword::Data)
         .ignore_then(ident())
         .then(type_parameter().repeated().collect())
-        .map(|(name, parameters)| DataDeclaration {
+        .then(where_clause(expression()))
+        .map(|((name, parameters), where_clause)| DataDeclaration {
             name,
             parameters,
-            where_clause: WhereClause(Vec::new()),
+            where_clause,
         })
 }
 
