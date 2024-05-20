@@ -96,6 +96,9 @@ impl<'src> Token<'src> {
         }
     }
 
+    // TODO: Operators should continue lines, as it's then obvious it's a
+    // continuation. Should indent? We can use something like `<-` for explicit
+    // function application.
     fn continues_line(&self) -> bool {
         matches!(self, Token::Close(_) | Token::Operator("="))
     }
