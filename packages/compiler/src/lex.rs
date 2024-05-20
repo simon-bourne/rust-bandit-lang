@@ -230,7 +230,6 @@ where
         }
 
         match token.0 {
-            // TODO: Is this right?
             Token::CloseBlock => self.close_block(token.1),
             Token::LineSeparator => self.handle_indent(token),
             Token::Open(delimiter) => {
