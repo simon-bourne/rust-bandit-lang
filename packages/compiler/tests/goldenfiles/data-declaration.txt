@@ -3,84 +3,123 @@ ParseResult {
         AST {
             items: [
                 Data(
-                    DataDeclaration {
-                        name: Identifier {
-                            name: "MyType",
-                            span: 5..11,
-                        },
-                        parameters: [
-                            Variable(
-                                Identifier {
-                                    name: "a",
-                                    span: 12..13,
+                    Data {
+                        declaration: DataDeclaration {
+                            name: Identifier {
+                                name: "MyType",
+                                span: 5..11,
+                            },
+                            parameters: [
+                                Parameter {
+                                    name: Identifier {
+                                        name: "a",
+                                        span: 12..13,
+                                    },
+                                    typ: None,
                                 },
-                            ),
-                            TypeAnnotation {
-                                expression: Variable(
-                                    Identifier {
+                                Parameter {
+                                    name: Identifier {
                                         name: "b",
                                         span: 15..16,
                                     },
-                                ),
-                                type_expression: Variable(
-                                    Identifier {
-                                        name: "Type",
-                                        span: 19..23,
-                                    },
-                                ),
-                                where_clause: WhereClause(
-                                    [],
-                                ),
-                            },
-                            TypeAnnotation {
-                                expression: Variable(
-                                    Identifier {
+                                    typ: Some(
+                                        TypeExpression {
+                                            expression: Variable(
+                                                Identifier {
+                                                    name: "Type",
+                                                    span: 19..23,
+                                                },
+                                            ),
+                                            where_clause: WhereClause(
+                                                [],
+                                            ),
+                                        },
+                                    ),
+                                },
+                                Parameter {
+                                    name: Identifier {
                                         name: "c",
                                         span: 26..27,
                                     },
-                                ),
-                                type_expression: BinaryOperator {
-                                    name: Named(
-                                        Operator {
-                                            name: "->",
-                                            span: 35..37,
+                                    typ: Some(
+                                        TypeExpression {
+                                            expression: BinaryOperator {
+                                                name: Named(
+                                                    Operator {
+                                                        name: "->",
+                                                        span: 35..37,
+                                                    },
+                                                ),
+                                                left: Variable(
+                                                    Identifier {
+                                                        name: "Type",
+                                                        span: 30..34,
+                                                    },
+                                                ),
+                                                right: BinaryOperator {
+                                                    name: Named(
+                                                        Operator {
+                                                            name: "->",
+                                                            span: 43..45,
+                                                        },
+                                                    ),
+                                                    left: Variable(
+                                                        Identifier {
+                                                            name: "Type",
+                                                            span: 38..42,
+                                                        },
+                                                    ),
+                                                    right: Variable(
+                                                        Identifier {
+                                                            name: "Type",
+                                                            span: 46..50,
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                            where_clause: WhereClause(
+                                                [],
+                                            ),
                                         },
                                     ),
-                                    left: Variable(
-                                        Identifier {
-                                            name: "Type",
-                                            span: 30..34,
-                                        },
-                                    ),
-                                    right: BinaryOperator {
-                                        name: Named(
-                                            Operator {
-                                                name: "->",
-                                                span: 43..45,
-                                            },
-                                        ),
-                                        left: Variable(
-                                            Identifier {
-                                                name: "Type",
-                                                span: 38..42,
-                                            },
-                                        ),
-                                        right: Variable(
-                                            Identifier {
-                                                name: "Type",
-                                                span: 46..50,
-                                            },
-                                        ),
-                                    },
                                 },
-                                where_clause: WhereClause(
-                                    [],
-                                ),
-                            },
-                        ],
-                        where_clause: WhereClause(
-                            [],
-                        ),
+                            ],
+                            where_clause: WhereClause(
+                                [],
+                            ),
+                        },
+                        constructors: VisibilityItems {
+                            visibility: Public,
+                            items: [
+                                TypeConstructor {
+                                    name: Identifier {
+                                        name: "X",
+                                        span: 59..60,
+                                    },
+                                    parameters: [
+                                        Parameter {
+                                            name: Identifier {
+                                                name: "item",
+                                                span: 64..68,
+                                            },
+                                            typ: Some(
+                                                TypeExpression {
+                                                    expression: Variable(
+                                                        Identifier {
+                                                            name: "Int",
+                                                            span: 71..74,
+                                                        },
+                                                    ),
+                                                    where_clause: WhereClause(
+                                                        [],
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
                     },
                 ),
             ],

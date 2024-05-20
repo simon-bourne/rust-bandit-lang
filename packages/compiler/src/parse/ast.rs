@@ -9,7 +9,7 @@ pub struct AST<'src> {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Item<'src> {
-    Data(DataDeclaration<'src>),
+    Data(Data<'src>),
     Function(Function<'src>),
 }
 
@@ -26,8 +26,26 @@ pub struct Function<'src> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DataDeclaration<'src> {
     pub name: Identifier<'src>,
-    pub parameters: Vec<Expression<'src>>,
+    pub parameters: Vec<Parameter<'src>>,
     pub where_clause: WhereClause<'src>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Data<'src> {
+    pub declaration: DataDeclaration<'src>,
+    pub constructors: VisibilityItems<TypeConstructor<'src>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TypeConstructor<'src> {
+    pub name: Identifier<'src>,
+    pub parameters: Vec<Parameter<'src>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Parameter<'src> {
+    pub name: Identifier<'src>,
+    pub typ: Option<TypeExpression<'src>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -40,15 +58,32 @@ pub enum Expression<'src> {
     },
     TypeAnnotation {
         expression: Box<Expression<'src>>,
-        type_expression: Box<Expression<'src>>,
-        where_clause: WhereClause<'src>,
+        type_expression: Box<TypeExpression<'src>>,
     },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TypeExpression<'src> {
+    pub expression: Expression<'src>,
+    pub where_clause: WhereClause<'src>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum OperatorName<'src> {
     Apply,
     Named(Operator<'src>),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VisibilityItems<T> {
+    pub visibility: Visibility,
+    pub items: Vec<T>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Visibility {
+    Public,
+    Private,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Constructor)]

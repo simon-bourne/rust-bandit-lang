@@ -5,7 +5,10 @@ use chumsky::{
 };
 
 use super::{
-    ast::{DataDeclaration, Expression, Function, Item, Operator, OperatorName, WhereClause, AST},
+    ast::{
+        Data, DataDeclaration, Expression, Function, Item, Operator, OperatorName, Parameter,
+        TypeConstructor, TypeExpression, Visibility, VisibilityItems, WhereClause, AST,
+    },
     ident, keyword, line_separator, operator, optional_line_end, parenthesized, TTParser,
 };
 use crate::lex::{Grouping, Keyword};
@@ -14,16 +17,17 @@ pub fn parser<'src>() -> impl TTParser<'src, AST<'src>> {
     item().repeated().collect().map(|items| AST { items })
 }
 
+// TODO: Split into `trait_item` and `embody_item`?
 fn item<'src>() -> impl TTParser<'src, Item<'src>> {
-    data_item()
+    data_with_body()
         .map(Item::Data)
         .or(function().map(Item::Function))
 }
 
-fn data_item<'src>() -> impl TTParser<'src, DataDeclaration<'src>> {
+fn data_declaration<'src>() -> impl TTParser<'src, DataDeclaration<'src>> {
     keyword(Keyword::Data)
         .ignore_then(ident())
-        .then(type_parameter().repeated().collect())
+        .then(parameter_wth_parens().repeated().collect())
         .then(where_clause(expression()))
         .map(|((name, parameters), where_clause)| DataDeclaration {
             name,
@@ -42,14 +46,20 @@ fn function<'src>() -> impl TTParser<'src, Function<'src>> {
     name.map(|name| Function { name })
 }
 
-/// Parse a type parameter
-///
-/// Like parsing an expression, but the top level is just an identifier or
-/// parathesized expression.
-fn type_parameter<'src>() -> impl TTParser<'src, Expression<'src>> {
-    ident()
-        .map(Expression::Variable)
-        .or(parenthesized(expression()))
+fn parameter<'src>() -> impl TTParser<'src, Parameter<'src>> {
+    let name = ident();
+
+    name.then_ignore(operator(":"))
+        .then(type_expression(expression()))
+        .map(|(name, typ)| Parameter {
+            name,
+            typ: Some(typ),
+        })
+        .or(name.map(|name| Parameter { name, typ: None }))
+}
+
+fn parameter_wth_parens<'src>() -> impl TTParser<'src, Parameter<'src>> {
+    recursive(|parameter_with_parens| parenthesized(parameter_with_parens).or(parameter()))
 }
 
 fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
@@ -76,18 +86,57 @@ fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
         let type_annotated = operators
             .clone()
             .then_ignore(operator(":"))
-            .then(expression.clone())
-            .then(where_clause(expression))
-            .map(
-                |((e, type_constraint), where_clause)| Expression::TypeAnnotation {
-                    expression: Box::new(e),
-                    type_expression: Box::new(type_constraint),
-                    where_clause,
-                },
-            );
+            .then(type_expression(expression.clone()))
+            .map(|(expression, type_expression)| Expression::TypeAnnotation {
+                expression: Box::new(expression),
+                type_expression: Box::new(type_expression),
+            });
 
         type_annotated.or(operators)
     })
+}
+
+fn type_expression<'src>(
+    expression: impl TTParser<'src, Expression<'src>>,
+) -> impl TTParser<'src, TypeExpression<'src>> {
+    expression
+        .clone()
+        .then(where_clause(expression))
+        .map(|(expression, where_clause)| TypeExpression {
+            expression,
+            where_clause,
+        })
+}
+
+fn data_with_body<'src>() -> impl TTParser<'src, Data<'src>> {
+    data_declaration()
+        .then(visibility_items(type_constructor()))
+        .map(|(declaration, constructors)| Data {
+            declaration,
+            constructors,
+        })
+}
+
+fn type_constructor<'src>() -> impl TTParser<'src, TypeConstructor<'src>> {
+    let name = ident();
+    name.keyword(Keyword::Of)
+        .then(parameter().separated_by(line_separator()).collect())
+        .map(|(name, parameters)| TypeConstructor { name, parameters })
+        .or(name.map(|name| TypeConstructor {
+            name,
+            parameters: Vec::new(),
+        }))
+}
+
+fn visibility_items<'src, T: 'src>(
+    parser: impl TTParser<'src, T>,
+) -> impl TTParser<'src, VisibilityItems<T>> {
+    keyword(Keyword::Public)
+        .to(Visibility::Public)
+        .or(keyword(Keyword::Private).to(Visibility::Private))
+        .then(parser.repeated().collect())
+        .close_block()
+        .map(|(visibility, items)| VisibilityItems { visibility, items })
 }
 
 fn where_clause<'src>(
@@ -144,7 +193,7 @@ mod tests {
     fn data_declaration() {
         parse(
             "data-declaration",
-            r#"data MyType a (b : Type) (c : Type -> Type -> Type)"#,
+            r#"data MyType a (b : Type) (c : Type -> Type -> Type) public X of item : Int"#,
         )
     }
 
@@ -152,7 +201,7 @@ mod tests {
     fn data_declaration_where() {
         parse(
             "data-declaration-where",
-            r#"data MyType a (b : Type) (c : Type -> Type -> Type where a == b, b == c, Ord a)"#,
+            r#"data MyType a (b : Type) (c : Type -> Type -> Type where a == b, b == c, Ord a) public X of item : Int"#,
         )
     }
 
