@@ -16,6 +16,7 @@ ParseResult {
                                         span: 12..13,
                                     },
                                     kind: None,
+                                    parentheses: 0,
                                 },
                                 TypeParameter {
                                     name: Identifier {
@@ -35,6 +36,7 @@ ParseResult {
                                             ),
                                         },
                                     ),
+                                    parentheses: 1,
                                 },
                                 TypeParameter {
                                     name: Identifier {
@@ -82,6 +84,7 @@ ParseResult {
                                             ),
                                         },
                                     ),
+                                    parentheses: 1,
                                 },
                             ],
                             where_clause: WhereClause(

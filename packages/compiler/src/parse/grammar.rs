@@ -58,24 +58,36 @@ fn parameter<'src>() -> impl TTParser<'src, Parameter<'src>> {
 
 fn type_parameter<'src>() -> impl TTParser<'src, TypeParameter<'src>> {
     let name = ident();
-    name.map(|name| TypeParameter { name, kind: None })
-        .or(recursive(|parameter| {
-            parenthesized(
-                name.then(
-                    operator(":")
-                        .ignore_then(type_expression(expression()))
-                        .or_not(),
-                )
-                .map(|(name, kind)| TypeParameter { name, kind })
-                .or(parameter),
+    name.map(|name| TypeParameter {
+        name,
+        kind: None,
+        parentheses: 0,
+    })
+    .or(recursive(|parameter| {
+        parenthesized(
+            name.then(
+                operator(":")
+                    .ignore_then(type_expression(expression()))
+                    .or_not(),
             )
-        }))
+            .map(|(name, kind)| TypeParameter {
+                name,
+                kind,
+                parentheses: 1,
+            })
+            .or(parameter.map(|p: TypeParameter| TypeParameter {
+                parentheses: p.parentheses + 1,
+                ..p
+            })),
+        )
+    }))
 }
 
 fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
     recursive(|expression| {
         let ident = ident().map(Expression::Variable);
-        let parenthesized = parenthesized(expression.clone());
+        let parenthesized =
+            parenthesized(expression.clone()).map(|e| Expression::Parenthesized(Box::new(e)));
         let atom = ident.or(parenthesized);
 
         // Function application is an implicit operator, and has higher precedence than
@@ -211,7 +223,7 @@ mod tests {
     fn data_declaration_where() {
         parse(
             "data-declaration-where",
-            r#"data MyType a (b : Type) (c : Type -> Type -> Type where a == b, b == c, Ord a) public X of item : Int"#,
+            r#"data MyType a (((b : (Type)))) (c : Type -> Type -> Type where a == b, b == c, Ord a) public X of item : Int"#,
         )
     }
 

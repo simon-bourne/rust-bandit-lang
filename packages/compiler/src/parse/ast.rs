@@ -46,6 +46,7 @@ pub struct TypeConstructor<'src> {
 pub struct TypeParameter<'src> {
     pub name: Identifier<'src>,
     pub kind: Option<TypeExpression<'src>>,
+    pub parentheses: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -59,13 +60,14 @@ pub enum Expression<'src> {
     Variable(Identifier<'src>),
     BinaryOperator {
         name: OperatorName<'src>,
-        left: Box<Expression<'src>>,
-        right: Box<Expression<'src>>,
+        left: Box<Self>,
+        right: Box<Self>,
     },
     TypeAnnotation {
-        expression: Box<Expression<'src>>,
+        expression: Box<Self>,
         type_expression: Box<TypeExpression<'src>>,
     },
+    Parenthesized(Box<Self>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
