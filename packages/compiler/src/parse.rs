@@ -109,8 +109,6 @@ fn keyword<'src>(kw: Keyword) -> impl TTParser<'src, ()> + Copy {
     primitive::select(move |x, _| (x == Token::Keyword(kw)).then_some(())).labelled(kw.as_str())
 }
 
-fn optional_line_end<'src, T>(
-    parser: impl TTParser<'src, T>,
-) -> impl TTParser<'src, T> {
+fn optional_line_end<'src, T>(parser: impl TTParser<'src, T>) -> impl TTParser<'src, T> {
     line_end().ignore_then(parser.clone()).or(parser)
 }
