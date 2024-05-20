@@ -26,7 +26,7 @@ pub struct Function<'src> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DataDeclaration<'src> {
     pub name: Identifier<'src>,
-    pub parameters: Vec<Parameter<'src>>,
+    pub parameters: Vec<TypeParameter<'src>>,
     pub where_clause: WhereClause<'src>,
 }
 
@@ -43,9 +43,15 @@ pub struct TypeConstructor<'src> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Parameter<'src> {
+pub struct TypeParameter<'src> {
     pub name: Identifier<'src>,
-    pub typ: Option<TypeExpression<'src>>,
+    pub kind: Option<TypeExpression<'src>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Parameter<'src> {
+    pub name: Option<Identifier<'src>>,
+    pub typ: TypeExpression<'src>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -10,14 +10,14 @@ ParseResult {
                                 span: 5..11,
                             },
                             parameters: [
-                                Parameter {
+                                TypeParameter {
                                     name: Identifier {
                                         name: "a",
                                         span: 12..13,
                                     },
                                     typ: None,
                                 },
-                                Parameter {
+                                TypeParameter {
                                     name: Identifier {
                                         name: "b",
                                         span: 15..16,
@@ -36,7 +36,7 @@ ParseResult {
                                         },
                                     ),
                                 },
-                                Parameter {
+                                TypeParameter {
                                     name: Identifier {
                                         name: "c",
                                         span: 26..27,
@@ -154,23 +154,23 @@ ParseResult {
                                     },
                                     parameters: [
                                         Parameter {
-                                            name: Identifier {
-                                                name: "item",
-                                                span: 92..96,
-                                            },
-                                            typ: Some(
-                                                TypeExpression {
-                                                    expression: Variable(
-                                                        Identifier {
-                                                            name: "Int",
-                                                            span: 99..102,
-                                                        },
-                                                    ),
-                                                    where_clause: WhereClause(
-                                                        [],
-                                                    ),
+                                            name: Some(
+                                                Identifier {
+                                                    name: "item",
+                                                    span: 92..96,
                                                 },
                                             ),
+                                            typ: TypeExpression {
+                                                expression: Variable(
+                                                    Identifier {
+                                                        name: "Int",
+                                                        span: 99..102,
+                                                    },
+                                                ),
+                                                where_clause: WhereClause(
+                                                    [],
+                                                ),
+                                            },
                                         },
                                     ],
                                 },

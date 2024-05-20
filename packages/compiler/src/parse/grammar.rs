@@ -7,7 +7,8 @@ use chumsky::{
 use super::{
     ast::{
         Data, DataDeclaration, Expression, Function, Item, Operator, OperatorName, Parameter,
-        TypeConstructor, TypeExpression, Visibility, VisibilityItems, WhereClause, AST,
+        TypeConstructor, TypeExpression, TypeParameter, Visibility, VisibilityItems, WhereClause,
+        AST,
     },
     ident, keyword, line_separator, operator, optional_line_end, parenthesized, TTParser,
 };
@@ -27,7 +28,7 @@ fn item<'src>() -> impl TTParser<'src, Item<'src>> {
 fn data_declaration<'src>() -> impl TTParser<'src, DataDeclaration<'src>> {
     keyword(Keyword::Data)
         .ignore_then(ident())
-        .then(parameter_wth_parens().repeated().collect())
+        .then(type_parameter().repeated().collect())
         .then(where_clause(expression()))
         .map(|((name, parameters), where_clause)| DataDeclaration {
             name,
@@ -50,16 +51,25 @@ fn parameter<'src>() -> impl TTParser<'src, Parameter<'src>> {
     let name = ident();
 
     name.then_ignore(operator(":"))
+        .or_not()
         .then(type_expression(expression()))
-        .map(|(name, typ)| Parameter {
-            name,
-            typ: Some(typ),
-        })
-        .or(name.map(|name| Parameter { name, typ: None }))
+        .map(|(name, typ)| Parameter { name, typ })
 }
 
-fn parameter_wth_parens<'src>() -> impl TTParser<'src, Parameter<'src>> {
-    recursive(|parameter_with_parens| parenthesized(parameter_with_parens).or(parameter()))
+fn type_parameter<'src>() -> impl TTParser<'src, TypeParameter<'src>> {
+    let name = ident();
+    name.map(|name| TypeParameter { name, kind: None })
+        .or(recursive(|parameter| {
+            parenthesized(
+                name.then(
+                    operator(":")
+                        .ignore_then(type_expression(expression()))
+                        .or_not(),
+                )
+                .map(|(name, kind)| TypeParameter { name, kind })
+                .or(parameter),
+            )
+        }))
 }
 
 fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
