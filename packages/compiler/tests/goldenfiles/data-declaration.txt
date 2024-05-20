@@ -15,14 +15,14 @@ ParseResult {
                                         name: "a",
                                         span: 12..13,
                                     },
-                                    typ: None,
+                                    kind: None,
                                 },
                                 TypeParameter {
                                     name: Identifier {
                                         name: "b",
                                         span: 15..16,
                                     },
-                                    typ: Some(
+                                    kind: Some(
                                         TypeExpression {
                                             expression: Variable(
                                                 Identifier {
@@ -41,7 +41,7 @@ ParseResult {
                                         name: "c",
                                         span: 26..27,
                                     },
-                                    typ: Some(
+                                    kind: Some(
                                         TypeExpression {
                                             expression: BinaryOperator {
                                                 name: Named(
