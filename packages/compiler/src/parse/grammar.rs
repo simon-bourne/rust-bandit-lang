@@ -69,7 +69,7 @@ fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
 
         let operators = application
             .clone()
-            .pratt((infix(right(1), "->"), infix(left(5), "+")));
+            .pratt((infix(right(1), "->"), infix(left(5), "==")));
 
         // TODO: Add quantification
         let type_annotated = operators
@@ -142,6 +142,14 @@ mod tests {
         parse(
             "data-declaration",
             r#"data MyType a (b : Type) (c : Type -> Type -> Type)"#,
+        )
+    }
+
+    #[test]
+    fn data_declaration_where() {
+        parse(
+            "data-declaration-where",
+            r#"data MyType a (b : Type) (c : Type -> Type -> Type where a == b, b == c, Ord a;)"#,
         )
     }
 
