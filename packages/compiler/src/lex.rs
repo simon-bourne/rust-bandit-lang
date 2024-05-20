@@ -7,15 +7,15 @@ use logos::Logos;
 #[logos(skip r"[ \t\r\f]+")]
 #[logos(subpattern ident = r"(\p{XID_Start}|_)\p{XID_Continue}*")]
 pub enum Token<'src> {
-    #[token("(", |_| Delimiter::Parentheses)]
-    #[token("[", |_| Delimiter::Brackets)]
-    #[token("{", |_| Delimiter::Braces)]
-    Open(Delimiter),
+    #[token("(", |_| Grouping::Parentheses)]
+    #[token("[", |_| Grouping::Brackets)]
+    #[token("{", |_| Grouping::Braces)]
+    Open(Grouping),
 
-    #[token(")", |_| Delimiter::Parentheses)]
-    #[token("]", |_| Delimiter::Brackets)]
-    #[token("}", |_| Delimiter::Braces)]
-    Close(Delimiter),
+    #[token(")", |_| Grouping::Parentheses)]
+    #[token("]", |_| Grouping::Brackets)]
+    #[token("}", |_| Grouping::Braces)]
+    Close(Grouping),
 
     #[token(",")]
     Comma,
@@ -189,8 +189,8 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
     }
 
     fn handle_close_bracket(&mut self) -> Option<SrcToken<'src>> {
-        if let Some((Token::Close(delimiter), span)) = self.iter.peek() {
-            let count = self.current_indent.brackets.count(*delimiter);
+        if let Some((Token::Close(grouping), span)) = self.iter.peek() {
+            let count = self.current_indent.brackets.count(*grouping);
 
             if *count > 0 {
                 *count -= 1;
@@ -232,8 +232,8 @@ where
         match token.0 {
             Token::CloseBlock => self.close_block(token.1),
             Token::LineSeparator => self.handle_indent(token),
-            Token::Open(delimiter) => {
-                *self.current_indent.brackets.count(delimiter) += 1;
+            Token::Open(grouping) => {
+                *self.current_indent.brackets.count(grouping) += 1;
                 Some(token)
             }
             _ => {
@@ -278,12 +278,11 @@ struct BracketNesting {
 }
 
 impl BracketNesting {
-    fn count(&mut self, delimiter: Delimiter) -> &mut usize {
-        match delimiter {
-            // TODO: Naming: Delimiter is more like a separator. Grouping?
-            Delimiter::Parentheses => &mut self.parens_count,
-            Delimiter::Brackets => &mut self.bracket_count,
-            Delimiter::Braces => &mut self.braces_count,
+    fn count(&mut self, grouping: Grouping) -> &mut usize {
+        match grouping {
+            Grouping::Parentheses => &mut self.parens_count,
+            Grouping::Brackets => &mut self.bracket_count,
+            Grouping::Braces => &mut self.braces_count,
         }
     }
 }
@@ -315,26 +314,26 @@ pub type Spanned<T> = (T, Span);
 pub type SrcToken<'src> = Spanned<Token<'src>>;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Delimiter {
+pub enum Grouping {
     Parentheses,
     Brackets,
     Braces,
 }
 
-impl Delimiter {
+impl Grouping {
     pub fn open_str(self) -> &'static str {
         match self {
-            Delimiter::Parentheses => "(",
-            Delimiter::Brackets => "[",
-            Delimiter::Braces => "{",
+            Grouping::Parentheses => "(",
+            Grouping::Brackets => "[",
+            Grouping::Braces => "{",
         }
     }
 
     pub fn close_str(self) -> &'static str {
         match self {
-            Delimiter::Parentheses => ")",
-            Delimiter::Brackets => "]",
-            Delimiter::Braces => "}",
+            Grouping::Parentheses => ")",
+            Grouping::Brackets => "]",
+            Grouping::Braces => "}",
         }
     }
 }

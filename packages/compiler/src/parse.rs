@@ -6,7 +6,7 @@ use chumsky::{
 };
 
 use self::ast::{Identifier, Operator};
-use crate::lex::{Delimiter, Keyword, Span, Token};
+use crate::lex::{Grouping, Keyword, Span, Token};
 
 pub mod ast;
 pub mod grammar;
@@ -25,14 +25,14 @@ pub trait TTParser<'src, Output>:
         self.then_ignore(keyword(kw))
     }
 
-    fn open(self, delimiter: Delimiter) -> impl TTParser<'src, Output> {
-        self.then_ignore(open(delimiter))
+    fn open(self, grouping: Grouping) -> impl TTParser<'src, Output> {
+        self.then_ignore(open(grouping))
     }
 
-    fn close(self, delimiter: Delimiter) -> impl TTParser<'src, Output> {
+    fn close(self, grouping: Grouping) -> impl TTParser<'src, Output> {
         self.then_ignore(
-            primitive::select(move |x, _| (x == Token::Close(delimiter)).then_some(()))
-                .labelled(delimiter.close_str()),
+            primitive::select(move |x, _| (x == Token::Close(grouping)).then_some(()))
+                .labelled(grouping.close_str()),
         )
     }
 
@@ -53,8 +53,8 @@ pub trait TTParser<'src, Output>:
     }
 }
 
-fn open<'src>(delimiter: Delimiter) -> impl TTParser<'src, ()> {
-    token(Token::Open(delimiter), delimiter.open_str())
+fn open<'src>(grouping: Grouping) -> impl TTParser<'src, ()> {
+    token(Token::Open(grouping), grouping.open_str())
 }
 
 fn line_separator<'src>() -> impl TTParser<'src, ()> {
@@ -67,9 +67,9 @@ fn token<'src>(token: Token<'src>, label: &'static str) -> impl TTParser<'src, (
 }
 
 fn parenthesized<'src, T>(parser: impl TTParser<'src, T>) -> impl TTParser<'src, T> {
-    open(Delimiter::Parentheses)
+    open(Grouping::Parentheses)
         .ignore_then(parser)
-        .close(Delimiter::Parentheses)
+        .close(Grouping::Parentheses)
 }
 
 impl<'src, Output, T> TTParser<'src, Output> for T where

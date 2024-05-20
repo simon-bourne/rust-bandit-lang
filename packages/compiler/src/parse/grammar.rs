@@ -8,7 +8,7 @@ use super::{
     ast::{DataDeclaration, Expression, Function, Item, Operator, OperatorName, WhereClause, AST},
     ident, keyword, line_separator, operator, parenthesized, TTParser,
 };
-use crate::lex::{Delimiter, Keyword};
+use crate::lex::{Grouping, Keyword};
 
 pub fn parser<'src>() -> impl TTParser<'src, AST<'src>> {
     item().repeated().collect().map(|items| AST { items })
@@ -33,11 +33,11 @@ fn data_item<'src>() -> impl TTParser<'src, DataDeclaration<'src>> {
 
 fn function<'src>() -> impl TTParser<'src, Function<'src>> {
     let name = ident()
-        .open(Delimiter::Parentheses)
-        .close(Delimiter::Parentheses)
+        .open(Grouping::Parentheses)
+        .close(Grouping::Parentheses)
         .skip_operator("=")
-        .open(Delimiter::Parentheses)
-        .close(Delimiter::Parentheses);
+        .open(Grouping::Parentheses)
+        .close(Grouping::Parentheses);
     name.map(|name| Function { name })
 }
 
