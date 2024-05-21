@@ -185,16 +185,16 @@ where
 }
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Debug, Default)]
-struct Indent {
-    depth: usize,
-}
+struct Indent(usize);
 
 impl Indent {
     fn new(src: &str, span: Span) -> Self {
-        let s = &src[span.into_range()];
-        Self {
-            depth: s.rfind('\n').map(|pos| (s.len() - pos) - 1).unwrap_or(0),
-        }
+        Self(
+            src[span.into_range()]
+                .rsplit_once('\n')
+                .map(|(_head, tail)| tail.len())
+                .unwrap_or(0),
+        )
     }
 }
 
