@@ -67,6 +67,7 @@ fn token<'src>(token: Token<'src>, label: &'static str) -> impl TTParser<'src, (
 }
 
 fn parenthesized<'src, T>(parser: impl TTParser<'src, T>) -> impl TTParser<'src, T> {
+    // TODO: Allow blocks within parentheses
     open(Grouping::Parentheses)
         .ignore_then(parser)
         .close(Grouping::Parentheses)

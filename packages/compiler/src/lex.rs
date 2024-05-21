@@ -53,15 +53,15 @@ pub enum Token<'src> {
     #[token("with", |_| Keyword::With)]
     Keyword(Keyword),
 
-    #[token("|")]
-    LambdaDelimiter,
+    #[token("\\")]
+    Lambda,
 
     #[regex(r"(?&ident)")]
     Identifier(&'src str),
-    #[regex(r"'(?&ident)")]
-    Lifetime(&'src str),
     #[regex(r"[\$%\&\*\+\./<=>@\^\-\~:]+")]
     Operator(&'src str),
+    #[regex(r"\.(?&ident)")]
+    NamedOperator(&'src str),
 
     Error,
 }
@@ -100,7 +100,7 @@ impl<'src> Token<'src> {
     }
 
     fn continues_line(&self) -> bool {
-        matches!(self, Token::Close(_) | Token::Operator(_))
+        matches!(self, Token::Operator(_) | Token::NamedOperator(_))
     }
 }
 
@@ -370,13 +370,14 @@ mod tests {
                         x
                     else
                         y(
-                            . a
-                            . b
+                            x
+                                .a
+                                .b
                         )
                         c
                 "#
             ),
-            "if a then if b then if c then << x >> else << y ( . a . b ) , c >>",
+            "if a then if b then if c then << x >> else << y ( << x .a .b >> ) , c >>",
         );
     }
 
