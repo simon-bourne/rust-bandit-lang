@@ -135,13 +135,9 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
     }
 
     fn finish(&mut self) -> Option<SrcToken<'src>> {
-        self.current_indent = Indent::default();
-
-        if self.indent_stack.is_empty() {
-            None
-        } else {
-            self.next()
-        }
+        self.indent_stack
+            .pop()
+            .map(|_| self.close_block(self.last_span))
     }
 
     fn handle_indent(&mut self, span: Span) -> SrcToken<'src> {
