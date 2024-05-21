@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, iter::Peekable};
 
-use chumsky::span::{SimpleSpan, Span as _};
+use chumsky::span::SimpleSpan;
 use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq, Eq, Copy, Clone)]
@@ -59,14 +59,37 @@ pub enum Token<'src> {
     #[token("|")]
     LambdaDelimiter,
 
-    #[regex(r"(?&ident)", |lex| lex.slice())]
+    #[regex(r"(?&ident)")]
     Identifier(&'src str),
-    #[regex(r"'(?&ident)", |lex| lex.slice())]
+    #[regex(r"'(?&ident)")]
     Lifetime(&'src str),
-    #[regex(r"[\$%\&\*\+\./<=>@\^\-\~:]+", |lex| lex.slice())]
+    #[regex(r"[\$%\&\*\+\./<=>@\^\-\~:]+")]
     Operator(&'src str),
 
     Error,
+}
+
+struct ContinuedLines<'src, I>(Peekable<I>)
+where
+    I: Iterator<Item = SrcToken<'src>>;
+
+impl<'src, I> Iterator for ContinuedLines<'src, I>
+where
+    I: Iterator<Item = SrcToken<'src>>,
+{
+    type Item = I::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let item = self.0.next()?;
+
+        if matches!(item.0, Token::LineSeparator)
+            && self.0.peek().is_some_and(|next| next.0.continues_line())
+        {
+            self.0.next()
+        } else {
+            Some(item)
+        }
+    }
 }
 
 impl<'src> Token<'src> {
@@ -76,7 +99,7 @@ impl<'src> Token<'src> {
             Err(()) => (Self::Error, span.into()),
         });
 
-        LayoutIter::new(tokens, source)
+        LayoutIter::new(ContinuedLines(tokens.peekable()), source)
     }
 
     fn is_block_open(&self) -> bool {
@@ -96,11 +119,8 @@ impl<'src> Token<'src> {
         }
     }
 
-    // TODO: Operators should continue lines, as it's then obvious it's a
-    // continuation. Should indent? We can use something like `<-` for explicit
-    // function application.
     fn continues_line(&self) -> bool {
-        matches!(self, Token::Close(_) | Token::Operator("="))
+        matches!(self, Token::Close(_) | Token::Operator(_))
     }
 }
 
@@ -164,17 +184,6 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
         }
     }
 
-    fn combine_else_if(&mut self, token: SrcToken<'src>) -> Option<SrcToken<'src>> {
-        if token.0 == Token::Keyword(Keyword::Else) {
-            if let Some((Token::Keyword(Keyword::If), if_span)) = self.iter.peek().copied() {
-                self.iter.next();
-                return Some((Token::Keyword(Keyword::ElseIf), if_span.union(token.1)));
-            }
-        }
-
-        None
-    }
-
     fn handle_indent(&mut self, token: SrcToken<'src>) -> Option<SrcToken<'src>> {
         let new_indent = BlockState::new_line(self.src, token.1);
 
@@ -183,10 +192,7 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
                 self.current_indent = new_indent;
                 self.next()
             }
-            Ordering::Equal => match self.iter.peek() {
-                Some(next_token) if !next_token.0.continues_line() => Some(token),
-                _ => self.next(),
-            },
+            Ordering::Equal => Some(token),
             Ordering::Greater => self.next(),
         }
     }
@@ -229,10 +235,6 @@ where
         };
 
         self.last_span = token.1;
-
-        if let Some(t) = self.combine_else_if(token) {
-            return Some(t);
-        }
 
         match token.0 {
             Token::CloseBlock => self.close_block(token.1),
@@ -457,7 +459,7 @@ mod tests {
                         z
                 "#
             ),
-            "if a then x ; else if b then y ; else z ;",
+            "if a then x ; else if b then y ; ; else z ;",
         );
     }
 
