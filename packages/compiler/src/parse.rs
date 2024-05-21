@@ -95,15 +95,15 @@ pub fn operator(name: &str) -> impl TTParser<Operator> + Copy {
 }
 
 macro_rules! token {
-    ($name:ident, $label:literal, $token:ident) => {
+    ($name:ident, $label:literal, $token:pat_param) => {
         fn $name<'src>() -> impl TTParser<'src, ()> + Copy {
-            select! { Token::$token => () }.labelled($label)
+            select! { $token => () }.labelled($label)
         }
     };
 }
 
-token!(line_end, "\\n", LineSeparator);
-token!(close_block, ";", CloseBlock);
+token!(line_end, "\\n", Token::LineSeparator);
+token!(close_block, ";", Token::Close(Grouping::Block));
 
 fn keyword<'src>(kw: Keyword) -> impl TTParser<'src, ()> + Copy {
     primitive::select(move |x, _| (x == Token::Keyword(kw)).then_some(())).labelled(kw.as_str())

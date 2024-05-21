@@ -23,9 +23,6 @@ pub enum Token<'src> {
     #[regex(r"[ \t\r\f\n]*\n[ \t]*")]
     LineSeparator,
 
-    #[token(";")]
-    CloseBlock,
-
     #[token("and", |_| Keyword::And)]
     #[token("break", |_| Keyword::Break)]
     #[token("continue", |_| Keyword::Continue)]
@@ -102,30 +99,13 @@ impl<'src> Token<'src> {
         LayoutIter::new(ContinuedLines(tokens.peekable()), source)
     }
 
-    fn is_block_open(&self) -> bool {
-        if let Token::Keyword(kw) = self {
-            matches!(
-                kw,
-                Keyword::Do
-                    | Keyword::Else
-                    | Keyword::Private
-                    | Keyword::Public
-                    | Keyword::Then
-                    | Keyword::Use
-                    | Keyword::Where
-            )
-        } else {
-            false
-        }
-    }
-
     fn continues_line(&self) -> bool {
         matches!(self, Token::Close(_) | Token::Operator(_))
     }
 }
 
 struct LayoutIter<'src, I: Iterator<Item = SrcToken<'src>>> {
-    iter: Peekable<I>,
+    iter: I,
     src: &'src str,
     last_span: Span,
     current_indent: Indent,
@@ -134,32 +114,12 @@ struct LayoutIter<'src, I: Iterator<Item = SrcToken<'src>>> {
 
 impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
     pub fn new(iter: I, src: &'src str) -> Self {
-        let mut iter = iter.peekable();
-        let current_indent = if let Some((Token::LineSeparator, indent)) = iter.peek() {
-            let indent = *indent;
-            iter.next();
-            Indent::new_line(src, indent)
-        } else {
-            Indent::default()
-        };
-
         Self {
             iter,
             src,
             last_span: Span::splat(0),
-            current_indent,
+            current_indent: Indent::default(),
             indent_stack: Vec::new(),
-        }
-    }
-
-    fn open_block(&mut self) {
-        self.indent_stack.push(self.current_indent);
-
-        if let Some((Token::LineSeparator, span)) = self.iter.peek() {
-            self.current_indent = Indent::new_line(self.src, *span);
-            self.iter.next();
-        } else {
-            self.current_indent = Indent::same_line(self.current_indent);
         }
     }
 
@@ -169,9 +129,9 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
             .is_some_and(|top| self.current_indent <= *top)
     }
 
-    fn close_block(&mut self, span: Span) -> Option<SrcToken<'src>> {
+    fn close_block(&mut self, span: Span) -> SrcToken<'src> {
         self.indent_stack.pop();
-        Some((Token::CloseBlock, span))
+        (Token::Close(Grouping::Block), span)
     }
 
     fn finish(&mut self) -> Option<SrcToken<'src>> {
@@ -184,16 +144,19 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
         }
     }
 
-    fn handle_indent(&mut self, token: SrcToken<'src>) -> Option<SrcToken<'src>> {
-        let new_indent = Indent::new_line(self.src, token.1);
+    fn handle_indent(&mut self, span: Span) -> SrcToken<'src> {
+        let new_indent = Indent::new(self.src, span);
 
         match new_indent.cmp(&self.current_indent) {
             Ordering::Less => {
                 self.current_indent = new_indent;
-                self.next()
+                self.close_block(span)
             }
-            Ordering::Equal => Some(token),
-            Ordering::Greater => self.next(),
+            Ordering::Equal => (Token::LineSeparator, span),
+            Ordering::Greater => {
+                self.current_indent = new_indent;
+                (Token::Open(Grouping::Block), span)
+            }
         }
     }
 }
@@ -205,10 +168,8 @@ where
     type Item = SrcToken<'src>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // TODO: If the current indent doesn't have an exactly matching close block,
-        // return an error
         if self.needs_block_close() {
-            return self.close_block(self.last_span);
+            return Some(self.close_block(self.last_span));
         }
 
         let Some(token) = self.iter.next() else {
@@ -217,39 +178,26 @@ where
 
         self.last_span = token.1;
 
-        match token.0 {
-            Token::CloseBlock => self.close_block(token.1),
-            Token::LineSeparator => self.handle_indent(token),
-            _ => {
-                if token.0.is_block_open() {
-                    self.open_block();
-                }
+        let result = if token.0 == Token::LineSeparator {
+            self.handle_indent(token.1)
+        } else {
+            token
+        };
 
-                Some(token)
-            }
-        }
+        Some(result)
     }
 }
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Debug, Default)]
 struct Indent {
-    next_line: usize,
-    same_line: usize,
+    depth: usize,
 }
 
 impl Indent {
-    fn new_line(src: &str, span: Span) -> Self {
+    fn new(src: &str, span: Span) -> Self {
         let s = &src[span.into_range()];
         Self {
-            next_line: s.rfind('\n').map(|pos| (s.len() - pos) - 1).unwrap_or(0),
-            same_line: 0,
-        }
-    }
-
-    fn same_line(indent: Self) -> Self {
-        Self {
-            next_line: indent.next_line,
-            same_line: indent.same_line + 1,
+            depth: s.rfind('\n').map(|pos| (s.len() - pos) - 1).unwrap_or(0),
         }
     }
 }
@@ -263,6 +211,7 @@ pub enum Grouping {
     Parentheses,
     Brackets,
     Braces,
+    Block,
 }
 
 impl Grouping {
@@ -271,6 +220,7 @@ impl Grouping {
             Grouping::Parentheses => "(",
             Grouping::Brackets => "[",
             Grouping::Braces => "{",
+            Grouping::Block => "<open block>",
         }
     }
 
@@ -279,6 +229,7 @@ impl Grouping {
             Grouping::Parentheses => ")",
             Grouping::Brackets => "]",
             Grouping::Braces => "}",
+            Grouping::Block => "<close block>",
         }
     }
 }
@@ -360,7 +311,7 @@ mod tests {
     use itertools::Itertools;
 
     use super::SrcToken;
-    use crate::lex::Token;
+    use crate::lex::{Grouping, Token};
 
     #[test]
     fn function() {
@@ -380,7 +331,7 @@ mod tests {
                         y
                 "#
             ),
-            "if a , then x ; else y ;",
+            "if << a >> then << x >> else << y >>",
         );
     }
 
@@ -397,7 +348,7 @@ mod tests {
                         z
                 "#
             ),
-            "if a then x ; else if b then y ; ; else z ;",
+            "if a then << x >> else if b then << y >> else << z >>",
         );
     }
 
@@ -410,7 +361,7 @@ mod tests {
                     else y
                 "#
             ),
-            "if a then x ; else y ;",
+            "if a then x , else y ,",
         );
     }
 
@@ -423,13 +374,13 @@ mod tests {
                         x
                     else
                         y(
-                            a
-                            b
+                            . a
+                            . b
                         )
                         c
                 "#
             ),
-            "if a then if b then if c then x ; ; ; else y ( a b ) , c ;",
+            "if a then if b then if c then << x >> else << y ( . a . b ) , c >>",
         );
     }
 
@@ -437,7 +388,7 @@ mod tests {
     fn single_line_imports() {
         test(
             r#"from Root :: Parent use Child1, Child2"#,
-            r#"from Root :: Parent use Child1 , Child2 ;"#,
+            r#"from Root :: Parent use Child1 , Child2"#,
         );
     }
 
@@ -452,7 +403,21 @@ mod tests {
                         Child2
                 "#
             ),
-            "from Root :: Parent , use Child1 , Child2 ;",
+            "from Root :: Parent , use << Child1 , Child2 >>",
+        );
+    }
+
+    #[test]
+    fn mismatched_indents() {
+        test(
+            indoc!(
+                r#"
+                    a
+                            b
+                        c
+                "#
+            ),
+            "a << b >> c >>",
         );
     }
 
@@ -470,7 +435,8 @@ mod tests {
         layout
             .into_iter()
             .map(|(token, span)| match token {
-                Token::CloseBlock => ";",
+                Token::Open(Grouping::Block) => "<<",
+                Token::Close(Grouping::Block) => ">>",
                 Token::LineSeparator => ",",
                 _ => &src[span.into_range()],
             })

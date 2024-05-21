@@ -150,6 +150,7 @@ fn type_constructor<'src>() -> impl TTParser<'src, TypeConstructor<'src>> {
         }))
 }
 
+// TODO: Accept blocks
 fn visibility_items<'src, T: 'src>(
     parser: impl TTParser<'src, T>,
 ) -> impl TTParser<'src, VisibilityItems<T>> {
@@ -157,10 +158,10 @@ fn visibility_items<'src, T: 'src>(
         .to(Visibility::Public)
         .or(keyword(Keyword::Private).to(Visibility::Private))
         .then(parser.repeated().collect())
-        .close_block()
         .map(|(visibility, items)| VisibilityItems { visibility, items })
 }
 
+// TODO: Accept blocks
 fn where_clause<'src>(
     expression: impl TTParser<'src, Expression<'src>>,
 ) -> impl TTParser<'src, WhereClause<'src>> {
@@ -172,7 +173,6 @@ fn where_clause<'src>(
                     .allow_trailing()
                     .collect(),
             )
-            .close_block()
             .or_not()
             .map(|where_clause| WhereClause(where_clause.unwrap_or_default())),
     )
@@ -223,8 +223,7 @@ mod tests {
     fn data_declaration_where() {
         parse(
             "data-declaration-where",
-            // TODO: Add a parser for same line where clauses
-            r#"data MyType a (((b : (Type)))) (c : Type -> Type -> Type where a == b, b == c, Ord a;) public X of item : Int"#,
+            r#"data MyType a (((b : (Type)))) (c : Type -> Type -> Type where a == b, b == c, Ord a) public X of item : Int"#,
         )
     }
 
