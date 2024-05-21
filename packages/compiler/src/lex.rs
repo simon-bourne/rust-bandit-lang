@@ -58,8 +58,10 @@ pub enum Token<'src> {
 
     #[regex(r"(?&ident)")]
     Identifier(&'src str),
+
     #[regex(r"[\$%\&\*\+\./<=>@\^\-\~:]+")]
     Operator(&'src str),
+
     #[regex(r"\.(?&ident)")]
     NamedOperator(&'src str),
 
