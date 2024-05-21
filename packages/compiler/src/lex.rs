@@ -150,6 +150,7 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
             }
             Ordering::Equal => (Token::LineSeparator, span),
             Ordering::Greater => {
+                self.indent_stack.push(self.current_indent);
                 self.current_indent = new_indent;
                 (Token::Open(Grouping::Block), span)
             }
@@ -310,97 +311,114 @@ mod tests {
     use crate::lex::{Grouping, Token};
 
     #[test]
-    fn function() {
-        test(r#"f() = x"#, "f ( ) = x");
+    fn empty() {
+        test("", "")
     }
 
     #[test]
-    fn if_then_else() {
+    fn only_whitespace() {
+        test("    ", "")
+    }
+
+    #[test]
+    fn blank_lines() {
+        test("\n\n", ",")
+    }
+
+    #[test]
+    fn no_indent() {
         test(
             indoc!(
                 r#"
-                    if
+                    x
+                    y
+                    z
+                "#
+            ),
+            "x , y , z ,",
+        )
+    }
+
+    #[test]
+    fn no_top_level() {
+        test(
+            r#"
+                    x
+                    y
+                    z
+                "#,
+            "<< x , y , z >>",
+        )
+    }
+
+    #[test]
+    fn indent_dedent() {
+        test(
+            indoc!(
+                r#"
+                    x
+                    y
+                    z
                         a
-                    then
-                        x
-                    else
-                        y
+                        b
+                        c
+                    p
+                    q
+                    r
                 "#
             ),
-            "if << a >> then << x >> else << y >>",
+            "x , y , z << a , b , c >> p , q , r ,",
         );
     }
 
     #[test]
-    fn dangling_else() {
+    fn indent_without_dedent() {
         test(
             indoc!(
                 r#"
-                    if a then
-                        x
-                    else if b then
-                        y
-                    else
-                        z
-                "#
-            ),
-            "if a then << x >> else if b then << y >> else << z >>",
-        );
-    }
-
-    #[test]
-    fn compact_if_else() {
-        test(
-            indoc!(
-                r#"
-                    if a then x
-                    else y
-                "#
-            ),
-            "if a then x , else y ,",
-        );
-    }
-
-    #[test]
-    fn multi() {
-        test(
-            indoc!(
-                r#"
-                    if a then if b then if c then
-                        x
-                    else
-                        y(
-                            x
-                                .a
-                                .b
-                        )
+                    x
+                    y
+                    z
+                        a
+                        b
                         c
                 "#
             ),
-            "if a then if b then if c then << x >> else << y ( << x .a .b >> ) , c >>",
+            "x , y , z << a , b , c >>",
         );
     }
 
     #[test]
-    fn single_line_imports() {
-        test(
-            r#"from Root :: Parent use Child1, Child2"#,
-            r#"from Root :: Parent use Child1 , Child2"#,
-        );
-    }
-
-    #[test]
-    fn multi_line_imports() {
+    fn line_continuation() {
         test(
             indoc!(
                 r#"
-                    from Root :: Parent
-                    use
-                        Child1
-                        Child2
+                    x
+                    y
+                    z
+                        + a
+                        + b
+                        + c
                 "#
             ),
-            "from Root :: Parent , use << Child1 , Child2 >>",
+            "x , y , z + a + b + c ,",
+        );
+    }
+
+    #[test]
+    fn nested_blocks() {
+        test(
+            indoc!(
+                r#"
+                    x
+                        y
+                            z
+                                a
+                        b
+                            c
+                "#
+            ),
+            "x << y << z << a >> >> b << c >> >>",
         );
     }
 
