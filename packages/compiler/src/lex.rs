@@ -214,6 +214,8 @@ where
     type Item = SrcToken<'src>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        // TODO: If the current indent doesn't have an exactly matching close block,
+        // return an error
         if self.needs_block_close() {
             return self.close_block(self.last_span);
         }
