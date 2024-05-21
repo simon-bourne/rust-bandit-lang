@@ -128,8 +128,8 @@ struct LayoutIter<'src, I: Iterator<Item = SrcToken<'src>>> {
     iter: Peekable<I>,
     src: &'src str,
     last_span: Span,
-    current_indent: BlockState,
-    indent_stack: Vec<BlockState>,
+    current_indent: Indent,
+    indent_stack: Vec<Indent>,
 }
 
 impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
@@ -138,9 +138,9 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
         let current_indent = if let Some((Token::LineSeparator, indent)) = iter.peek() {
             let indent = *indent;
             iter.next();
-            BlockState::new_line(src, indent)
+            Indent::new_line(src, indent)
         } else {
-            BlockState::default()
+            Indent::default()
         };
 
         Self {
@@ -153,20 +153,20 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
     }
 
     fn open_block(&mut self) {
-        self.indent_stack.push(self.current_indent.clone());
+        self.indent_stack.push(self.current_indent);
 
         if let Some((Token::LineSeparator, span)) = self.iter.peek() {
-            self.current_indent = BlockState::new_line(self.src, *span);
+            self.current_indent = Indent::new_line(self.src, *span);
             self.iter.next();
         } else {
-            self.current_indent = BlockState::same_line(self.current_indent.indent);
+            self.current_indent = Indent::same_line(self.current_indent);
         }
     }
 
     fn needs_block_close(&self) -> bool {
         self.indent_stack
             .last()
-            .is_some_and(|top| self.current_indent.indent <= top.indent)
+            .is_some_and(|top| self.current_indent <= *top)
     }
 
     fn close_block(&mut self, span: Span) -> Option<SrcToken<'src>> {
@@ -175,7 +175,7 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
     }
 
     fn finish(&mut self) -> Option<SrcToken<'src>> {
-        self.current_indent = BlockState::default();
+        self.current_indent = Indent::default();
 
         if self.indent_stack.is_empty() {
             None
@@ -185,9 +185,9 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
     }
 
     fn handle_indent(&mut self, token: SrcToken<'src>) -> Option<SrcToken<'src>> {
-        let new_indent = BlockState::new_line(self.src, token.1);
+        let new_indent = Indent::new_line(self.src, token.1);
 
-        match new_indent.indent.cmp(&self.current_indent.indent) {
+        match new_indent.cmp(&self.current_indent) {
             Ordering::Less => {
                 self.current_indent = new_indent;
                 self.next()
@@ -195,21 +195,6 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
             Ordering::Equal => Some(token),
             Ordering::Greater => self.next(),
         }
-    }
-
-    fn handle_close_bracket(&mut self) -> Option<SrcToken<'src>> {
-        if let Some((Token::Close(grouping), span)) = self.iter.peek() {
-            let count = self.current_indent.brackets.count(*grouping);
-
-            if *count > 0 {
-                *count -= 1;
-            } else if let Some(indent) = self.indent_stack.pop() {
-                self.current_indent = indent;
-                return Some((Token::CloseBlock, *span));
-            }
-        }
-
-        None
     }
 }
 
@@ -226,10 +211,6 @@ where
             return self.close_block(self.last_span);
         }
 
-        if let Some(t) = self.handle_close_bracket() {
-            return Some(t);
-        }
-
         let Some(token) = self.iter.next() else {
             return self.finish();
         };
@@ -239,10 +220,6 @@ where
         match token.0 {
             Token::CloseBlock => self.close_block(token.1),
             Token::LineSeparator => self.handle_indent(token),
-            Token::Open(grouping) => {
-                *self.current_indent.brackets.count(grouping) += 1;
-                Some(token)
-            }
             _ => {
                 if token.0.is_block_open() {
                     self.open_block();
@@ -273,45 +250,6 @@ impl Indent {
         Self {
             next_line: indent.next_line,
             same_line: indent.same_line + 1,
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug, Default)]
-struct BracketNesting {
-    bracket_count: usize,
-    parens_count: usize,
-    braces_count: usize,
-}
-
-impl BracketNesting {
-    fn count(&mut self, grouping: Grouping) -> &mut usize {
-        match grouping {
-            Grouping::Parentheses => &mut self.parens_count,
-            Grouping::Brackets => &mut self.bracket_count,
-            Grouping::Braces => &mut self.braces_count,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-struct BlockState {
-    brackets: BracketNesting,
-    indent: Indent,
-}
-
-impl BlockState {
-    fn new_line(src: &str, span: Span) -> Self {
-        Self {
-            brackets: BracketNesting::default(),
-            indent: Indent::new_line(src, span),
-        }
-    }
-
-    fn same_line(indent: Indent) -> Self {
-        Self {
-            brackets: BracketNesting::default(),
-            indent: Indent::same_line(indent),
         }
     }
 }

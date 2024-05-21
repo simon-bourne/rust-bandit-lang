@@ -223,7 +223,8 @@ mod tests {
     fn data_declaration_where() {
         parse(
             "data-declaration-where",
-            r#"data MyType a (((b : (Type)))) (c : Type -> Type -> Type where a == b, b == c, Ord a) public X of item : Int"#,
+            // TODO: Add a parser for same line where clauses
+            r#"data MyType a (((b : (Type)))) (c : Type -> Type -> Type where a == b, b == c, Ord a;) public X of item : Int"#,
         )
     }
 
