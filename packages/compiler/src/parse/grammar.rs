@@ -16,20 +16,20 @@ use super::{
 use crate::lex::{Grouping, Keyword};
 
 pub fn parser<'src>() -> impl TTParser<'src, AST<'src>> {
-    item().repeated().collect().map(|items| AST { items })
+    trait_item().repeated().collect().map(|items| AST { items })
 }
 
-// TODO: Split into `trait_item` and `embody_item`?
-fn item<'src>() -> impl TTParser<'src, Item<'src>> {
-    data_with_body()
-        .map(Item::Data)
-        .or(function().map(Item::Function))
+fn trait_item<'src>() -> impl TTParser<'src, Item<'src>> {
+    data().map(Item::Data).or(function().map(Item::Function))
 }
 
 fn data_declaration<'src>() -> impl TTParser<'src, DataDeclaration<'src>> {
+    let parameters = in_block(type_parameter().separated_by(line_end()).collect())
+        .or(type_parameter().repeated().collect());
+
     keyword(Keyword::Data)
         .ignore_then(ident())
-        .then(type_parameter().repeated().collect())
+        .then(parameters)
         .then(where_clause(expression()))
         .map(|((name, parameters), where_clause)| DataDeclaration {
             name,
@@ -106,7 +106,7 @@ fn type_expression<'src>(
         .map(|(expression, where_clause)| TypeExpression::new(expression, where_clause))
 }
 
-fn data_with_body<'src>() -> impl TTParser<'src, Data<'src>> {
+fn data<'src>() -> impl TTParser<'src, Data<'src>> {
     data_declaration()
         .then(visibility_items(type_constructor()))
         .map(|(declaration, constructors)| Data::new(declaration, constructors))
@@ -182,7 +182,15 @@ mod tests {
             "data-declaration",
             indoc!(
                 r#"
-                    data MyType a (b : Type) (c : Type -> Type -> Type)
+                    data MyType
+                        a
+                        (b : Type)
+                        (
+                            c
+                                : Type
+                                -> Type
+                                -> Type
+                        )
                     public X of
                         item : Int
                 "#
