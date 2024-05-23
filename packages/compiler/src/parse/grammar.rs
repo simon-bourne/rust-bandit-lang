@@ -126,23 +126,18 @@ fn visibility_items<'src, T: 'src>(
     let public = keyword(Keyword::Public).to(Visibility::Public);
     let private = keyword(Keyword::Private).to(Visibility::Private);
 
-    optional_line_end(
-        public
-            .or(private)
-            .then(item_list(parser))
-            .map(|(visibility, items)| VisibilityItems::new(visibility, items)),
-    )
+    optional_line_end(public.or(private))
+        .then(item_list(parser))
+        .map(|(visibility, items)| VisibilityItems::new(visibility, items))
 }
 
 fn where_clause<'src>(
     expression: impl TTParser<'src, Expression<'src>>,
 ) -> impl TTParser<'src, WhereClause<'src>> {
-    optional_line_end(
-        keyword(Keyword::Where)
-            .ignore_then(item_list(expression))
-            .or_not()
-            .map(|where_clause| WhereClause(where_clause.unwrap_or_default())),
-    )
+    optional_line_end(keyword(Keyword::Where))
+        .ignore_then(item_list(expression))
+        .or_not()
+        .map(|where_clause| WhereClause(where_clause.unwrap_or_default()))
 }
 
 fn item_list<'src, T: 'src>(item: impl TTParser<'src, T>) -> impl TTParser<'src, Vec<T>> {
@@ -184,13 +179,8 @@ mod tests {
                 r#"
                     data MyType
                         a
-                        (b : Type)
-                        (
-                            c
-                                : Type
-                                -> Type
-                                -> Type
-                        )
+                        b : Type
+                        c : Type -> Type -> Type
                     public
                         X of item : Int
                 "#
@@ -204,8 +194,8 @@ mod tests {
             "data-declaration-where",
             indoc!(
                 r#"
-                    data MyType a (((b : (Type)))) (c : Type -> Type -> Type where a == b, b == c, Ord a) public X of item : Int
-                "#
+                    data MyType a (((b : (Type)))) (c : Type -> Type -> Type
+                    where a == b, b == c, Ord a) public X of item : Int             "#
             ),
         )
     }

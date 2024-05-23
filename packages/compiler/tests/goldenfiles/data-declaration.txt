@@ -21,14 +21,14 @@ ParseResult {
                                 TypeParameter {
                                     name: Identifier {
                                         name: "b",
-                                        span: 23..24,
+                                        span: 22..23,
                                     },
                                     kind: Some(
                                         TypeExpression {
                                             expression: Variable(
                                                 Identifier {
                                                     name: "Type",
-                                                    span: 27..31,
+                                                    span: 26..30,
                                                 },
                                             ),
                                             where_clause: WhereClause(
@@ -36,12 +36,12 @@ ParseResult {
                                             ),
                                         },
                                     ),
-                                    parentheses: 1,
+                                    parentheses: 0,
                                 },
                                 TypeParameter {
                                     name: Identifier {
                                         name: "c",
-                                        span: 47..48,
+                                        span: 35..36,
                                     },
                                     kind: Some(
                                         TypeExpression {
@@ -49,32 +49,32 @@ ParseResult {
                                                 name: Named(
                                                     Operator {
                                                         name: "->",
-                                                        span: 80..82,
+                                                        span: 44..46,
                                                     },
                                                 ),
                                                 left: Variable(
                                                     Identifier {
                                                         name: "Type",
-                                                        span: 63..67,
+                                                        span: 39..43,
                                                     },
                                                 ),
                                                 right: BinaryOperator {
                                                     name: Named(
                                                         Operator {
                                                             name: "->",
-                                                            span: 100..102,
+                                                            span: 52..54,
                                                         },
                                                     ),
                                                     left: Variable(
                                                         Identifier {
                                                             name: "Type",
-                                                            span: 83..87,
+                                                            span: 47..51,
                                                         },
                                                     ),
                                                     right: Variable(
                                                         Identifier {
                                                             name: "Type",
-                                                            span: 103..107,
+                                                            span: 55..59,
                                                         },
                                                     ),
                                                 },
@@ -84,7 +84,7 @@ ParseResult {
                                             ),
                                         },
                                     ),
-                                    parentheses: 1,
+                                    parentheses: 0,
                                 },
                             ],
                             where_clause: WhereClause(
@@ -97,21 +97,21 @@ ParseResult {
                                 TypeConstructor {
                                     name: Identifier {
                                         name: "X",
-                                        span: 125..126,
+                                        span: 71..72,
                                     },
                                     parameters: [
                                         Field {
                                             name: Some(
                                                 Identifier {
                                                     name: "item",
-                                                    span: 130..134,
+                                                    span: 76..80,
                                                 },
                                             ),
                                             typ: TypeExpression {
                                                 expression: Variable(
                                                     Identifier {
                                                         name: "Int",
-                                                        span: 137..140,
+                                                        span: 83..86,
                                                     },
                                                 ),
                                                 where_clause: WhereClause(
