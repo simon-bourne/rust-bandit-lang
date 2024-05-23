@@ -39,9 +39,10 @@ pub struct Data<'src> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TypeConstructor<'src> {
     pub name: Identifier<'src>,
-    pub parameters: Vec<Parameter<'src>>,
+    pub parameters: Vec<Field<'src>>,
 }
 
+/// `name` or `(name : Kind)`
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TypeParameter<'src> {
     pub name: Identifier<'src>,
@@ -49,8 +50,26 @@ pub struct TypeParameter<'src> {
     pub parentheses: usize,
 }
 
+impl<'src> TypeParameter<'src> {
+    pub fn new(name: Identifier<'src>, kind: Option<TypeExpression<'src>>) -> Self {
+        Self {
+            name,
+            kind,
+            parentheses: 0,
+        }
+    }
+
+    pub fn parenthesized(self) -> Self {
+        Self {
+            parentheses: self.parentheses + 1,
+            ..self
+        }
+    }
+}
+
+/// `(name : Type)` or `Type`
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Parameter<'src> {
+pub struct Field<'src> {
     pub name: Option<Identifier<'src>>,
     pub typ: TypeExpression<'src>,
 }
@@ -68,6 +87,23 @@ pub enum Expression<'src> {
         type_expression: Box<TypeExpression<'src>>,
     },
     Parenthesized(Box<Self>),
+}
+
+impl<'src> Expression<'src> {
+    pub fn apply(left: Self, right: Self) -> Self {
+        Self::BinaryOperator {
+            name: OperatorName::Apply,
+            left: Box::new(left),
+            right: Box::new(right),
+        }
+    }
+
+    pub fn type_annotation(expression: Self, type_expression: TypeExpression<'src>) -> Self {
+        Self::TypeAnnotation {
+            expression: Box::new(expression),
+            type_expression: Box::new(type_expression),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

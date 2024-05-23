@@ -6,7 +6,7 @@ use chumsky::{
 
 use super::{
     ast::{
-        Data, DataDeclaration, Expression, Function, Item, Operator, OperatorName, Parameter,
+        Data, DataDeclaration, Expression, Field, Function, Item, Operator, OperatorName,
         TypeConstructor, TypeExpression, TypeParameter, Visibility, VisibilityItems, WhereClause,
         AST,
     },
@@ -47,40 +47,26 @@ fn function<'src>() -> impl TTParser<'src, Function<'src>> {
     name.map(|name| Function { name })
 }
 
-fn parameter<'src>() -> impl TTParser<'src, Parameter<'src>> {
+fn field<'src>() -> impl TTParser<'src, Field<'src>> {
     let name = ident();
 
     name.then_ignore(operator(":"))
         .or_not()
         .then(type_expression(expression()))
-        .map(|(name, typ)| Parameter { name, typ })
+        .map(|(name, typ)| Field { name, typ })
 }
 
 fn type_parameter<'src>() -> impl TTParser<'src, TypeParameter<'src>> {
-    let name = ident();
-    name.map(|name| TypeParameter {
-        name,
-        kind: None,
-        parentheses: 0,
-    })
-    .or(recursive(|parameter| {
-        parenthesized(
-            name.then(
+    recursive(|parameter| {
+        ident()
+            .then(
                 operator(":")
                     .ignore_then(type_expression(expression()))
                     .or_not(),
             )
-            .map(|(name, kind)| TypeParameter {
-                name,
-                kind,
-                parentheses: 1,
-            })
-            .or(parameter.map(|p: TypeParameter| TypeParameter {
-                parentheses: p.parentheses + 1,
-                ..p
-            })),
-        )
-    }))
+            .map(|(name, kind)| TypeParameter::new(name, kind))
+            .or(parenthesized(parameter).map(TypeParameter::parenthesized))
+    })
 }
 
 fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
@@ -92,13 +78,7 @@ fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
 
         // Function application is an implicit operator, and has higher precedence than
         // everything else.
-        let application =
-            atom.clone()
-                .foldl(atom.repeated(), |left, right| Expression::BinaryOperator {
-                    name: OperatorName::Apply,
-                    left: Box::new(left),
-                    right: Box::new(right),
-                });
+        let application = atom.clone().foldl(atom.repeated(), Expression::apply);
 
         let operators = application
             .clone()
@@ -109,9 +89,8 @@ fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
             .clone()
             .then_ignore(operator(":"))
             .then(type_expression(expression.clone()))
-            .map(|(expression, type_expression)| Expression::TypeAnnotation {
-                expression: Box::new(expression),
-                type_expression: Box::new(type_expression),
+            .map(|(expression, type_expression)| {
+                Expression::type_annotation(expression, type_expression)
             });
 
         type_annotated.or(operators)
@@ -142,7 +121,7 @@ fn data_with_body<'src>() -> impl TTParser<'src, Data<'src>> {
 fn type_constructor<'src>() -> impl TTParser<'src, TypeConstructor<'src>> {
     let name = ident();
     name.keyword(Keyword::Of)
-        .then(parameter().separated_by(line_separator()).collect())
+        .then(field().separated_by(line_separator()).collect())
         .map(|(name, parameters)| TypeConstructor { name, parameters })
         .or(name.map(|name| TypeConstructor {
             name,

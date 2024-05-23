@@ -100,7 +100,7 @@ ParseResult {
                                         span: 59..60,
                                     },
                                     parameters: [
-                                        Parameter {
+                                        Field {
                                             name: Some(
                                                 Identifier {
                                                     name: "item",
