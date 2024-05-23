@@ -9,7 +9,8 @@ use super::{
         Data, DataDeclaration, Expression, Field, Function, Item, Operator, TypeConstructor,
         TypeExpression, TypeParameter, Visibility, VisibilityItems, WhereClause, AST,
     },
-    ident, keyword, line_separator, operator, optional_line_end, parenthesized, TTParser,
+    comma, ident, in_block, keyword, line_end, line_separator, operator, optional_line_end,
+    parenthesized, TTParser,
 };
 use crate::lex::{Grouping, Keyword};
 
@@ -119,27 +120,36 @@ fn type_constructor<'src>() -> impl TTParser<'src, TypeConstructor<'src>> {
         .or(name.map(TypeConstructor::empty))
 }
 
-// TODO: Accept blocks
 fn visibility_items<'src, T: 'src>(
     parser: impl TTParser<'src, T>,
 ) -> impl TTParser<'src, VisibilityItems<T>> {
-    keyword(Keyword::Public)
-        .to(Visibility::Public)
-        .or(keyword(Keyword::Private).to(Visibility::Private))
-        .then(parser.repeated().collect())
-        .map(|(visibility, items)| VisibilityItems::new(visibility, items))
+    let public = keyword(Keyword::Public).to(Visibility::Public);
+    let private = keyword(Keyword::Private).to(Visibility::Private);
+
+    optional_line_end(
+        public
+            .or(private)
+            .then(item_list(parser))
+            .map(|(visibility, items)| VisibilityItems::new(visibility, items)),
+    )
 }
 
-// TODO: Accept blocks
 fn where_clause<'src>(
     expression: impl TTParser<'src, Expression<'src>>,
 ) -> impl TTParser<'src, WhereClause<'src>> {
     optional_line_end(
         keyword(Keyword::Where)
-            .ignore_then(expression.separated_by(line_separator()).collect())
+            .ignore_then(item_list(expression))
             .or_not()
             .map(|where_clause| WhereClause(where_clause.unwrap_or_default())),
     )
+}
+
+fn item_list<'src, T: 'src>(item: impl TTParser<'src, T>) -> impl TTParser<'src, Vec<T>> {
+    item.clone()
+        .separated_by(comma())
+        .collect()
+        .or(in_block(item.separated_by(line_end()).collect()))
 }
 
 fn infix<'src>(

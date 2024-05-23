@@ -21,7 +21,7 @@ pub enum Token<'src> {
     Comma,
 
     #[regex(r"[ \t\r\f\n]*\n[ \t]*")]
-    LineSeparator,
+    LineEnd,
 
     #[token("and", |_| Keyword::And)]
     #[token("break", |_| Keyword::Break)]
@@ -81,7 +81,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let item = self.0.next()?;
 
-        if matches!(item.0, Token::LineSeparator)
+        if matches!(item.0, Token::LineEnd)
             && self.0.peek().is_some_and(|next| next.0.continues_line())
         {
             self.0.next()
@@ -150,7 +150,7 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
                 self.current_indent = new_indent;
                 self.close_block(span)
             }
-            Ordering::Equal => (Token::LineSeparator, span),
+            Ordering::Equal => (Token::LineEnd, span),
             Ordering::Greater => {
                 self.indent_stack.push(self.current_indent);
                 self.current_indent = new_indent;
@@ -177,7 +177,7 @@ where
 
         self.last_span = token.1;
 
-        let result = if token.0 == Token::LineSeparator {
+        let result = if token.0 == Token::LineEnd {
             self.handle_indent(token.1)
         } else {
             token
@@ -454,7 +454,7 @@ mod tests {
             .map(|(token, span)| match token {
                 Token::Open(Grouping::Block) => "<<",
                 Token::Close(Grouping::Block) => ">>",
-                Token::LineSeparator => ",",
+                Token::LineEnd => ",",
                 _ => &src[span.into_range()],
             })
             .join(" ")

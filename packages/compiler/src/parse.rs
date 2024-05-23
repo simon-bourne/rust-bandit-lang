@@ -36,10 +36,6 @@ pub trait TTParser<'src, Output>:
         )
     }
 
-    fn close_block(self) -> impl TTParser<'src, Output> {
-        self.then_ignore(close_block()).skip_line_ends()
-    }
-
     fn skip_line_ends(self) -> impl TTParser<'src, Output> {
         self.then_ignore(line_end().repeated())
     }
@@ -58,7 +54,7 @@ fn open<'src>(grouping: Grouping) -> impl TTParser<'src, ()> {
 }
 
 fn line_separator<'src>() -> impl TTParser<'src, ()> {
-    primitive::select(move |x, _| (x == Token::LineSeparator || x == Token::Comma).then_some(()))
+    primitive::select(move |x, _| (x == Token::LineEnd || x == Token::Comma).then_some(()))
         .labelled("<line separator>")
 }
 
@@ -67,10 +63,15 @@ fn token<'src>(token: Token<'src>, label: &'static str) -> impl TTParser<'src, (
 }
 
 fn parenthesized<'src, T>(parser: impl TTParser<'src, T>) -> impl TTParser<'src, T> {
-    // TODO: Allow blocks within parentheses
-    open(Grouping::Parentheses)
-        .ignore_then(parser)
-        .close(Grouping::Parentheses)
+    grouped(parser.clone().or(in_block(parser)), Grouping::Parentheses)
+}
+
+fn in_block<'src, T>(parser: impl TTParser<'src, T>) -> impl TTParser<'src, T> {
+    grouped(parser, Grouping::Block)
+}
+
+fn grouped<'src, T>(parser: impl TTParser<'src, T>, grouping: Grouping) -> impl TTParser<'src, T> {
+    open(grouping).ignore_then(parser).close(grouping)
 }
 
 impl<'src, Output, T> TTParser<'src, Output> for T where
@@ -103,8 +104,8 @@ macro_rules! token {
     };
 }
 
-token!(line_end, "\\n", Token::LineSeparator);
-token!(close_block, ";", Token::Close(Grouping::Block));
+token!(line_end, "\\n", Token::LineEnd);
+token!(comma, ",", Token::Comma);
 
 fn keyword<'src>(kw: Keyword) -> impl TTParser<'src, ()> + Copy {
     primitive::select(move |x, _| (x == Token::Keyword(kw)).then_some(())).labelled(kw.as_str())
