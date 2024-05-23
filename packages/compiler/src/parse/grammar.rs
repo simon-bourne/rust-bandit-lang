@@ -6,9 +6,8 @@ use chumsky::{
 
 use super::{
     ast::{
-        Data, DataDeclaration, Expression, Field, Function, Item, Operator, OperatorName,
-        TypeConstructor, TypeExpression, TypeParameter, Visibility, VisibilityItems, WhereClause,
-        AST,
+        Data, DataDeclaration, Expression, Field, Function, Item, Operator, TypeConstructor,
+        TypeExpression, TypeParameter, Visibility, VisibilityItems, WhereClause, AST,
     },
     ident, keyword, line_separator, operator, optional_line_end, parenthesized, TTParser,
 };
@@ -103,30 +102,21 @@ fn type_expression<'src>(
     expression
         .clone()
         .then(where_clause(expression))
-        .map(|(expression, where_clause)| TypeExpression {
-            expression,
-            where_clause,
-        })
+        .map(|(expression, where_clause)| TypeExpression::new(expression, where_clause))
 }
 
 fn data_with_body<'src>() -> impl TTParser<'src, Data<'src>> {
     data_declaration()
         .then(visibility_items(type_constructor()))
-        .map(|(declaration, constructors)| Data {
-            declaration,
-            constructors,
-        })
+        .map(|(declaration, constructors)| Data::new(declaration, constructors))
 }
 
 fn type_constructor<'src>() -> impl TTParser<'src, TypeConstructor<'src>> {
     let name = ident();
     name.keyword(Keyword::Of)
         .then(field().separated_by(line_separator()).collect())
-        .map(|(name, parameters)| TypeConstructor { name, parameters })
-        .or(name.map(|name| TypeConstructor {
-            name,
-            parameters: Vec::new(),
-        }))
+        .map(|(name, parameters)| TypeConstructor::new(name, parameters))
+        .or(name.map(TypeConstructor::empty))
 }
 
 // TODO: Accept blocks
@@ -137,7 +127,7 @@ fn visibility_items<'src, T: 'src>(
         .to(Visibility::Public)
         .or(keyword(Keyword::Private).to(Visibility::Private))
         .then(parser.repeated().collect())
-        .map(|(visibility, items)| VisibilityItems { visibility, items })
+        .map(|(visibility, items)| VisibilityItems::new(visibility, items))
 }
 
 // TODO: Accept blocks
@@ -146,12 +136,7 @@ fn where_clause<'src>(
 ) -> impl TTParser<'src, WhereClause<'src>> {
     optional_line_end(
         keyword(Keyword::Where)
-            .ignore_then(
-                expression
-                    .separated_by(line_separator())
-                    .allow_trailing()
-                    .collect(),
-            )
+            .ignore_then(expression.separated_by(line_separator()).collect())
             .or_not()
             .map(|where_clause| WhereClause(where_clause.unwrap_or_default())),
     )
@@ -166,15 +151,7 @@ fn infix<'src>(
     Operator<'src>,
     (Expression<'src>, Operator<'src>, Expression<'src>),
 > {
-    pratt::infix::<_, _, Operator, (Expression, Operator, Expression)>(
-        associativity,
-        operator(name),
-        |left, op, right| Expression::BinaryOperator {
-            name: OperatorName::Named(op),
-            left: Box::new(left),
-            right: Box::new(right),
-        },
-    )
+    pratt::infix(associativity, operator(name), Expression::binary_operator)
 }
 
 // Windows line endings are a pain, so just skip the parser tests

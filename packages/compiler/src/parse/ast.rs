@@ -30,16 +30,25 @@ pub struct DataDeclaration<'src> {
     pub where_clause: WhereClause<'src>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Constructor)]
 pub struct Data<'src> {
     pub declaration: DataDeclaration<'src>,
     pub constructors: VisibilityItems<TypeConstructor<'src>>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Constructor)]
 pub struct TypeConstructor<'src> {
     pub name: Identifier<'src>,
     pub parameters: Vec<Field<'src>>,
+}
+
+impl<'src> TypeConstructor<'src> {
+    pub fn empty(name: Identifier<'src>) -> Self {
+        Self {
+            name,
+            parameters: Vec::new(),
+        }
+    }
 }
 
 /// `name` or `(name : Kind)`
@@ -98,6 +107,14 @@ impl<'src> Expression<'src> {
         }
     }
 
+    pub fn binary_operator(left: Self, operator: Operator<'src>, right: Self) -> Self {
+        Self::BinaryOperator {
+            name: OperatorName::Named(operator),
+            left: Box::new(left),
+            right: Box::new(right),
+        }
+    }
+
     pub fn type_annotation(expression: Self, type_expression: TypeExpression<'src>) -> Self {
         Self::TypeAnnotation {
             expression: Box::new(expression),
@@ -106,7 +123,7 @@ impl<'src> Expression<'src> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Constructor)]
 pub struct TypeExpression<'src> {
     pub expression: Expression<'src>,
     pub where_clause: WhereClause<'src>,
@@ -118,7 +135,7 @@ pub enum OperatorName<'src> {
     Named(Operator<'src>),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Constructor)]
 pub struct VisibilityItems<T> {
     pub visibility: Visibility,
     pub items: Vec<T>,
