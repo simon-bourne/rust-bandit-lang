@@ -1,5 +1,6 @@
 use chumsky::{
     pratt::{self, left, right, Associativity, Infix},
+    primitive::empty,
     recursive::recursive,
     IterParser, Parser,
 };
@@ -9,8 +10,8 @@ use super::{
         Data, DataDeclaration, Expression, Field, Function, Item, Operator, TypeConstructor,
         TypeExpression, TypeParameter, Visibility, VisibilityItems, WhereClause, AST,
     },
-    comma, ident, in_block, keyword, line_end, line_separator, operator, optional_line_end,
-    parenthesized, TTParser,
+    comma, grouped, ident, in_block, keyword, line_end, operator, optional_line_end, parenthesized,
+    TTParser,
 };
 use crate::lex::{Grouping, Keyword};
 
@@ -38,13 +39,12 @@ fn data_declaration<'src>() -> impl TTParser<'src, DataDeclaration<'src>> {
 }
 
 fn function<'src>() -> impl TTParser<'src, Function<'src>> {
-    let name = ident()
-        .open(Grouping::Parentheses)
-        .close(Grouping::Parentheses)
+    let unit = grouped(empty(), Grouping::Parentheses);
+    ident()
+        .then_ignore(unit.clone())
         .skip_operator("=")
-        .open(Grouping::Parentheses)
-        .close(Grouping::Parentheses);
-    name.map(|name| Function { name })
+        .then_ignore(unit)
+        .map(|name| Function { name })
 }
 
 fn field<'src>() -> impl TTParser<'src, Field<'src>> {
@@ -115,7 +115,7 @@ fn data_with_body<'src>() -> impl TTParser<'src, Data<'src>> {
 fn type_constructor<'src>() -> impl TTParser<'src, TypeConstructor<'src>> {
     let name = ident();
     name.keyword(Keyword::Of)
-        .then(field().separated_by(line_separator()).collect())
+        .then(item_list(field()))
         .map(|(name, parameters)| TypeConstructor::new(name, parameters))
         .or(name.map(TypeConstructor::empty))
 }

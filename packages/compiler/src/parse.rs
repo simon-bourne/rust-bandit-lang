@@ -25,21 +25,6 @@ pub trait TTParser<'src, Output>:
         self.then_ignore(keyword(kw))
     }
 
-    fn open(self, grouping: Grouping) -> impl TTParser<'src, Output> {
-        self.then_ignore(open(grouping))
-    }
-
-    fn close(self, grouping: Grouping) -> impl TTParser<'src, Output> {
-        self.then_ignore(
-            primitive::select(move |x, _| (x == Token::Close(grouping)).then_some(()))
-                .labelled(grouping.close_str()),
-        )
-    }
-
-    fn skip_line_ends(self) -> impl TTParser<'src, Output> {
-        self.then_ignore(line_end().repeated())
-    }
-
     fn skip_operator(self, required_name: &'static str) -> impl TTParser<'src, Output> {
         self.then_ignore(    select! {
             Token::Operator(name) = ext if name == required_name => Operator::new(name,ext.span())
@@ -49,13 +34,9 @@ pub trait TTParser<'src, Output>:
     }
 }
 
-fn open<'src>(grouping: Grouping) -> impl TTParser<'src, ()> {
-    token(Token::Open(grouping), grouping.open_str())
-}
-
-fn line_separator<'src>() -> impl TTParser<'src, ()> {
-    primitive::select(move |x, _| (x == Token::LineEnd || x == Token::Comma).then_some(()))
-        .labelled("<line separator>")
+impl<'src, Output, T> TTParser<'src, Output> for T where
+    T: Parser<'src, SpannedInput<'src, Token<'src>>, Output, RichError<'src>> + Clone + 'src
+{
 }
 
 fn token<'src>(token: Token<'src>, label: &'static str) -> impl TTParser<'src, ()> {
@@ -71,12 +52,10 @@ fn in_block<'src, T>(parser: impl TTParser<'src, T>) -> impl TTParser<'src, T> {
 }
 
 fn grouped<'src, T>(parser: impl TTParser<'src, T>, grouping: Grouping) -> impl TTParser<'src, T> {
-    open(grouping).ignore_then(parser).close(grouping)
-}
+    let open = token(Token::Open(grouping), grouping.open_str());
+    let close = token(Token::Close(grouping), grouping.close_str());
 
-impl<'src, Output, T> TTParser<'src, Output> for T where
-    T: Parser<'src, SpannedInput<'src, Token<'src>>, Output, RichError<'src>> + Clone + 'src
-{
+    open.ignore_then(parser).then_ignore(close)
 }
 
 macro_rules! lexeme {
