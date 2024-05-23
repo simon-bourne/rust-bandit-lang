@@ -104,14 +104,14 @@ ParseResult {
                                             name: Some(
                                                 Identifier {
                                                     name: "item",
-                                                    span: 64..68,
+                                                    span: 68..72,
                                                 },
                                             ),
                                             typ: TypeExpression {
                                                 expression: Variable(
                                                     Identifier {
                                                         name: "Int",
-                                                        span: 71..74,
+                                                        span: 75..78,
                                                     },
                                                 ),
                                                 where_clause: WhereClause(
