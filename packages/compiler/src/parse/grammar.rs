@@ -146,10 +146,8 @@ fn where_clause<'src>(
 }
 
 fn item_list<'src, T: 'src>(item: impl TTParser<'src, T>) -> impl TTParser<'src, Vec<T>> {
-    item.clone()
-        .separated_by(comma())
-        .collect()
-        .or(in_block(item.separated_by(line_end()).collect()))
+    in_block(item.clone().separated_by(line_end()).at_least(1).collect())
+        .or(item.separated_by(comma()).at_least(1).collect())
 }
 
 fn infix<'src>(
@@ -171,6 +169,7 @@ mod tests {
 
     use chumsky::{prelude::Input, Parser};
     use goldenfile::Mint;
+    use indoc::indoc;
 
     use crate::{
         lex::{Span, Token},
@@ -181,7 +180,13 @@ mod tests {
     fn data_declaration() {
         parse(
             "data-declaration",
-            r#"data MyType a (b : Type) (c : Type -> Type -> Type) public X of item : Int"#,
+            indoc!(
+                r#"
+                    data MyType a (b : Type) (c : Type -> Type -> Type)
+                    public X of
+                        item : Int
+                "#
+            ),
         )
     }
 
@@ -189,7 +194,11 @@ mod tests {
     fn data_declaration_where() {
         parse(
             "data-declaration-where",
-            r#"data MyType a (((b : (Type)))) (c : Type -> Type -> Type where a == b, b == c, Ord a) public X of item : Int"#,
+            indoc!(
+                r#"
+                    data MyType a (((b : (Type)))) (c : Type -> Type -> Type where a == b, b == c, Ord a) public X of item : Int
+                "#
+            ),
         )
     }
 
