@@ -97,7 +97,7 @@ ParseResult {
                                 TypeConstructor {
                                     name: Identifier {
                                         name: "X",
-                                        span: 121..122,
+                                        span: 125..126,
                                     },
                                     parameters: [
                                         Field {

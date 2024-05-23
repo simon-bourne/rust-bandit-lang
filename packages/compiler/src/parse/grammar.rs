@@ -191,8 +191,8 @@ mod tests {
                                 -> Type
                                 -> Type
                         )
-                    public X of
-                        item : Int
+                    public
+                        X of item : Int
                 "#
             ),
         )
