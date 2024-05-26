@@ -37,7 +37,7 @@
 			"patterns": [
 				{
 					"name": "keyword.control.bandit",
-					"match": "\\b(break|continue|else|if|match|loop|return|then|with|while)\\b"
+					"match": "\\b(break|case|continue|else|if|loop|of|return|then|while)\\b"
 				},
 				{
 					"name": "keyword.operator.bandit",
@@ -45,7 +45,7 @@
 				},
 				{
 					"name": "keyword.other.bandit",
-					"match": "\\b(data|do|embody|forall|from|let|of|private|public|self|trait|type|use|where)\\b"
+					"match": "\\b(data|do|embody|forall|from|let|private|public|trait|type|use|where)\\b"
 				}
 			]
 		},

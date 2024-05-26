@@ -25,6 +25,7 @@ pub enum Token<'src> {
 
     #[token("and", |_| Keyword::And)]
     #[token("break", |_| Keyword::Break)]
+    #[token("case", |_| Keyword::Case)]
     #[token("continue", |_| Keyword::Continue)]
     #[token("data", |_| Keyword::Data)]
     #[token("do", |_| Keyword::Do)]
@@ -35,22 +36,18 @@ pub enum Token<'src> {
     #[token("if", |_| Keyword::If)]
     #[token("let", |_| Keyword::Let)]
     #[token("loop", |_| Keyword::Loop)]
-    #[token("match", |_| Keyword::Match)]
-    #[token("move", |_| Keyword::Move)]
     #[token("not", |_| Keyword::Not)]
     #[token("of", |_| Keyword::Of)]
     #[token("or", |_| Keyword::Or)]
     #[token("private", |_| Keyword::Private)]
     #[token("public", |_| Keyword::Public)]
     #[token("return", |_| Keyword::Return)]
-    #[token("self", |_| Keyword::SelfValue)]
     #[token("then", |_| Keyword::Then)]
     #[token("trait", |_| Keyword::Trait)]
     #[token("type", |_| Keyword::Type)]
     #[token("use", |_| Keyword::Use)]
     #[token("where", |_| Keyword::Where)]
     #[token("while", |_| Keyword::While)]
-    #[token("with", |_| Keyword::With)]
     Keyword(Keyword),
 
     #[token("\\")]
@@ -237,33 +234,29 @@ impl Grouping {
 pub enum Keyword {
     And,
     Break,
+    Case,
     Continue,
     Data,
     Do,
     Else,
-    ElseIf,
     Embody,
     Forall,
     From,
     If,
     Let,
     Loop,
-    Match,
-    Move,
     Not,
     Of,
     Or,
     Private,
     Public,
     Return,
-    SelfValue,
     Then,
     Trait,
     Type,
     Use,
     Where,
     While,
-    With,
 }
 
 impl Keyword {
@@ -273,33 +266,29 @@ impl Keyword {
         match self {
             KW::And => "and",
             KW::Break => "break",
+            KW::Case => "case",
             KW::Continue => "continue",
             KW::Data => "data",
             KW::Do => "do",
             KW::Else => "else",
-            KW::ElseIf => "else if",
             KW::Embody => "embody",
             KW::Forall => "forall",
             KW::From => "from",
             KW::If => "if",
             KW::Let => "let",
             KW::Loop => "loop",
-            KW::Match => "match",
-            KW::Move => "move",
             KW::Not => "not",
             KW::Of => "of",
             KW::Or => "or",
             KW::Private => "private",
             KW::Public => "public",
             KW::Return => "return",
-            KW::SelfValue => "self",
             KW::Then => "then",
             KW::Trait => "trait",
             KW::Type => "type",
             KW::Use => "use",
             KW::Where => "where",
             KW::While => "while",
-            KW::With => "with",
         }
     }
 }
