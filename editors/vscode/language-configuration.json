@@ -11,25 +11,18 @@
     ],
     // symbols that are auto closed when typing
     "autoClosingPairs": [
-        ["embody", ";"],
-        ["if", ";"],
-        ["match", ";"],
-        ["loop", ";"],
-        ["data", ";"],
-        ["do", ";"],
-        ["embody", ";"],
-        ["record", ";"],
-        ["trait", ";"],
         ["{", "}"],
         ["[", "]"],
         ["(", ")"],
-        ["\"", "\""]
+        ["\"", "\""],
+        ["`", "`"]
     ],
     // symbols that can be used to surround a selection
     "surroundingPairs": [
         ["{", "}"],
         ["[", "]"],
         ["(", ")"],
-        ["\"", "\""]
+        ["\"", "\""],
+        ["`", "`"]
     ]
 }
