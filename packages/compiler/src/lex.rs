@@ -31,6 +31,7 @@ pub enum Token<'src> {
     #[token("do", |_| Keyword::Do)]
     #[token("else", |_| Keyword::Else)]
     #[token("embody", |_| Keyword::Embody)]
+    #[token("∀", |_| Keyword::Forall)]
     #[token("forall", |_| Keyword::Forall)]
     #[token("from", |_| Keyword::From)]
     #[token("if", |_| Keyword::If)]
@@ -50,12 +51,14 @@ pub enum Token<'src> {
     #[token("while", |_| Keyword::While)]
     Keyword(Keyword),
 
+    #[token("λ")]
     #[token("\\")]
     Lambda,
 
     #[regex(r"(?&ident)")]
     Identifier(&'src str),
 
+    #[token(r"→")]
     #[regex(r"[\$%\&\*\+\./<=>@\^\-\~:]+")]
     Operator(&'src str),
 
