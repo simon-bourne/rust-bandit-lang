@@ -47,7 +47,7 @@ expr do expr expr do
             let lexer = Token::layout(&input);
 
             for token in lexer {
-                assert!(matches!(token.0, Token::Error(_)));
+                assert!(!matches!(token.0, Token::Error(_)));
                 black_box(&token);
             }
         })
