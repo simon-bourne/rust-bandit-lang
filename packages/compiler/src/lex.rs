@@ -68,7 +68,13 @@ pub enum Token<'src> {
     #[regex(r"\.(?&ident)")]
     NamedOperator(&'src str),
 
-    Error,
+    Error(Error),
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum Error {
+    UnknownToken,
+    Dedent,
 }
 
 struct ContinuedLines<'src, I>(Peekable<I>)
@@ -100,7 +106,7 @@ impl<'src> Token<'src> {
     pub fn layout(source: &'src str) -> impl Iterator<Item = SrcToken<'src>> + '_ {
         let tokens = Self::lexer(source).spanned().map(|(tok, span)| match tok {
             Ok(tok) => (tok, Span::from(span)),
-            Err(()) => (Self::Error, span.into()),
+            Err(()) => (Self::Error(Error::UnknownToken), span.into()),
         });
 
         LayoutIter::new(ContinuedLines(tokens.peekable()), source)
@@ -142,8 +148,7 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
                     .last()
                     .is_some_and(|top| self.current_indent > *top)
                 {
-                    // TODO: Make a dedent error
-                    return Some((Token::Error, span));
+                    return Some((Token::Error(Error::Dedent), span));
                 }
 
                 Some(result)
@@ -169,7 +174,8 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
         match new_indent.cmp(&self.current_indent) {
             Ordering::Less => {
                 self.current_indent = new_indent;
-                self.try_close_block(span).unwrap_or((Token::Error, span))
+                self.try_close_block(span)
+                    .unwrap_or((Token::Error(Error::Dedent), span))
             }
             Ordering::Equal => (Token::LineEnd, span),
             Ordering::Greater => {
@@ -498,7 +504,7 @@ mod tests {
                 Token::Open(Grouping::Block) => "<<",
                 Token::Close(Grouping::Block) => ">>",
                 Token::LineEnd => ",",
-                Token::Error => "<error>",
+                Token::Error(_) => "<error>",
                 _ => &src[span.into_range()],
             })
             .join(" ")
