@@ -5,8 +5,8 @@ use chumsky::{
     select, Parser,
 };
 
-use self::ast::{Identifier, Operator};
-use crate::lex::{Grouping, Keyword, Span, Token};
+use self::ast::{Identifier, OperatorName};
+use crate::lex::{Grouping, Keyword, Operator, Span, Token};
 
 pub mod ast;
 pub mod grammar;
@@ -25,12 +25,8 @@ pub trait TTParser<'src, Output>:
         self.then_ignore(keyword(kw))
     }
 
-    fn operator(self, required_name: &'static str) -> impl TTParser<'src, Output> {
-        self.then_ignore(    select! {
-            Token::Operator(name) = ext if name == required_name => Operator::new(name,ext.span())
-        }
-        .labelled(required_name)
-        )
+    fn operator(self, name: Operator) -> impl TTParser<'src, Output> {
+        self.then_ignore(operator(name))
     }
 }
 
@@ -68,11 +64,11 @@ macro_rules! lexeme {
 
 lexeme!(ident, "<identifier>", Identifier);
 
-pub fn operator(name: &str) -> impl TTParser<Operator> + Copy {
+pub fn operator<'src>(name: Operator) -> impl TTParser<'src, OperatorName> + Copy {
     select! {
-        Token::Operator(op_name) = ext if name == op_name => Operator::new(name,ext.span())
+        Token::Operator(op_name) = ext if name == op_name => OperatorName::Named{name,span: ext.span()}
     }
-    .labelled("<operator>")
+    .labelled(name.as_str())
 }
 
 macro_rules! token {

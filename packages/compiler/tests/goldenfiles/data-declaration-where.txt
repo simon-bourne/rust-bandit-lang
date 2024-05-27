@@ -48,12 +48,10 @@ ParseResult {
                                     kind: Some(
                                         TypeExpression {
                                             expression: BinaryOperator {
-                                                name: Named(
-                                                    Operator {
-                                                        name: "->",
-                                                        span: 41..43,
-                                                    },
-                                                ),
+                                                name: Named {
+                                                    name: To,
+                                                    span: 41..43,
+                                                },
                                                 left: Variable(
                                                     Identifier {
                                                         name: "Type",
@@ -61,12 +59,10 @@ ParseResult {
                                                     },
                                                 ),
                                                 right: BinaryOperator {
-                                                    name: Named(
-                                                        Operator {
-                                                            name: "->",
-                                                            span: 49..51,
-                                                        },
-                                                    ),
+                                                    name: Named {
+                                                        name: To,
+                                                        span: 49..51,
+                                                    },
                                                     left: Variable(
                                                         Identifier {
                                                             name: "Type",
@@ -84,12 +80,10 @@ ParseResult {
                                             where_clause: WhereClause(
                                                 [
                                                     BinaryOperator {
-                                                        name: Named(
-                                                            Operator {
-                                                                name: "==",
-                                                                span: 65..67,
-                                                            },
-                                                        ),
+                                                        name: Named {
+                                                            name: Equal,
+                                                            span: 65..67,
+                                                        },
                                                         left: Variable(
                                                             Identifier {
                                                                 name: "a",
@@ -104,12 +98,10 @@ ParseResult {
                                                         ),
                                                     },
                                                     BinaryOperator {
-                                                        name: Named(
-                                                            Operator {
-                                                                name: "==",
-                                                                span: 73..75,
-                                                            },
-                                                        ),
+                                                        name: Named {
+                                                            name: Equal,
+                                                            span: 73..75,
+                                                        },
                                                         left: Variable(
                                                             Identifier {
                                                                 name: "b",

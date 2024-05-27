@@ -1,6 +1,6 @@
 use derive_more::Constructor;
 
-use crate::lex::Span;
+use crate::lex::{Operator, Span};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AST<'src> {
@@ -87,7 +87,7 @@ pub struct Field<'src> {
 pub enum Expression<'src> {
     Variable(Identifier<'src>),
     BinaryOperator {
-        name: OperatorName<'src>,
+        name: OperatorName,
         left: Box<Self>,
         right: Box<Self>,
     },
@@ -107,9 +107,9 @@ impl<'src> Expression<'src> {
         }
     }
 
-    pub fn binary_operator(left: Self, operator: Operator<'src>, right: Self) -> Self {
+    pub fn binary_operator(left: Self, name: OperatorName, right: Self) -> Self {
         Self::BinaryOperator {
-            name: OperatorName::Named(operator),
+            name,
             left: Box::new(left),
             right: Box::new(right),
         }
@@ -130,9 +130,9 @@ pub struct TypeExpression<'src> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum OperatorName<'src> {
+pub enum OperatorName {
     Apply,
-    Named(Operator<'src>),
+    Named { name: Operator, span: Span },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Constructor)]
@@ -154,10 +154,4 @@ pub struct WhereClause<'src>(pub Vec<Expression<'src>>);
 pub struct Identifier<'src> {
     pub name: &'src str,
     pub span: Span,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Constructor)]
-pub struct Operator<'src> {
-    pub name: &'src str,
-    span: Span,
 }

@@ -23,7 +23,6 @@ pub enum Token<'src> {
     #[regex(r"[ \t\r\f\n]*\n[ \t]*")]
     LineEnd,
 
-    #[token("and", |_| Keyword::And)]
     #[token("break", |_| Keyword::Break)]
     #[token("case", |_| Keyword::Case)]
     #[token("continue", |_| Keyword::Continue)]
@@ -37,9 +36,7 @@ pub enum Token<'src> {
     #[token("if", |_| Keyword::If)]
     #[token("let", |_| Keyword::Let)]
     #[token("loop", |_| Keyword::Loop)]
-    #[token("not", |_| Keyword::Not)]
     #[token("of", |_| Keyword::Of)]
-    #[token("or", |_| Keyword::Or)]
     #[token("private", |_| Keyword::Private)]
     #[token("public", |_| Keyword::Public)]
     #[token("return", |_| Keyword::Return)]
@@ -59,11 +56,18 @@ pub enum Token<'src> {
     Identifier(&'src str),
 
     // TODO: != not, and, or, <=, >=
-    // TODO: Name all operators
-    #[token(r"⇒")]
-    #[token(r"→")]
-    #[regex(r"[\$%\&\*\+\./<=>@\^\-\~:]+")]
-    Operator(&'src str),
+    #[token("and", |_| Operator::And)]
+    #[token("or", |_| Operator::Or)]
+    #[token("not", |_| Operator::Not)]
+    #[token("+", |_| Operator::Plus)]
+    #[token("=", |_| Operator::Assign)]
+    #[token("==", |_| Operator::Equal)]
+    #[token("⇒", |_| Operator::Implies)]
+    #[token("=>", |_| Operator::Implies)]
+    #[token(":", |_| Operator::HasType)]
+    #[token("→", |_| Operator::To)]
+    #[token("->", |_| Operator::To)]
+    Operator(Operator),
 
     #[regex(r"\.(?&ident)")]
     NamedOperator(&'src str),
@@ -262,7 +266,6 @@ impl Grouping {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Keyword {
-    And,
     Break,
     Case,
     Continue,
@@ -275,9 +278,7 @@ pub enum Keyword {
     If,
     Let,
     Loop,
-    Not,
     Of,
-    Or,
     Private,
     Public,
     Return,
@@ -294,7 +295,6 @@ impl Keyword {
         use Keyword as KW;
 
         match self {
-            KW::And => "and",
             KW::Break => "break",
             KW::Case => "case",
             KW::Continue => "continue",
@@ -307,9 +307,7 @@ impl Keyword {
             KW::If => "if",
             KW::Let => "let",
             KW::Loop => "loop",
-            KW::Not => "not",
             KW::Of => "of",
-            KW::Or => "or",
             KW::Private => "private",
             KW::Public => "public",
             KW::Return => "return",
@@ -319,6 +317,39 @@ impl Keyword {
             KW::Use => "use",
             KW::Where => "where",
             KW::While => "while",
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum Operator {
+    And,
+    Or,
+    Not,
+
+    Plus,
+
+    Apply,
+    Assign,
+    Equal,
+    HasType,
+    Implies,
+    To,
+}
+
+impl Operator {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Operator::And => "and",
+            Operator::Or => "or",
+            Operator::Not => "not",
+            Operator::Plus => "+",
+            Operator::Implies => "=>",
+            Operator::HasType => ":",
+            Operator::Assign => "=",
+            Operator::Equal => "==",
+            Operator::Apply => "<-",
+            Operator::To => "->",
         }
     }
 }

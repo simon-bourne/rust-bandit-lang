@@ -46,12 +46,10 @@ ParseResult {
                                     kind: Some(
                                         TypeExpression {
                                             expression: BinaryOperator {
-                                                name: Named(
-                                                    Operator {
-                                                        name: "->",
-                                                        span: 44..46,
-                                                    },
-                                                ),
+                                                name: Named {
+                                                    name: To,
+                                                    span: 44..46,
+                                                },
                                                 left: Variable(
                                                     Identifier {
                                                         name: "Type",
@@ -59,12 +57,10 @@ ParseResult {
                                                     },
                                                 ),
                                                 right: BinaryOperator {
-                                                    name: Named(
-                                                        Operator {
-                                                            name: "->",
-                                                            span: 52..54,
-                                                        },
-                                                    ),
+                                                    name: Named {
+                                                        name: To,
+                                                        span: 52..54,
+                                                    },
                                                     left: Variable(
                                                         Identifier {
                                                             name: "Type",

@@ -7,13 +7,13 @@ use chumsky::{
 
 use super::{
     ast::{
-        Data, DataDeclaration, Expression, Field, Function, Item, Operator, TypeConstructor,
+        Data, DataDeclaration, Expression, Field, Function, Item, OperatorName, TypeConstructor,
         TypeExpression, TypeParameter, Visibility, VisibilityItems, WhereClause, AST,
     },
     comma, grouped, ident, in_block, keyword, line_end, operator, optional_line_end, parenthesized,
     TTParser,
 };
-use crate::lex::{Grouping, Keyword};
+use crate::lex::{Grouping, Keyword, Operator};
 
 pub fn parser<'src>() -> impl TTParser<'src, AST<'src>> {
     trait_item().repeated().collect().map(|items| AST { items })
@@ -42,7 +42,7 @@ fn function<'src>() -> impl TTParser<'src, Function<'src>> {
     let unit = grouped(empty(), Grouping::Parentheses);
     ident()
         .then_ignore(unit.clone())
-        .operator("=")
+        .operator(Operator::Assign)
         .then_ignore(unit)
         .map(|name| Function { name })
 }
@@ -50,7 +50,7 @@ fn function<'src>() -> impl TTParser<'src, Function<'src>> {
 fn field<'src>() -> impl TTParser<'src, Field<'src>> {
     let name = ident();
 
-    name.then_ignore(operator(":"))
+    name.then_ignore(operator(Operator::HasType))
         .or_not()
         .then(type_expression(expression()))
         .map(|(name, typ)| Field { name, typ })
@@ -60,7 +60,7 @@ fn type_parameter<'src>() -> impl TTParser<'src, TypeParameter<'src>> {
     recursive(|parameter| {
         ident()
             .then(
-                operator(":")
+                operator(Operator::HasType)
                     .ignore_then(type_expression(expression()))
                     .or_not(),
             )
@@ -80,14 +80,15 @@ fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
         // everything else.
         let application = atom.clone().foldl(atom.repeated(), Expression::apply);
 
-        let operators = application
-            .clone()
-            .pratt((infix(right(1), "->"), infix(left(5), "==")));
+        let operators = application.clone().pratt((
+            infix(right(1), Operator::To),
+            infix(left(5), Operator::Equal),
+        ));
 
         // TODO: Add quantification
         let type_annotated = operators
             .clone()
-            .then_ignore(operator(":"))
+            .then_ignore(operator(Operator::HasType))
             .then(type_expression(expression.clone()))
             .map(|(expression, type_expression)| {
                 Expression::type_annotation(expression, type_expression)
@@ -147,12 +148,12 @@ fn item_list<'src, T: 'src>(item: impl TTParser<'src, T>) -> impl TTParser<'src,
 
 fn infix<'src>(
     associativity: Associativity,
-    name: &'src str,
+    name: Operator,
 ) -> Infix<
-    impl TTParser<Operator>,
-    impl Fn(Expression<'src>, Operator<'src>, Expression<'src>) -> Expression<'src> + Clone,
-    Operator<'src>,
-    (Expression<'src>, Operator<'src>, Expression<'src>),
+    impl TTParser<'src, OperatorName>,
+    impl Fn(Expression<'src>, OperatorName, Expression<'src>) -> Expression<'src> + Clone,
+    OperatorName,
+    (Expression<'src>, OperatorName, Expression<'src>),
 > {
     pratt::infix(associativity, operator(name), Expression::binary_operator)
 }
