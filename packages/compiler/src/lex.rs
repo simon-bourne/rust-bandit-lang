@@ -58,6 +58,9 @@ pub enum Token<'src> {
     #[regex(r"(?&ident)")]
     Identifier(&'src str),
 
+    // TODO: != not, and, or, <=, >=
+    // TODO: Name all operators
+    #[token(r"⇒")]
     #[token(r"→")]
     #[regex(r"[\$%\&\*\+\./<=>@\^\-\~:]+")]
     Operator(&'src str),

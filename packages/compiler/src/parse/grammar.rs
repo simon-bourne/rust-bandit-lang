@@ -42,7 +42,7 @@ fn function<'src>() -> impl TTParser<'src, Function<'src>> {
     let unit = grouped(empty(), Grouping::Parentheses);
     ident()
         .then_ignore(unit.clone())
-        .skip_operator("=")
+        .operator("=")
         .then_ignore(unit)
         .map(|name| Function { name })
 }
@@ -192,10 +192,11 @@ mod tests {
     fn data_declaration_where() {
         parse(
             "data-declaration-where",
+            // TODO: This fails if we ut a newline at the end (it expects a `where`)
             indoc!(
                 r#"
                     data MyType a (((b : (Type)))) (c : Type -> Type -> Type
-                    where a == b, b == c, Ord a) public X of item : Int             "#
+                    where a == b, b == c, Ord a) public X of item : Int"#
             ),
         )
     }

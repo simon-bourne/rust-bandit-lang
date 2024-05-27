@@ -25,7 +25,7 @@ pub trait TTParser<'src, Output>:
         self.then_ignore(keyword(kw))
     }
 
-    fn skip_operator(self, required_name: &'static str) -> impl TTParser<'src, Output> {
+    fn operator(self, required_name: &'static str) -> impl TTParser<'src, Output> {
         self.then_ignore(    select! {
             Token::Operator(name) = ext if name == required_name => Operator::new(name,ext.span())
         }
