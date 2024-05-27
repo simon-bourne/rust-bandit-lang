@@ -55,18 +55,30 @@ pub enum Token<'src> {
     #[regex(r"(?&ident)")]
     Identifier(&'src str),
 
-    // TODO: != not, and, or, <=, >=
+    // ASCII operators
     #[token("and", |_| NamedOperator::And)]
     #[token("or", |_| NamedOperator::Or)]
     #[token("not", |_| NamedOperator::Not)]
     #[token("+", |_| NamedOperator::Plus)]
-    #[token("=", |_| NamedOperator::Assign)]
+    #[token("-", |_| NamedOperator::Minus)]
+    #[token("*", |_| NamedOperator::Multiply)]
+    #[token("/", |_| NamedOperator::Divide)]
     #[token("==", |_| NamedOperator::Equal)]
-    #[token("⇒", |_| NamedOperator::Implies)]
+    #[token("/=", |_| NamedOperator::NotEqual)]
+    #[token("<", |_| NamedOperator::LessThan)]
+    #[token(">", |_| NamedOperator::GreaterThan)]
+    #[token("<=", |_| NamedOperator::LessOrEqual)]
+    #[token(">=", |_| NamedOperator::GreaterOrEqual)]
+    #[token("=", |_| NamedOperator::Assign)]
     #[token("=>", |_| NamedOperator::Implies)]
     #[token(":", |_| NamedOperator::HasType)]
-    #[token("→", |_| NamedOperator::To)]
     #[token("->", |_| NamedOperator::To)]
+    // Unicode operators
+    #[token("≠", |_| NamedOperator::NotEqual)]
+    #[token("≤", |_| NamedOperator::LessOrEqual)]
+    #[token("≥", |_| NamedOperator::GreaterOrEqual)]
+    #[token("→", |_| NamedOperator::To)]
+    #[token("⇒", |_| NamedOperator::Implies)]
     Operator(NamedOperator),
 
     #[regex(r"\.(?&ident)")]
@@ -328,10 +340,19 @@ pub enum NamedOperator {
     Not,
 
     Plus,
+    Minus,
+    Multiply,
+    Divide,
+
+    Equal,
+    NotEqual,
+    LessThan,
+    GreaterThan,
+    LessOrEqual,
+    GreaterOrEqual,
 
     Apply,
     Assign,
-    Equal,
     HasType,
     Implies,
     To,
@@ -343,11 +364,22 @@ impl NamedOperator {
             NamedOperator::And => "and",
             NamedOperator::Or => "or",
             NamedOperator::Not => "not",
+
             NamedOperator::Plus => "+",
+            NamedOperator::Minus => "-",
+            NamedOperator::Multiply => "*",
+            NamedOperator::Divide => "/",
+
+            NamedOperator::Equal => "==",
+            NamedOperator::NotEqual => "/=",
+            NamedOperator::LessThan => "<",
+            NamedOperator::GreaterThan => ">",
+            NamedOperator::LessOrEqual => "<=",
+            NamedOperator::GreaterOrEqual => ">=",
+
             NamedOperator::Implies => "=>",
             NamedOperator::HasType => ":",
             NamedOperator::Assign => "=",
-            NamedOperator::Equal => "==",
             NamedOperator::Apply => "<-",
             NamedOperator::To => "->",
         }
