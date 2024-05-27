@@ -1,6 +1,6 @@
 use derive_more::Constructor;
 
-use crate::lex::{Operator, Span};
+use crate::lex::{NamedOperator, Span};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AST<'src> {
@@ -87,7 +87,7 @@ pub struct Field<'src> {
 pub enum Expression<'src> {
     Variable(Identifier<'src>),
     BinaryOperator {
-        name: OperatorName,
+        name: Operator,
         left: Box<Self>,
         right: Box<Self>,
     },
@@ -101,13 +101,13 @@ pub enum Expression<'src> {
 impl<'src> Expression<'src> {
     pub fn apply(left: Self, right: Self) -> Self {
         Self::BinaryOperator {
-            name: OperatorName::Apply,
+            name: Operator::Apply,
             left: Box::new(left),
             right: Box::new(right),
         }
     }
 
-    pub fn binary_operator(left: Self, name: OperatorName, right: Self) -> Self {
+    pub fn binary_operator(left: Self, name: Operator, right: Self) -> Self {
         Self::BinaryOperator {
             name,
             left: Box::new(left),
@@ -130,9 +130,9 @@ pub struct TypeExpression<'src> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum OperatorName {
+pub enum Operator {
     Apply,
-    Named { name: Operator, span: Span },
+    Named { name: NamedOperator, span: Span },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Constructor)]

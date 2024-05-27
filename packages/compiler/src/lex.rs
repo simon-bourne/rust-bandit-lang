@@ -56,18 +56,18 @@ pub enum Token<'src> {
     Identifier(&'src str),
 
     // TODO: != not, and, or, <=, >=
-    #[token("and", |_| Operator::And)]
-    #[token("or", |_| Operator::Or)]
-    #[token("not", |_| Operator::Not)]
-    #[token("+", |_| Operator::Plus)]
-    #[token("=", |_| Operator::Assign)]
-    #[token("==", |_| Operator::Equal)]
-    #[token("⇒", |_| Operator::Implies)]
-    #[token("=>", |_| Operator::Implies)]
-    #[token(":", |_| Operator::HasType)]
-    #[token("→", |_| Operator::To)]
-    #[token("->", |_| Operator::To)]
-    Operator(Operator),
+    #[token("and", |_| NamedOperator::And)]
+    #[token("or", |_| NamedOperator::Or)]
+    #[token("not", |_| NamedOperator::Not)]
+    #[token("+", |_| NamedOperator::Plus)]
+    #[token("=", |_| NamedOperator::Assign)]
+    #[token("==", |_| NamedOperator::Equal)]
+    #[token("⇒", |_| NamedOperator::Implies)]
+    #[token("=>", |_| NamedOperator::Implies)]
+    #[token(":", |_| NamedOperator::HasType)]
+    #[token("→", |_| NamedOperator::To)]
+    #[token("->", |_| NamedOperator::To)]
+    Operator(NamedOperator),
 
     #[regex(r"\.(?&ident)")]
     NamedOperator(&'src str),
@@ -322,7 +322,7 @@ impl Keyword {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Operator {
+pub enum NamedOperator {
     And,
     Or,
     Not,
@@ -337,19 +337,19 @@ pub enum Operator {
     To,
 }
 
-impl Operator {
+impl NamedOperator {
     pub fn as_str(self) -> &'static str {
         match self {
-            Operator::And => "and",
-            Operator::Or => "or",
-            Operator::Not => "not",
-            Operator::Plus => "+",
-            Operator::Implies => "=>",
-            Operator::HasType => ":",
-            Operator::Assign => "=",
-            Operator::Equal => "==",
-            Operator::Apply => "<-",
-            Operator::To => "->",
+            NamedOperator::And => "and",
+            NamedOperator::Or => "or",
+            NamedOperator::Not => "not",
+            NamedOperator::Plus => "+",
+            NamedOperator::Implies => "=>",
+            NamedOperator::HasType => ":",
+            NamedOperator::Assign => "=",
+            NamedOperator::Equal => "==",
+            NamedOperator::Apply => "<-",
+            NamedOperator::To => "->",
         }
     }
 }
