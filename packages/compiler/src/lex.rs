@@ -84,13 +84,15 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let item = self.0.next()?;
 
-        if matches!(item.0, Token::LineEnd)
-            && self.0.peek().is_some_and(|next| next.0.continues_line())
-        {
-            self.0.next()
-        } else {
-            Some(item)
+        if matches!(item.0, Token::LineEnd) {
+            match self.0.peek() {
+                Some(next) if next.0.continues_line() => return self.0.next(),
+                None => return self.0.next(),
+                _ => (),
+            }
         }
+
+        Some(item)
     }
 }
 
@@ -128,10 +130,27 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
         }
     }
 
-    fn needs_block_close(&self) -> bool {
-        self.indent_stack
-            .last()
-            .is_some_and(|top| self.current_indent <= *top)
+    fn try_close_block(&mut self, span: Span) -> Option<SrcToken<'src>> {
+        let top = self.indent_stack.last()?;
+
+        match self.current_indent.cmp(top) {
+            Ordering::Less => {
+                let result = self.close_block(span);
+
+                if self
+                    .indent_stack
+                    .last()
+                    .is_some_and(|top| self.current_indent > *top)
+                {
+                    // TODO: Make a dedent error
+                    return Some((Token::Error, span));
+                }
+
+                Some(result)
+            }
+            Ordering::Equal => Some(self.close_block(span)),
+            Ordering::Greater => None,
+        }
     }
 
     fn close_block(&mut self, span: Span) -> SrcToken<'src> {
@@ -140,9 +159,8 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
     }
 
     fn finish(&mut self) -> Option<SrcToken<'src>> {
-        self.indent_stack
-            .pop()
-            .map(|_| self.close_block(self.last_span))
+        self.current_indent = Indent::default();
+        self.try_close_block(self.last_span)
     }
 
     fn handle_indent(&mut self, span: Span) -> SrcToken<'src> {
@@ -151,7 +169,7 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
         match new_indent.cmp(&self.current_indent) {
             Ordering::Less => {
                 self.current_indent = new_indent;
-                self.close_block(span)
+                self.try_close_block(span).unwrap_or((Token::Error, span))
             }
             Ordering::Equal => (Token::LineEnd, span),
             Ordering::Greater => {
@@ -170,8 +188,8 @@ where
     type Item = SrcToken<'src>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.needs_block_close() {
-            return Some(self.close_block(self.last_span));
+        if let Some(token) = self.try_close_block(self.last_span) {
+            return Some(token);
         }
 
         let Some(token) = self.iter.next() else {
@@ -319,7 +337,7 @@ mod tests {
 
     #[test]
     fn blank_lines() {
-        test("\n\n", ",")
+        test("\n\n", "")
     }
 
     #[test]
@@ -332,7 +350,7 @@ mod tests {
                     z
                 "#
             ),
-            "x , y , z ,",
+            "x , y , z",
         )
     }
 
@@ -364,7 +382,7 @@ mod tests {
                     r
                 "#
             ),
-            "x , y , z << a , b , c >> p , q , r ,",
+            "x , y , z << a , b , c >> p , q , r",
         );
     }
 
@@ -398,7 +416,7 @@ mod tests {
                         + c
                 "#
             ),
-            "x , y , z + a + b + c ,",
+            "x , y , z + a + b + c",
         );
     }
 
@@ -420,7 +438,7 @@ mod tests {
     }
 
     #[test]
-    fn mismatched_indents() {
+    fn mismatched_dedent() {
         test(
             indoc!(
                 r#"
@@ -429,7 +447,38 @@ mod tests {
                         c
                 "#
             ),
-            "a << b >> c >>",
+            "a << b <error> c >>",
+        );
+    }
+
+    #[test]
+    fn mismatched_double_dedent() {
+        test(
+            indoc!(
+                r#"
+                    a
+                        b
+                                c
+                                    d
+                            e
+                "#
+            ),
+            "a << b << c << d <error> e >> >>",
+        );
+    }
+
+    #[test]
+    fn mismatched_double_dedent_at_end() {
+        test(
+            indoc!(
+                r#"
+                    a
+                            b
+                                c
+                        d
+                "#
+            ),
+            "a << b << c <error> d >>",
         );
     }
 
@@ -438,7 +487,6 @@ mod tests {
         let result = unlex(Token::layout(src), src);
 
         assert_eq!(expected, result);
-        assert_eq!(expected, unlex(Token::layout(&result), &result));
     }
 
     fn unlex<'a>(layout: impl Iterator<Item = SrcToken<'a>>, src: &str) -> String {
@@ -450,6 +498,7 @@ mod tests {
                 Token::Open(Grouping::Block) => "<<",
                 Token::Close(Grouping::Block) => ">>",
                 Token::LineEnd => ",",
+                Token::Error => "<error>",
                 _ => &src[span.into_range()],
             })
             .join(" ")

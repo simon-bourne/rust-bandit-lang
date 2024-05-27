@@ -16,11 +16,11 @@ do
     expr expr (do
             expr expr
             expr
-        expr)
+            expr)
     do
             expr
-        do
-            expr
+    do
+        expr
 exprexpr
 expr do expr expr do
     expr
