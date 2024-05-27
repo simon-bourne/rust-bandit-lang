@@ -164,6 +164,8 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
                     .last()
                     .is_some_and(|top| self.current_indent > *top)
                 {
+                    // We skipped from `current_indent < top` to  `current_indent > top`, which
+                    // means `current_indent` has no matching "block open".
                     return Some((Token::Error(Error::Dedent), span));
                 }
 
