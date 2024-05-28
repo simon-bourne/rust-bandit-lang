@@ -65,7 +65,7 @@ macro_rules! lexeme {
 
 lexeme!(ident, "<identifier>", Identifier);
 
-pub fn operator<'src>(name: NamedOperator) -> impl TTParser<'src, Operator> + Copy {
+fn operator<'src>(name: NamedOperator) -> impl TTParser<'src, Operator> + Copy {
     select! {
         Token::Operator(op_name) = ext if name == op_name => Operator::Named{name,span: ext.span()}
     }
