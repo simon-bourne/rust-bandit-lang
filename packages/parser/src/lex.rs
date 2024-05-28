@@ -87,37 +87,6 @@ pub enum Token<'src> {
     Error(Error),
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum Error {
-    UnknownToken,
-    Dedent,
-}
-
-struct ContinuedLines<'src, I>(Peekable<I>)
-where
-    I: Iterator<Item = SrcToken<'src>>;
-
-impl<'src, I> Iterator for ContinuedLines<'src, I>
-where
-    I: Iterator<Item = SrcToken<'src>>,
-{
-    type Item = I::Item;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let item = self.0.next()?;
-
-        if matches!(item.0, Token::LineEnd) {
-            match self.0.peek() {
-                Some(next) if next.0.continues_line() => return self.0.next(),
-                None => return self.0.next(),
-                _ => (),
-            }
-        }
-
-        Some(item)
-    }
-}
-
 impl<'src> Token<'src> {
     pub fn layout(source: &'src str) -> impl Iterator<Item = SrcToken<'src>> + '_ {
         let tokens = Self::lexer(source).spanned().map(|(tok, span)| match tok {
@@ -130,119 +99,6 @@ impl<'src> Token<'src> {
 
     fn continues_line(&self) -> bool {
         matches!(self, Token::Operator(_) | Token::NamedOperator(_))
-    }
-}
-
-struct LayoutIter<'src, I: Iterator<Item = SrcToken<'src>>> {
-    iter: I,
-    src: &'src str,
-    last_span: Span,
-    current_indent: Indent,
-    indent_stack: Vec<Indent>,
-}
-
-impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
-    pub fn new(iter: I, src: &'src str) -> Self {
-        Self {
-            iter,
-            src,
-            last_span: Span::splat(0),
-            current_indent: Indent::default(),
-            indent_stack: Vec::new(),
-        }
-    }
-
-    fn try_close_block(&mut self, span: Span) -> Option<SrcToken<'src>> {
-        let top = self.indent_stack.last()?;
-
-        match self.current_indent.cmp(top) {
-            Ordering::Less => {
-                let result = self.close_block(span);
-
-                if self
-                    .indent_stack
-                    .last()
-                    .is_some_and(|top| self.current_indent > *top)
-                {
-                    // We skipped from `current_indent < top` to  `current_indent > top`, which
-                    // means `current_indent` has no matching "block open".
-                    return Some((Token::Error(Error::Dedent), span));
-                }
-
-                Some(result)
-            }
-            Ordering::Equal => Some(self.close_block(span)),
-            Ordering::Greater => None,
-        }
-    }
-
-    fn close_block(&mut self, span: Span) -> SrcToken<'src> {
-        self.indent_stack.pop();
-        (Token::Close(Grouping::Block), span)
-    }
-
-    fn finish(&mut self) -> Option<SrcToken<'src>> {
-        self.current_indent = Indent::default();
-        self.try_close_block(self.last_span)
-    }
-
-    fn handle_indent(&mut self, span: Span) -> SrcToken<'src> {
-        let new_indent = Indent::new(self.src, span);
-
-        match new_indent.cmp(&self.current_indent) {
-            Ordering::Less => {
-                self.current_indent = new_indent;
-                self.try_close_block(span)
-                    .unwrap_or((Token::Error(Error::Dedent), span))
-            }
-            Ordering::Equal => (Token::LineEnd, span),
-            Ordering::Greater => {
-                self.indent_stack.push(self.current_indent);
-                self.current_indent = new_indent;
-                (Token::Open(Grouping::Block), span)
-            }
-        }
-    }
-}
-
-impl<'src, I> Iterator for LayoutIter<'src, I>
-where
-    I: Iterator<Item = SrcToken<'src>>,
-{
-    type Item = SrcToken<'src>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(token) = self.try_close_block(self.last_span) {
-            return Some(token);
-        }
-
-        let Some(token) = self.iter.next() else {
-            return self.finish();
-        };
-
-        self.last_span = token.1;
-
-        let result = if token.0 == Token::LineEnd {
-            self.handle_indent(token.1)
-        } else {
-            token
-        };
-
-        Some(result)
-    }
-}
-
-#[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Debug, Default)]
-struct Indent(usize);
-
-impl Indent {
-    fn new(src: &str, span: Span) -> Self {
-        Self(
-            src[span.into_range()]
-                .rsplit_once('\n')
-                .map(|(_head, tail)| tail.len())
-                .unwrap_or(0),
-        )
     }
 }
 
@@ -385,6 +241,150 @@ impl NamedOperator {
             NamedOperator::Apply => "<-",
             NamedOperator::To => "->",
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum Error {
+    UnknownToken,
+    Dedent,
+}
+
+struct ContinuedLines<'src, I>(Peekable<I>)
+where
+    I: Iterator<Item = SrcToken<'src>>;
+
+impl<'src, I> Iterator for ContinuedLines<'src, I>
+where
+    I: Iterator<Item = SrcToken<'src>>,
+{
+    type Item = I::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let item = self.0.next()?;
+
+        if matches!(item.0, Token::LineEnd) {
+            match self.0.peek() {
+                Some(next) if next.0.continues_line() => return self.0.next(),
+                None => return self.0.next(),
+                _ => (),
+            }
+        }
+
+        Some(item)
+    }
+}
+
+struct LayoutIter<'src, I: Iterator<Item = SrcToken<'src>>> {
+    iter: I,
+    src: &'src str,
+    last_span: Span,
+    current_indent: Indent,
+    indent_stack: Vec<Indent>,
+}
+
+impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
+    pub fn new(iter: I, src: &'src str) -> Self {
+        Self {
+            iter,
+            src,
+            last_span: Span::splat(0),
+            current_indent: Indent::default(),
+            indent_stack: Vec::new(),
+        }
+    }
+
+    fn try_close_block(&mut self, span: Span) -> Option<SrcToken<'src>> {
+        let top = self.indent_stack.last()?;
+
+        match self.current_indent.cmp(top) {
+            Ordering::Less => {
+                let result = self.close_block(span);
+
+                if self
+                    .indent_stack
+                    .last()
+                    .is_some_and(|top| self.current_indent > *top)
+                {
+                    // We skipped from `current_indent < top` to  `current_indent > top`, which
+                    // means `current_indent` has no matching "block open".
+                    return Some((Token::Error(Error::Dedent), span));
+                }
+
+                Some(result)
+            }
+            Ordering::Equal => Some(self.close_block(span)),
+            Ordering::Greater => None,
+        }
+    }
+
+    fn close_block(&mut self, span: Span) -> SrcToken<'src> {
+        self.indent_stack.pop();
+        (Token::Close(Grouping::Block), span)
+    }
+
+    fn finish(&mut self) -> Option<SrcToken<'src>> {
+        self.current_indent = Indent::default();
+        self.try_close_block(self.last_span)
+    }
+
+    fn handle_indent(&mut self, span: Span) -> SrcToken<'src> {
+        let new_indent = Indent::new(self.src, span);
+
+        match new_indent.cmp(&self.current_indent) {
+            Ordering::Less => {
+                self.current_indent = new_indent;
+                self.try_close_block(span)
+                    .unwrap_or((Token::Error(Error::Dedent), span))
+            }
+            Ordering::Equal => (Token::LineEnd, span),
+            Ordering::Greater => {
+                self.indent_stack.push(self.current_indent);
+                self.current_indent = new_indent;
+                (Token::Open(Grouping::Block), span)
+            }
+        }
+    }
+}
+
+impl<'src, I> Iterator for LayoutIter<'src, I>
+where
+    I: Iterator<Item = SrcToken<'src>>,
+{
+    type Item = SrcToken<'src>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(token) = self.try_close_block(self.last_span) {
+            return Some(token);
+        }
+
+        let Some(token) = self.iter.next() else {
+            return self.finish();
+        };
+
+        self.last_span = token.1;
+
+        let result = if token.0 == Token::LineEnd {
+            self.handle_indent(token.1)
+        } else {
+            token
+        };
+
+        Some(result)
+    }
+}
+
+#[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Debug, Default)]
+struct Indent(usize);
+
+impl Indent {
+    fn new(src: &str, span: Span) -> Self {
+        Self(
+            src[span.into_range()]
+                .rsplit_once('\n')
+                .map(|(_head, tail)| tail.len())
+                .unwrap_or(0),
+        )
     }
 }
 
