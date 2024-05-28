@@ -55,7 +55,7 @@ fn grouped<'src, T>(parser: impl TTParser<'src, T>, grouping: Grouping) -> impl 
     open.ignore_then(parser).then_ignore(close)
 }
 
-fn ident<'src>() -> impl TTParser<'src, Identifier<'src>> + Copy {
+fn identifier<'src>() -> impl TTParser<'src, Identifier<'src>> + Copy {
     select! {
         Token::Identifier(name) = ext => Identifier::new(name,ext.span())
     }

@@ -6,8 +6,8 @@ use chumsky::{
 };
 
 use super::{
-    comma, grouped, ident, in_block, keyword, line_end, operator, optional_line_end, parenthesized,
-    TTParser,
+    comma, grouped, identifier, in_block, keyword, line_end, operator, optional_line_end,
+    parenthesized, TTParser,
 };
 use crate::{
     ast::{
@@ -30,7 +30,7 @@ fn data_declaration<'src>() -> impl TTParser<'src, DataDeclaration<'src>> {
         .or(type_parameter().repeated().collect());
 
     keyword(Keyword::Data)
-        .ignore_then(ident())
+        .ignore_then(identifier())
         .then(parameters)
         .then(where_clause(expression()))
         .map(|((name, parameters), where_clause)| DataDeclaration {
@@ -42,7 +42,7 @@ fn data_declaration<'src>() -> impl TTParser<'src, DataDeclaration<'src>> {
 
 fn function<'src>() -> impl TTParser<'src, Function<'src>> {
     let unit = grouped(empty(), Grouping::Parentheses);
-    ident()
+    identifier()
         .then_ignore(unit.clone())
         .operator(NamedOperator::Assign)
         .then_ignore(unit)
@@ -50,7 +50,7 @@ fn function<'src>() -> impl TTParser<'src, Function<'src>> {
 }
 
 fn field<'src>() -> impl TTParser<'src, Field<'src>> {
-    let name = ident();
+    let name = identifier();
 
     name.then_ignore(operator(NamedOperator::HasType))
         .or_not()
@@ -60,7 +60,7 @@ fn field<'src>() -> impl TTParser<'src, Field<'src>> {
 
 fn type_parameter<'src>() -> impl TTParser<'src, TypeParameter<'src>> {
     recursive(|parameter| {
-        ident()
+        identifier()
             .then(
                 operator(NamedOperator::HasType)
                     .ignore_then(type_expression(expression()))
@@ -73,7 +73,7 @@ fn type_parameter<'src>() -> impl TTParser<'src, TypeParameter<'src>> {
 
 fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
     recursive(|expression| {
-        let ident = ident().map(Expression::Variable);
+        let ident = identifier().map(Expression::Variable);
         let parenthesized =
             parenthesized(expression.clone()).map(|e| Expression::Parenthesized(Box::new(e)));
         let atom = ident.or(parenthesized);
@@ -116,7 +116,7 @@ fn data<'src>() -> impl TTParser<'src, Data<'src>> {
 }
 
 fn type_constructor<'src>() -> impl TTParser<'src, TypeConstructor<'src>> {
-    let name = ident();
+    let name = identifier();
     name.keyword(Keyword::Of)
         .then(item_list(field()))
         .map(|(name, parameters)| TypeConstructor::new(name, parameters))
