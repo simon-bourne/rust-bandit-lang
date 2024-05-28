@@ -1,4 +1,4 @@
-use bandit_compiler::lex::Token;
+use bandit_parser::lex::Token;
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use logos::Logos;
 
