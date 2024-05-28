@@ -5,10 +5,11 @@ use chumsky::{
     select, Parser,
 };
 
-use self::ast::{Identifier, Operator};
-use crate::lex::{Grouping, Keyword, NamedOperator, Span, Token};
+use crate::{
+    ast::{Identifier, Operator},
+    lex::{Grouping, Keyword, NamedOperator, Span, Token},
+};
 
-pub mod ast;
 pub mod grammar;
 
 pub type SpannedInput<'src, T> = input::SpannedInput<T, Span, &'src [(T, Span)]>;

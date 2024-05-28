@@ -6,14 +6,16 @@ use chumsky::{
 };
 
 use super::{
+    comma, grouped, ident, in_block, keyword, line_end, operator, optional_line_end, parenthesized,
+    TTParser,
+};
+use crate::{
     ast::{
         Data, DataDeclaration, Expression, Field, Function, Item, Operator, TypeConstructor,
         TypeExpression, TypeParameter, Visibility, VisibilityItems, WhereClause, AST,
     },
-    comma, grouped, ident, in_block, keyword, line_end, operator, optional_line_end, parenthesized,
-    TTParser,
+    lex::{Grouping, Keyword, NamedOperator},
 };
-use crate::lex::{Grouping, Keyword, NamedOperator};
 
 pub fn parser<'src>() -> impl TTParser<'src, AST<'src>> {
     trait_item().repeated().collect().map(|items| AST { items })
