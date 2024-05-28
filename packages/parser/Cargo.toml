@@ -8,12 +8,12 @@ publish = false
 chumsky = { workspace = true, features = ["label"] }
 logos.workspace = true
 derive_more.workspace = true
-indoc.workspace = true
 itertools.workspace = true
-goldenfile.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
+goldenfile.workspace = true
+indoc.workspace = true
 
 [[bench]]
 name = "lexer"
