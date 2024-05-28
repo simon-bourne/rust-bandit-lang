@@ -55,15 +55,12 @@ fn grouped<'src, T>(parser: impl TTParser<'src, T>, grouping: Grouping) -> impl 
     open.ignore_then(parser).then_ignore(close)
 }
 
-macro_rules! lexeme {
-    ($name:ident, $label:literal, $token:ident) => {
-        pub fn $name<'src>() -> impl TTParser<'src, $token<'src>> + Copy {
-            select! { Token::$token(name) = ext => $token::new(name, ext.span()) }.labelled($label)
-        }
-    };
+fn ident<'src>() -> impl TTParser<'src, Identifier<'src>> + Copy {
+    select! {
+        Token::Identifier(name) = ext => Identifier::new(name,ext.span())
+    }
+    .labelled("<identifier>")
 }
-
-lexeme!(ident, "<identifier>", Identifier);
 
 fn operator<'src>(name: NamedOperator) -> impl TTParser<'src, Operator> + Copy {
     select! {
