@@ -12,7 +12,7 @@ use super::{
 use crate::{
     ast::{
         Data, DataDeclaration, Expression, Field, Function, Item, Operator, TypeConstructor,
-        TypeExpression, TypeParameter, Visibility, VisibilityItems, WhereClause, AST,
+        Type, TypeParameter, Visibility, VisibilityItems, WhereClause, AST,
     },
     lex::{Grouping, Keyword, NamedOperator},
 };
@@ -102,11 +102,11 @@ fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
 
 fn type_expression<'src>(
     expression: impl TTParser<'src, Expression<'src>>,
-) -> impl TTParser<'src, TypeExpression<'src>> {
+) -> impl TTParser<'src, Type<'src>> {
     expression
         .clone()
         .then(where_clause(expression))
-        .map(|(expression, where_clause)| TypeExpression::new(Box::new(expression), where_clause))
+        .map(|(expression, where_clause)| Type::new(Box::new(expression), where_clause))
 }
 
 fn data<'src>() -> impl TTParser<'src, Data<'src>> {

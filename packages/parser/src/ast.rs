@@ -55,12 +55,12 @@ impl<'src> TypeConstructor<'src> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TypeParameter<'src> {
     pub name: Identifier<'src>,
-    pub kind: Option<TypeExpression<'src>>,
+    pub kind: Option<Type<'src>>,
     pub parentheses: usize,
 }
 
 impl<'src> TypeParameter<'src> {
-    pub fn new(name: Identifier<'src>, kind: Option<TypeExpression<'src>>) -> Self {
+    pub fn new(name: Identifier<'src>, kind: Option<Type<'src>>) -> Self {
         Self {
             name,
             kind,
@@ -80,7 +80,7 @@ impl<'src> TypeParameter<'src> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Field<'src> {
     pub name: Option<Identifier<'src>>,
-    pub typ: TypeExpression<'src>,
+    pub typ: Type<'src>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -93,7 +93,7 @@ pub enum Expression<'src> {
     },
     TypeAnnotation {
         expression: Box<Self>,
-        type_expression: TypeExpression<'src>,
+        type_expression: Type<'src>,
     },
     Parenthesized(Box<Self>),
 }
@@ -115,7 +115,7 @@ impl<'src> Expression<'src> {
         }
     }
 
-    pub fn type_annotation(expression: Self, type_expression: TypeExpression<'src>) -> Self {
+    pub fn type_annotation(expression: Self, type_expression: Type<'src>) -> Self {
         Self::TypeAnnotation {
             expression: Box::new(expression),
             type_expression,
@@ -124,7 +124,7 @@ impl<'src> Expression<'src> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Constructor)]
-pub struct TypeExpression<'src> {
+pub struct Type<'src> {
     pub expression: Box<Expression<'src>>,
     pub where_clause: WhereClause<'src>,
 }
