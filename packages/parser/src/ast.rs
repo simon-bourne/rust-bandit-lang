@@ -93,7 +93,7 @@ pub enum Expression<'src> {
     },
     TypeAnnotation {
         expression: Box<Self>,
-        type_expression: Box<TypeExpression<'src>>,
+        type_expression: TypeExpression<'src>,
     },
     Parenthesized(Box<Self>),
 }
@@ -118,14 +118,14 @@ impl<'src> Expression<'src> {
     pub fn type_annotation(expression: Self, type_expression: TypeExpression<'src>) -> Self {
         Self::TypeAnnotation {
             expression: Box::new(expression),
-            type_expression: Box::new(type_expression),
+            type_expression,
         }
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Constructor)]
 pub struct TypeExpression<'src> {
-    pub expression: Expression<'src>,
+    pub expression: Box<Expression<'src>>,
     pub where_clause: WhereClause<'src>,
 }
 

@@ -106,7 +106,7 @@ fn type_expression<'src>(
     expression
         .clone()
         .then(where_clause(expression))
-        .map(|(expression, where_clause)| TypeExpression::new(expression, where_clause))
+        .map(|(expression, where_clause)| TypeExpression::new(Box::new(expression), where_clause))
 }
 
 fn data<'src>() -> impl TTParser<'src, Data<'src>> {
