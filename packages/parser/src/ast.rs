@@ -26,7 +26,7 @@ pub struct Function<'src> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DataDeclaration<'src> {
     pub name: Identifier<'src>,
-    pub parameters: Vec<TypeParameter<'src>>,
+    pub parameters: Vec<Expression<'src>>,
     pub where_clause: WhereClause<'src>,
 }
 
@@ -39,48 +39,16 @@ pub struct Data<'src> {
 #[derive(Clone, Debug, Eq, PartialEq, Constructor)]
 pub struct TypeConstructor<'src> {
     pub name: Identifier<'src>,
-    pub parameters: Vec<Field<'src>>,
+    pub parameters: Option<Expression<'src>>,
 }
 
 impl<'src> TypeConstructor<'src> {
     pub fn empty(name: Identifier<'src>) -> Self {
         Self {
             name,
-            parameters: Vec::new(),
+            parameters: None,
         }
     }
-}
-
-/// `name` or `(name : Kind)`
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TypeParameter<'src> {
-    pub name: Identifier<'src>,
-    pub kind: Option<Type<'src>>,
-    pub parentheses: usize,
-}
-
-impl<'src> TypeParameter<'src> {
-    pub fn new(name: Identifier<'src>, kind: Option<Type<'src>>) -> Self {
-        Self {
-            name,
-            kind,
-            parentheses: 0,
-        }
-    }
-
-    pub fn parenthesized(self) -> Self {
-        Self {
-            parentheses: self.parentheses + 1,
-            ..self
-        }
-    }
-}
-
-/// `(name : Type)` or `Type`
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Field<'src> {
-    pub name: Option<Identifier<'src>>,
-    pub typ: Type<'src>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -91,17 +59,26 @@ pub enum Expression<'src> {
         left: Box<Self>,
         right: Box<Self>,
     },
-    TypeAnnotation {
+    Where {
         expression: Box<Self>,
-        type_expression: Type<'src>,
+        constraints: Box<Self>,
     },
     Parenthesized(Box<Self>),
+    // TODO: Add abstraction (quantification/lambdas)
 }
 
 impl<'src> Expression<'src> {
     pub fn apply(left: Self, right: Self) -> Self {
         Self::BinaryOperator {
             name: Operator::Apply,
+            left: Box::new(left),
+            right: Box::new(right),
+        }
+    }
+
+    pub fn line_separator(left: Self, right: Self) -> Self {
+        Self::BinaryOperator {
+            name: Operator::LineSeparator,
             left: Box::new(left),
             right: Box::new(right),
         }
@@ -115,23 +92,22 @@ impl<'src> Expression<'src> {
         }
     }
 
-    pub fn type_annotation(expression: Self, type_expression: Type<'src>) -> Self {
-        Self::TypeAnnotation {
-            expression: Box::new(expression),
-            type_expression,
+    pub fn parenthesized(self) -> Self {
+        Self::Parenthesized(Box::new(self))
+    }
+
+    pub fn where_clause(self, constraints: Self) -> Self {
+        Self::Where {
+            expression: Box::new(self),
+            constraints: Box::new(constraints),
         }
     }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Constructor)]
-pub struct Type<'src> {
-    pub expression: Box<Expression<'src>>,
-    pub where_clause: WhereClause<'src>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Operator {
     Apply,
+    LineSeparator,
     Named { name: NamedOperator, span: Span },
 }
 
@@ -148,7 +124,7 @@ pub enum Visibility {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Constructor)]
-pub struct WhereClause<'src>(pub Vec<Expression<'src>>);
+pub struct WhereClause<'src>(pub Option<Expression<'src>>);
 
 #[derive(Clone, Debug, Eq, PartialEq, Constructor)]
 pub struct Identifier<'src> {

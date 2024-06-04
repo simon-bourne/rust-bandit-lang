@@ -10,22 +10,26 @@ ParseResult {
                                 span: 5..11,
                             },
                             parameters: [
-                                TypeParameter {
-                                    name: Identifier {
+                                Variable(
+                                    Identifier {
                                         name: "a",
                                         span: 12..13,
                                     },
-                                    kind: None,
-                                    parentheses: 0,
-                                },
-                                TypeParameter {
-                                    name: Identifier {
-                                        name: "b",
-                                        span: 17..18,
-                                    },
-                                    kind: Some(
-                                        TypeExpression {
-                                            expression: Parenthesized(
+                                ),
+                                Parenthesized(
+                                    Parenthesized(
+                                        BinaryOperator {
+                                            name: Named {
+                                                name: HasType,
+                                                span: 19..20,
+                                            },
+                                            left: Variable(
+                                                Identifier {
+                                                    name: "b",
+                                                    span: 17..18,
+                                                },
+                                            ),
+                                            right: Parenthesized(
                                                 Variable(
                                                     Identifier {
                                                         name: "Type",
@@ -33,112 +37,113 @@ ParseResult {
                                                     },
                                                 ),
                                             ),
-                                            where_clause: WhereClause(
-                                                [],
-                                            ),
                                         },
                                     ),
-                                    parentheses: 3,
-                                },
-                                TypeParameter {
-                                    name: Identifier {
-                                        name: "c",
-                                        span: 32..33,
-                                    },
-                                    kind: Some(
-                                        TypeExpression {
-                                            expression: BinaryOperator {
+                                ),
+                                Where {
+                                    expression: BinaryOperator {
+                                        name: Named {
+                                            name: HasType,
+                                            span: 34..35,
+                                        },
+                                        left: Variable(
+                                            Identifier {
+                                                name: "c",
+                                                span: 32..33,
+                                            },
+                                        ),
+                                        right: BinaryOperator {
+                                            name: Named {
+                                                name: To,
+                                                span: 41..43,
+                                            },
+                                            left: Variable(
+                                                Identifier {
+                                                    name: "Type",
+                                                    span: 36..40,
+                                                },
+                                            ),
+                                            right: BinaryOperator {
                                                 name: Named {
                                                     name: To,
-                                                    span: 41..43,
+                                                    span: 49..51,
                                                 },
                                                 left: Variable(
                                                     Identifier {
                                                         name: "Type",
-                                                        span: 36..40,
+                                                        span: 44..48,
                                                     },
                                                 ),
-                                                right: BinaryOperator {
-                                                    name: Named {
-                                                        name: To,
-                                                        span: 49..51,
+                                                right: Variable(
+                                                    Identifier {
+                                                        name: "Type",
+                                                        span: 52..56,
                                                     },
-                                                    left: Variable(
-                                                        Identifier {
-                                                            name: "Type",
-                                                            span: 44..48,
-                                                        },
-                                                    ),
-                                                    right: Variable(
-                                                        Identifier {
-                                                            name: "Type",
-                                                            span: 52..56,
-                                                        },
-                                                    ),
-                                                },
+                                                ),
                                             },
-                                            where_clause: WhereClause(
-                                                [
-                                                    BinaryOperator {
-                                                        name: Named {
-                                                            name: Equal,
-                                                            span: 65..67,
-                                                        },
-                                                        left: Variable(
-                                                            Identifier {
-                                                                name: "a",
-                                                                span: 63..64,
-                                                            },
-                                                        ),
-                                                        right: Variable(
-                                                            Identifier {
-                                                                name: "b",
-                                                                span: 68..69,
-                                                            },
-                                                        ),
-                                                    },
-                                                    BinaryOperator {
-                                                        name: Named {
-                                                            name: Equal,
-                                                            span: 73..75,
-                                                        },
-                                                        left: Variable(
-                                                            Identifier {
-                                                                name: "b",
-                                                                span: 71..72,
-                                                            },
-                                                        ),
-                                                        right: Variable(
-                                                            Identifier {
-                                                                name: "c",
-                                                                span: 76..77,
-                                                            },
-                                                        ),
-                                                    },
-                                                    BinaryOperator {
-                                                        name: Apply,
-                                                        left: Variable(
-                                                            Identifier {
-                                                                name: "Ord",
-                                                                span: 79..82,
-                                                            },
-                                                        ),
-                                                        right: Variable(
-                                                            Identifier {
-                                                                name: "a",
-                                                                span: 83..84,
-                                                            },
-                                                        ),
-                                                    },
-                                                ],
+                                        },
+                                    },
+                                    constraints: BinaryOperator {
+                                        name: LineSeparator,
+                                        left: BinaryOperator {
+                                            name: Named {
+                                                name: Equal,
+                                                span: 65..67,
+                                            },
+                                            left: Variable(
+                                                Identifier {
+                                                    name: "a",
+                                                    span: 63..64,
+                                                },
+                                            ),
+                                            right: Variable(
+                                                Identifier {
+                                                    name: "b",
+                                                    span: 68..69,
+                                                },
                                             ),
                                         },
-                                    ),
-                                    parentheses: 1,
+                                        right: BinaryOperator {
+                                            name: LineSeparator,
+                                            left: BinaryOperator {
+                                                name: Named {
+                                                    name: Equal,
+                                                    span: 73..75,
+                                                },
+                                                left: Variable(
+                                                    Identifier {
+                                                        name: "b",
+                                                        span: 71..72,
+                                                    },
+                                                ),
+                                                right: Variable(
+                                                    Identifier {
+                                                        name: "c",
+                                                        span: 76..77,
+                                                    },
+                                                ),
+                                            },
+                                            right: BinaryOperator {
+                                                name: Apply,
+                                                left: Variable(
+                                                    Identifier {
+                                                        name: "Ord",
+                                                        span: 79..82,
+                                                    },
+                                                ),
+                                                right: Variable(
+                                                    Identifier {
+                                                        name: "a",
+                                                        span: 83..84,
+                                                    },
+                                                ),
+                                            },
+                                        },
+                                    },
                                 },
                             ],
                             where_clause: WhereClause(
-                                [],
+                                None,
                             ),
                         },
                         constructors: VisibilityItems {
@@ -149,27 +154,26 @@ ParseResult {
                                         name: "X",
                                         span: 93..94,
                                     },
-                                    parameters: [
-                                        Field {
-                                            name: Some(
+                                    parameters: Some(
+                                        BinaryOperator {
+                                            name: Named {
+                                                name: HasType,
+                                                span: 103..104,
+                                            },
+                                            left: Variable(
                                                 Identifier {
                                                     name: "item",
                                                     span: 98..102,
                                                 },
                                             ),
-                                            typ: TypeExpression {
-                                                expression: Variable(
-                                                    Identifier {
-                                                        name: "Int",
-                                                        span: 105..108,
-                                                    },
-                                                ),
-                                                where_clause: WhereClause(
-                                                    [],
-                                                ),
-                                            },
+                                            right: Variable(
+                                                Identifier {
+                                                    name: "Int",
+                                                    span: 105..108,
+                                                },
+                                            ),
                                         },
-                                    ],
+                                    ),
                                 },
                             ],
                         },

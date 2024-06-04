@@ -41,7 +41,7 @@ fn token<'src>(token: Token<'src>, label: &'static str) -> impl TTParser<'src, (
 }
 
 fn parenthesized<'src, T>(parser: impl TTParser<'src, T>) -> impl TTParser<'src, T> {
-    grouped(parser.clone().or(in_block(parser)), Grouping::Parentheses)
+    grouped(parser, Grouping::Parentheses)
 }
 
 fn in_block<'src, T>(parser: impl TTParser<'src, T>) -> impl TTParser<'src, T> {

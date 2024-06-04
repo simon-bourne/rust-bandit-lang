@@ -1,6 +1,6 @@
 use chumsky::{
     pratt::{self, left, right, Associativity, Infix},
-    primitive::empty,
+    primitive::{choice, empty},
     recursive::recursive,
     IterParser, Parser,
 };
@@ -11,8 +11,8 @@ use super::{
 };
 use crate::{
     ast::{
-        Data, DataDeclaration, Expression, Field, Function, Item, Operator, TypeConstructor,
-        Type, TypeParameter, Visibility, VisibilityItems, WhereClause, AST,
+        Data, DataDeclaration, Expression, Function, Item, Operator, TypeConstructor, Visibility,
+        VisibilityItems, WhereClause, AST,
     },
     lex::{Grouping, Keyword, NamedOperator},
 };
@@ -26,7 +26,7 @@ fn trait_item<'src>() -> impl TTParser<'src, Item<'src>> {
 }
 
 fn data_declaration<'src>() -> impl TTParser<'src, DataDeclaration<'src>> {
-    let parameters = in_block(type_parameter().separated_by(line_end()).collect())
+    let parameters = in_block(expression().separated_by(line_end()).collect())
         .or(type_parameter().repeated().collect());
 
     keyword(Keyword::Data)
@@ -49,26 +49,10 @@ fn function<'src>() -> impl TTParser<'src, Function<'src>> {
         .map(|name| Function { name })
 }
 
-fn field<'src>() -> impl TTParser<'src, Field<'src>> {
-    let name = identifier();
-
-    name.then_ignore(operator(NamedOperator::HasType))
-        .or_not()
-        .then(type_expression(expression()))
-        .map(|(name, typ)| Field { name, typ })
-}
-
-fn type_parameter<'src>() -> impl TTParser<'src, TypeParameter<'src>> {
-    recursive(|parameter| {
-        identifier()
-            .then(
-                operator(NamedOperator::HasType)
-                    .ignore_then(type_expression(expression()))
-                    .or_not(),
-            )
-            .map(|(name, kind)| TypeParameter::new(name, kind))
-            .or(parenthesized(parameter).map(TypeParameter::parenthesized))
-    })
+fn type_parameter<'src>() -> impl TTParser<'src, Expression<'src>> {
+    identifier()
+        .map(Expression::Variable)
+        .or(parenthesized(expression()))
 }
 
 fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
@@ -76,37 +60,49 @@ fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
         let ident = identifier().map(Expression::Variable);
         let parenthesized =
             parenthesized(expression.clone()).map(|e| Expression::Parenthesized(Box::new(e)));
-        let atom = ident.or(parenthesized);
+        let item_list = in_block(
+            expression
+                .clone()
+                .then_ignore(line_end())
+                .repeated()
+                .foldr(expression.clone(), Expression::line_separator),
+        );
+        let atom = choice((ident, parenthesized, item_list));
 
         // Function application is an implicit operator, and has higher precedence than
         // everything else.
         let application = atom.clone().foldl(atom.repeated(), Expression::apply);
 
         let operators = application.clone().pratt((
-            infix(right(1), NamedOperator::To),
-            infix(left(5), NamedOperator::Equal),
+            infix(left(1), NamedOperator::HasType),
+            infix(right(2), NamedOperator::To),
+            pratt::infix(right(3), comma(), Expression::line_separator),
+            infix(left(4), NamedOperator::Equal),
         ));
 
-        // TODO: Add quantification
-        let type_annotated = operators
-            .clone()
-            .then_ignore(operator(NamedOperator::HasType))
-            .then(type_expression(expression.clone()))
-            .map(|(expression, type_expression)| {
-                Expression::type_annotation(expression, type_expression)
-            });
-
-        type_annotated.or(operators)
+        operators
+            .then(
+                optional_line_end(keyword(Keyword::Where))
+                    .ignore_then(expression)
+                    .or_not(),
+            )
+            .map(|(expr, where_clause)| match where_clause {
+                None => expr,
+                Some(where_clause) => Expression::where_clause(expr, where_clause),
+            })
     })
 }
 
-fn type_expression<'src>(
-    expression: impl TTParser<'src, Expression<'src>>,
-) -> impl TTParser<'src, Type<'src>> {
-    expression
-        .clone()
-        .then(where_clause(expression))
-        .map(|(expression, where_clause)| Type::new(Box::new(expression), where_clause))
+fn infix<'src>(
+    associativity: Associativity,
+    name: NamedOperator,
+) -> Infix<
+    impl TTParser<'src, Operator>,
+    impl Fn(Expression<'src>, Operator, Expression<'src>) -> Expression<'src> + Clone,
+    Operator,
+    (Expression<'src>, Operator, Expression<'src>),
+> {
+    pratt::infix(associativity, operator(name), Expression::binary_operator)
 }
 
 fn data<'src>() -> impl TTParser<'src, Data<'src>> {
@@ -118,8 +114,8 @@ fn data<'src>() -> impl TTParser<'src, Data<'src>> {
 fn type_constructor<'src>() -> impl TTParser<'src, TypeConstructor<'src>> {
     let name = identifier();
     name.keyword(Keyword::Of)
-        .then(item_list(field()))
-        .map(|(name, parameters)| TypeConstructor::new(name, parameters))
+        .then(expression())
+        .map(|(name, parameters)| TypeConstructor::new(name, Some(parameters)))
         .or(name.map(TypeConstructor::empty))
 }
 
@@ -138,26 +134,14 @@ fn where_clause<'src>(
     expression: impl TTParser<'src, Expression<'src>>,
 ) -> impl TTParser<'src, WhereClause<'src>> {
     optional_line_end(keyword(Keyword::Where))
-        .ignore_then(item_list(expression))
+        .ignore_then(expression)
         .or_not()
-        .map(|where_clause| WhereClause(where_clause.unwrap_or_default()))
+        .map(WhereClause)
 }
 
 fn item_list<'src, T: 'src>(item: impl TTParser<'src, T>) -> impl TTParser<'src, Vec<T>> {
     in_block(item.clone().separated_by(line_end()).at_least(1).collect())
         .or(item.separated_by(comma()).at_least(1).collect())
-}
-
-fn infix<'src>(
-    associativity: Associativity,
-    name: NamedOperator,
-) -> Infix<
-    impl TTParser<'src, Operator>,
-    impl Fn(Expression<'src>, Operator, Expression<'src>) -> Expression<'src> + Clone,
-    Operator,
-    (Expression<'src>, Operator, Expression<'src>),
-> {
-    pratt::infix(associativity, operator(name), Expression::binary_operator)
 }
 
 // Windows line endings are a pain, so just skip the parser tests
