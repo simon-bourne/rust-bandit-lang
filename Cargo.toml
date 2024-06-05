@@ -23,3 +23,4 @@ logos = "0.13.0"
 num-bigint = "0.4.4"
 xtask-base = { git = "https://github.com/simon-bourne/rust-xtask-base" }
 derive_more = "0.99"
+slotmap = "1.0.7"
