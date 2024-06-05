@@ -12,6 +12,8 @@ authors = ["Simon Bourne <simonbourne@gmail.com>"]
 debug = 0
 
 [workspace.dependencies]
+bandit-parser = { path = "packages/parser" }
+
 chumsky = { version = "1.0.0-alpha.7", features = ["pratt"] }
 criterion = "0.5.1"
 goldenfile = "1.7.1"

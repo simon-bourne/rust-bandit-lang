@@ -121,6 +121,9 @@ dependencies = [
 [[package]]
 name = "bandit-type-inference"
 version = "0.1.0"
+dependencies = [
+ "bandit-parser",
+]
 
 [[package]]
 name = "beef"
