@@ -19,37 +19,37 @@ struct Value<'src, A: Annotation> {
 }
 
 pub trait Annotation {
-    type KindId;
-    type TypeId<'src>;
+    type Kind;
+    type Type<'src>;
 }
 
 struct Inference;
 
 impl Annotation for Inference {
-    type KindId = InferenceVariable<(), KindKey>;
-    type TypeId<'src> = InferenceVariable<ast::Identifier<'src>, TypeKey>;
+    type Kind = InferenceVariable<Kind<Self>, KindKey>;
+    type Type<'src> = InferenceVariable<QuantifiedType<'src, Self>, TypeKey>;
 }
 
 struct Inferred;
 
 impl Annotation for Inferred {
-    type KindId = ();
-    type TypeId<'src> = ast::Identifier<'src>;
+    type Kind = Kind<Self>;
+    type Type<'src> = Type<'src, QuantifiedType<'src, Self>>;
 }
 
 pub struct QuantifiedType<'src, A: Annotation> {
     parameters: Vec<TypeParameter<'src, A>>,
-    typ: Type<A::TypeId<'src>>,
+    typ: Type<'src, A::Type<'src>>,
 }
 
 struct TypeParameter<'src, A: Annotation> {
     name: ast::Identifier<'src>,
-    kind: Type<A::KindId>,
+    kind: A::Kind,
 }
 
-struct Context<'src> {
-    types: SlotMap<TypeKey, QuantifiedType<'src, Inference>>,
-    kinds: SlotMap<KindKey, Type<<Inference as Annotation>::KindId>>,
+struct Context<'src, A: Annotation> {
+    types: SlotMap<TypeKey, A::Type<'src>>,
+    kinds: SlotMap<KindKey, A::Kind>,
 }
 
 new_key_type! {struct TypeKey;}
@@ -60,10 +60,13 @@ enum InferenceVariable<Known, Unknown> {
     Unknown(Unknown),
 }
 
-enum Type<Identifier> {
+type Type<'src, Child> = UniverseType<ast::Identifier<'src>, Child>;
+struct Kind<A: Annotation>(UniverseType<(), A::Kind>);
+
+enum UniverseType<Identifier, Child> {
     Atom(Identifier),
     Function {
-        parameter: Box<Self>,
-        return_type: Box<Self>,
+        parameter: Box<Child>,
+        return_type: Box<Child>,
     },
 }
