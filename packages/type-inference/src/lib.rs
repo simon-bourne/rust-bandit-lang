@@ -1,79 +1,69 @@
 // TODO: Deny unused
 #![allow(unused)]
-use std::collections::HashMap;
-
 use bandit_parser::ast;
 use slotmap::{new_key_type, DefaultKey, SlotMap};
 
-pub struct Program<'src, A: Annotation<'src>> {
+pub struct Program<'src, A: Annotation> {
     data: Vec<DataDeclaration<'src, A>>,
     values: Vec<Value<'src, A>>,
 }
 
-struct DataDeclaration<'src, A: Annotation<'src>> {
+struct DataDeclaration<'src, A: Annotation> {
     name: ast::Identifier<'src>,
     parameters: Vec<TypeParameter<'src, A>>,
 }
 
-struct Value<'src, A: Annotation<'src>> {
+struct Value<'src, A: Annotation> {
     name: ast::Identifier<'src>,
-    typ: A::Type,
+    typ: QuantifiedType<'src, A>,
 }
 
-pub trait Annotation<'src> {
-    type Kind;
-    type Type;
-    type TypeIdentifier;
-    type KindIdentifier;
-}
-
-pub struct Source;
-
-impl<'src> Annotation<'src> for Source {
-    type Kind = Option<Kind<Self::KindIdentifier>>;
-    type KindIdentifier = ();
-    type Type = Option<QuantifiedType<'src, Self>>;
-    type TypeIdentifier = ast::Identifier<'src>;
+pub trait Annotation {
+    type KindId;
+    type TypeId<'src>;
 }
 
 struct Inference;
 
-impl<'src> Annotation<'src> for Inference {
-    type Kind = Kind<Self::KindIdentifier>;
-    type KindIdentifier = InferenceVariable<(), TypeInferenceVariable>;
-    type Type = QuantifiedType<'src, Self>;
-    type TypeIdentifier = InferenceVariable<ast::Identifier<'src>, TypeInferenceVariable>;
+impl Annotation for Inference {
+    type KindId = InferenceVariable<(), KindKey>;
+    type TypeId<'src> = InferenceVariable<ast::Identifier<'src>, TypeKey>;
 }
 
-pub struct QuantifiedType<'src, A: Annotation<'src>> {
+struct Inferred;
+
+impl Annotation for Inferred {
+    type KindId = ();
+    type TypeId<'src> = ast::Identifier<'src>;
+}
+
+pub struct QuantifiedType<'src, A: Annotation> {
     parameters: Vec<TypeParameter<'src, A>>,
-    typ: Type<A::TypeIdentifier, Self>,
+    typ: Type<A::TypeId<'src>>,
 }
 
-struct TypeParameter<'src, A: Annotation<'src>> {
-    name: A::TypeIdentifier,
-    kind: A::Kind,
+struct TypeParameter<'src, A: Annotation> {
+    name: ast::Identifier<'src>,
+    kind: Type<A::KindId>,
 }
-
-pub struct Kind<Id>(Type<Id, Self>);
 
 struct Context<'src> {
-    types: SlotMap<TypeInferenceVariable, QuantifiedType<'src, Inference>>,
-    kinds: SlotMap<KindInferenceVariable, Kind<<Inference as Annotation<'src>>::KindIdentifier>>,
+    types: SlotMap<TypeKey, QuantifiedType<'src, Inference>>,
+    kinds: SlotMap<KindKey, Type<<Inference as Annotation>::KindId>>,
 }
 
-new_key_type! {struct TypeInferenceVariable;}
-new_key_type! {struct KindInferenceVariable;}
+new_key_type! {struct TypeKey;}
+new_key_type! {struct KindKey;}
 
 enum InferenceVariable<Known, Unknown> {
     Known(Known),
     Unknown(Unknown),
 }
 
-enum Type<Identifier, Child> {
+enum Type<Identifier> {
     Atom(Identifier),
     Function {
-        parameter: Box<Child>,
-        return_type: Box<Child>,
+        parameter: Box<Self>,
+        return_type: Box<Self>,
     },
 }
