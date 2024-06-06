@@ -60,15 +60,19 @@ enum InferenceVariable<Known, Unknown> {
     Unknown(Unknown),
 }
 
-// TODO: Allow type expressions like `T (A b c)`. Parentheses don't need to be
-// stored, just type name and applications.
 type Type<'src, Child> = UniverseType<ast::Identifier<'src>, Child>;
 struct Kind<A: Annotation>(UniverseType<(), A::Kind>);
 
 enum UniverseType<Identifier, Child> {
     Atom(Identifier),
-    Function {
-        parameter: Box<Child>,
-        return_type: Box<Child>,
+    BinaryOperator {
+        operator: TypeOperator,
+        left: Box<Child>,
+        right: Box<Child>,
     },
+}
+
+enum TypeOperator {
+    Arrow,
+    Apply,
 }
