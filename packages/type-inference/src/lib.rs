@@ -1,5 +1,7 @@
 // TODO: Deny unused
 #![allow(unused)]
+use std::mem::size_of;
+
 use bandit_parser::ast;
 use slotmap::{new_key_type, DefaultKey, SlotMap};
 
@@ -10,69 +12,63 @@ pub struct Program<'src, A: Annotation> {
 
 struct DataDeclaration<'src, A: Annotation> {
     name: ast::Identifier<'src>,
-    parameters: Vec<TypeParameter<'src, A>>,
+    parameters: Vec<Type<'src, A>>,
 }
 
 struct Value<'src, A: Annotation> {
     name: ast::Identifier<'src>,
-    typ: QuantifiedType<'src, A>,
+    typ: Type<'src, A>,
 }
 
 pub trait Annotation {
-    type Kind;
     type Type<'src>;
 }
 
 struct Inference;
 
 impl Annotation for Inference {
-    type Kind = InferenceVariable<Kind<Self>, KindKey>;
-    type Type<'src> = InferenceVariable<QuantifiedType<'src, Self>, TypeKey>;
+    type Type<'src> = InferenceVariable<Type<'src, Self>, TypeKey>;
 }
 
 struct Inferred;
 
 impl Annotation for Inferred {
-    type Kind = Kind<Self>;
-    type Type<'src> = Type<'src, QuantifiedType<'src, Self>>;
-}
-
-pub struct QuantifiedType<'src, A: Annotation> {
-    parameters: Vec<TypeParameter<'src, A>>,
-    typ: Type<'src, A::Type<'src>>,
-}
-
-struct TypeParameter<'src, A: Annotation> {
-    name: ast::Identifier<'src>,
-    kind: A::Kind,
+    type Type<'src> = Type<'src, Self>;
 }
 
 struct Context<'src, A: Annotation> {
     types: SlotMap<TypeKey, A::Type<'src>>,
-    kinds: SlotMap<KindKey, A::Kind>,
 }
 
 new_key_type! {struct TypeKey;}
-new_key_type! {struct KindKey;}
 
 enum InferenceVariable<Known, Unknown> {
     Known(Known),
     Unknown(Unknown),
 }
 
-type Type<'src, Child> = UniverseType<ast::Identifier<'src>, Child>;
-struct Kind<A: Annotation>(UniverseType<(), A::Kind>);
-
-enum UniverseType<Identifier, Child> {
-    Atom(Identifier),
-    BinaryOperator {
-        operator: TypeOperator,
-        left: Box<Child>,
-        right: Box<Child>,
-    },
-}
-
 enum TypeOperator {
     Arrow,
     Apply,
+}
+
+enum Type<'src, A: Annotation> {
+    Base,
+    /// `∀a b c. a -> b -> c` is a type `(a : Type) -> (b : Type) -> (c : Type)
+    /// -> a -> b -> c`, where the 1st 3 arguments are inferred by the
+    /// compiler.
+    Quantified {
+        inferred: Vec<Self>,
+        explicit: Box<Self>,
+    },
+    Atom {
+        name: ast::Identifier<'src>,
+        typ: Box<A::Type<'src>>,
+    },
+    BinaryOperator {
+        operator: TypeOperator,
+        left: Box<Self>,
+        right: Box<Self>,
+        typ: Box<A::Type<'src>>,
+    },
 }
