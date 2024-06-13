@@ -1,6 +1,6 @@
 // TODO: Deny unused
 #![allow(unused)]
-use std::mem::size_of;
+use std::{cell::RefCell, mem::size_of, rc::Rc};
 
 use bandit_parser::ast;
 use slotmap::{new_key_type, DefaultKey, SlotMap};
@@ -27,7 +27,7 @@ pub trait Annotation {
 struct Inference;
 
 impl Annotation for Inference {
-    type Type<'src> = InferenceVariable<Type<'src, Self>, TypeKey>;
+    type Type<'src> = RefCell<InferenceVariable<Type<'src, Self>, TypeKey>>;
 }
 
 struct Inferred;
@@ -47,11 +47,6 @@ enum InferenceVariable<Known, Unknown> {
     Unknown(Unknown),
 }
 
-enum TypeOperator {
-    Arrow,
-    Apply,
-}
-
 enum Type<'src, A: Annotation> {
     Base,
     /// `∀a b c. a -> b -> c` is a type `(a : Type) -> (b : Type) -> (c : Type)
@@ -61,14 +56,21 @@ enum Type<'src, A: Annotation> {
         inferred: Vec<Self>,
         explicit: Box<Self>,
     },
-    Atom {
+    Variable {
         name: ast::Identifier<'src>,
-        typ: Box<A::Type<'src>>,
+        typ: Rc<A::Type<'src>>,
     },
-    BinaryOperator {
-        operator: TypeOperator,
-        left: Box<Self>,
-        right: Box<Self>,
-        typ: Box<A::Type<'src>>,
-    },
+    Arrow(Box<Arrow<Self>>),
+    Apply(Box<Apply<Self, A::Type<'src>>>),
+}
+
+struct Arrow<Child> {
+    left: Child,
+    right: Child,
+}
+
+struct Apply<Child, Type> {
+    left: Child,
+    right: Child,
+    typ: Type,
 }
