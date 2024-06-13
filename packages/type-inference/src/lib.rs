@@ -53,15 +53,17 @@ enum Type<'src, A: Annotation> {
     /// -> a -> b -> c`, where the 1st 3 arguments are inferred by the
     /// compiler.
     Quantified {
-        inferred: Vec<Self>,
+        inferred: Vec<TypeConstructor<'src, A::Type<'src>>>,
         explicit: Box<Self>,
     },
-    Variable {
-        name: ast::Identifier<'src>,
-        typ: Rc<A::Type<'src>>,
-    },
+    Constructor(TypeConstructor<'src, A::Type<'src>>),
     Arrow(Box<Arrow<Self>>),
     Apply(Box<Apply<Self, A::Type<'src>>>),
+}
+
+struct TypeConstructor<'src, Type> {
+    name: ast::Identifier<'src>,
+    typ: Rc<Type>,
 }
 
 struct Arrow<Child> {
