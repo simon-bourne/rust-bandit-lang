@@ -4,65 +4,69 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use bandit_parser::ast::{self, Identifier};
 
-pub struct Program<'src, A: Annotation> {
+pub struct Program<'src, A: Annotation<'src>> {
     data: Vec<DataDeclaration<'src, A>>,
     values: Vec<Value<'src, A>>,
 }
 
-struct DataDeclaration<'src, A: Annotation> {
+struct DataDeclaration<'src, A: Annotation<'src>> {
     name: ast::Identifier<'src>,
     parameters: Vec<Type<'src, A>>,
 }
 
-struct Value<'src, A: Annotation> {
+struct Value<'src, A: Annotation<'src>> {
     name: ast::Identifier<'src>,
     typ: Type<'src, A>,
 }
 
-pub trait Annotation {
-    type Type<'src>;
+pub trait Annotation<'src> {
+    type Type;
 }
 
 struct Inference;
 
-impl Annotation for Inference {
-    type Type<'src> = Rc<RefCell<Option<Type<'src, Self>>>>;
+impl<'src> Annotation<'src> for Inference {
+    type Type = RefCell<Option<Type<'src, Self>>>;
 }
 
 struct Inferred;
 
-impl Annotation for Inferred {
-    type Type<'src> = Rc<Type<'src, Self>>;
+impl<'src> Annotation<'src> for Inferred {
+    type Type = Type<'src, Self>;
 }
 
-struct Context<'src, A: Annotation> {
-    types: HashMap<Identifier<'src>, A::Type<'src>>,
+struct Context<'src> {
+    types: HashMap<Identifier<'src>, <Inference as Annotation<'src>>::Type>,
 }
 
-enum Type<'src, A: Annotation> {
+enum Type<'src, A: Annotation<'src>> {
     Base,
     /// `∀a b c. a -> b -> c` is a type `(a : Type) -> (b : Type) -> (c : Type)
-    /// -> a -> b -> c`, where the 1st 3 arguments are inferred by the
+    /// -> a -> b -> c`, where the first 3 arguments are inferred by the
     /// compiler.
     Quantified {
-        inferred: Vec<TypeConstructor<'src, A::Type<'src>>>,
+        inferred: Vec<TypeConstructor<'src, A::Type>>,
         explicit: Box<Self>,
     },
-    Constructor(TypeConstructor<'src, A::Type<'src>>),
-    Arrow {
-        left: A::Type<'src>,
-        right: A::Type<'src>,
-    },
-    Apply {
-        left: A::Type<'src>,
-        right: A::Type<'src>,
-        typ: A::Type<'src>,
-    },
+    Constructor(TypeConstructor<'src, A::Type>),
+    Arrow(Rc<Arrow<A::Type>>),
+    Apply(Rc<Apply<A::Type>>),
+}
+
+struct Arrow<Type> {
+    left: Type,
+    right: Type,
+}
+
+struct Apply<Type> {
+    left: Type,
+    right: Type,
+    typ: Type,
 }
 
 struct TypeConstructor<'src, Type> {
     name: ast::Identifier<'src>,
-    typ: Type,
+    typ: Rc<Type>,
 }
 
 #[cfg(test)]
