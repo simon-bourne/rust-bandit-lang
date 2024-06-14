@@ -6,4 +6,3 @@ publish = false
 
 [dependencies]
 bandit-parser.workspace = true
-slotmap.workspace = true

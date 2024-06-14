@@ -123,7 +123,6 @@ name = "bandit-type-inference"
 version = "0.1.0"
 dependencies = [
  "bandit-parser",
- "slotmap",
 ]
 
 [[package]]
@@ -1097,15 +1096,6 @@ checksum = "e041bb827d1bfca18f213411d51b665309f1afb37a04a5d1464530e13779fc0f"
 dependencies = [
  "console",
  "similar",
-]
-
-[[package]]
-name = "slotmap"
-version = "1.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbff4acf519f630b3a3ddcfaea6c06b42174d9a44bc70c620e9ed1649d58b82a"
-dependencies = [
- "version_check",
 ]
 
 [[package]]

@@ -1,9 +1,8 @@
 // TODO: Deny unused
 #![allow(unused)]
-use std::{cell::RefCell, mem::size_of, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use bandit_parser::ast;
-use slotmap::{new_key_type, DefaultKey, SlotMap};
+use bandit_parser::ast::{self, Identifier};
 
 pub struct Program<'src, A: Annotation> {
     data: Vec<DataDeclaration<'src, A>>,
@@ -27,24 +26,17 @@ pub trait Annotation {
 struct Inference;
 
 impl Annotation for Inference {
-    type Type<'src> = RefCell<InferenceVariable<Type<'src, Self>, TypeKey>>;
+    type Type<'src> = Rc<RefCell<Option<Type<'src, Self>>>>;
 }
 
 struct Inferred;
 
 impl Annotation for Inferred {
-    type Type<'src> = Type<'src, Self>;
+    type Type<'src> = Rc<Type<'src, Self>>;
 }
 
 struct Context<'src, A: Annotation> {
-    types: SlotMap<TypeKey, A::Type<'src>>,
-}
-
-new_key_type! {struct TypeKey;}
-
-enum InferenceVariable<Known, Unknown> {
-    Known(Known),
-    Unknown(Unknown),
+    types: HashMap<Identifier<'src>, A::Type<'src>>,
 }
 
 enum Type<'src, A: Annotation> {
@@ -57,22 +49,31 @@ enum Type<'src, A: Annotation> {
         explicit: Box<Self>,
     },
     Constructor(TypeConstructor<'src, A::Type<'src>>),
-    Arrow(Box<Arrow<Self>>),
-    Apply(Box<Apply<Self, A::Type<'src>>>),
+    Arrow {
+        left: A::Type<'src>,
+        right: A::Type<'src>,
+    },
+    Apply {
+        left: A::Type<'src>,
+        right: A::Type<'src>,
+        typ: A::Type<'src>,
+    },
 }
 
 struct TypeConstructor<'src, Type> {
     name: ast::Identifier<'src>,
-    typ: Rc<Type>,
-}
-
-struct Arrow<Child> {
-    left: Child,
-    right: Child,
-}
-
-struct Apply<Child, Type> {
-    left: Child,
-    right: Child,
     typ: Type,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // TODO: This sholuld be removed once we actually use the types
+    // Check there are no cycles in the types
+    #[test]
+    fn build() {
+        let _inferred = Type::<'static, Inferred>::Base;
+        let _inference = Type::<'static, Inference>::Base;
+    }
 }
