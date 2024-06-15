@@ -53,6 +53,28 @@ enum Type<'src, A: Annotation<'src>> {
     Apply(Rc<Apply<A::Type>>),
 }
 
+type InferenceType<'src> = <Inference as Annotation<'src>>::Type;
+
+impl<'src> Type<'src, Inference> {
+    fn unify(x: &mut Rc<InferenceType<'src>>, y: &mut Rc<InferenceType<'src>>) -> Result<(), ()> {
+        if Rc::ptr_eq(x, y) {
+            return Ok(());
+        }
+
+        if x.borrow().is_none() {
+            *x = y.clone();
+            return Ok(());
+        }
+
+        if y.borrow().is_none() {
+            *y = x.clone();
+            return Ok(());
+        }
+
+        todo!()
+    }
+}
+
 struct Arrow<Type> {
     left: Type,
     right: Type,
