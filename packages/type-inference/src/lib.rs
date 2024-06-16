@@ -63,11 +63,11 @@ struct Context<'src> {
 }
 
 impl<'src> Context<'src> {
-    fn insert(&mut self, id: Identifier<'src>, typ: &mut Rc<InferenceType<'src>>) -> Result<()> {
-        if let Some(existing) = self.types.get_mut(&id) {
+    fn insert(&mut self, id: &Identifier<'src>, typ: &mut Rc<InferenceType<'src>>) -> Result<()> {
+        if let Some(existing) = self.types.get_mut(id) {
             Type::unify(existing, typ)?;
         } else {
-            self.types.insert(id, typ.clone());
+            self.types.insert(id.clone(), typ.clone());
         }
 
         Ok(())
@@ -134,7 +134,7 @@ struct Value<'src, A: Annotation<'src>> {
 
 impl<'src> Value<'src, Inference> {
     fn build_context(&mut self, context: &mut Context<'src>) -> Result<()> {
-        context.insert(self.name.clone(), &mut self.typ)
+        context.insert(&self.name, &mut self.typ)
     }
 }
 
