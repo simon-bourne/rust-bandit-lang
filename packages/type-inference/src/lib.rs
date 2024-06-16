@@ -10,13 +10,16 @@ pub struct Program<'src, A: Annotation<'src>> {
 }
 
 impl<'src> Program<'src, Inference> {
-    fn build_context(&mut self, context: &mut Context<'src>) -> Result<()> {
+    // TODO: We need an `infer_types` method on `Type` to unify expressions,
+    // applications, and their arguments etc. We need to call this method on each
+    // type.
+    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         for d in &mut self.data {
-            d.build_context(context)?;
+            d.infer_types(context)?;
         }
 
         for v in &mut self.values {
-            v.build_context(context)?;
+            v.infer_types(context)?;
         }
 
         Ok(())
@@ -33,9 +36,9 @@ struct DataDeclaration<'src, A: Annotation<'src>> {
 }
 
 impl<'src> DataDeclaration<'src, Inference> {
-    fn build_context(&mut self, context: &mut Context<'src>) -> Result<()> {
+    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         for param in &mut self.parameters {
-            param.0.build_context(context)?;
+            param.0.infer_types(context)?;
         }
 
         Ok(())
@@ -136,7 +139,7 @@ struct Value<'src, A: Annotation<'src>> {
 }
 
 impl<'src> Value<'src, Inference> {
-    fn build_context(&mut self, context: &mut Context<'src>) -> Result<()> {
+    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         context.insert(&self.name, &mut self.typ)
     }
 }
