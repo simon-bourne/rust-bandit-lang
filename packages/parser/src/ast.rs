@@ -126,7 +126,7 @@ pub enum Visibility {
 #[derive(Clone, Debug, Eq, PartialEq, Constructor)]
 pub struct WhereClause<'src>(pub Option<Expression<'src>>);
 
-#[derive(Clone, Debug, Eq, PartialEq, Constructor)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Constructor)]
 pub struct Identifier<'src> {
     pub name: &'src str,
     pub span: Span,

@@ -1,6 +1,6 @@
 // TODO: Deny unused
 #![allow(unused)]
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, result};
 
 use bandit_parser::ast::{self, Identifier};
 
@@ -9,14 +9,37 @@ pub struct Program<'src, A: Annotation<'src>> {
     values: Vec<Value<'src, A>>,
 }
 
-struct DataDeclaration<'src, A: Annotation<'src>> {
-    name: ast::Identifier<'src>,
-    parameters: Vec<Type<'src, A>>,
+impl<'src> Program<'src, Inference> {
+    fn build_context(&mut self, context: &mut Context<'src>) -> Result<()> {
+        for d in &mut self.data {
+            d.build_context(context)?;
+        }
+
+        for v in &mut self.values {
+            v.build_context(context)?;
+        }
+
+        Ok(())
+    }
 }
 
-struct Value<'src, A: Annotation<'src>> {
+type Result<T> = result::Result<T, InferenceError>;
+
+struct InferenceError;
+
+struct DataDeclaration<'src, A: Annotation<'src>> {
     name: ast::Identifier<'src>,
-    typ: Type<'src, A>,
+    parameters: Vec<Parameter<'src, A>>,
+}
+
+impl<'src> DataDeclaration<'src, Inference> {
+    fn build_context(&mut self, context: &mut Context<'src>) -> Result<()> {
+        for param in &mut self.parameters {
+            param.0.build_context(context)?;
+        }
+
+        Ok(())
+    }
 }
 
 pub trait Annotation<'src> {
@@ -36,7 +59,19 @@ impl<'src> Annotation<'src> for Inferred {
 }
 
 struct Context<'src> {
-    types: HashMap<Identifier<'src>, <Inference as Annotation<'src>>::Type>,
+    types: HashMap<Identifier<'src>, Rc<InferenceType<'src>>>,
+}
+
+impl<'src> Context<'src> {
+    fn insert(&mut self, id: Identifier<'src>, typ: &mut Rc<InferenceType<'src>>) -> Result<()> {
+        if let Some(existing) = self.types.get_mut(&id) {
+            Type::unify(existing, typ)?;
+        } else {
+            self.types.insert(id, typ.clone());
+        }
+
+        Ok(())
+    }
 }
 
 enum Type<'src, A: Annotation<'src>> {
@@ -45,10 +80,10 @@ enum Type<'src, A: Annotation<'src>> {
     /// -> a -> b -> c`, where the first 3 arguments are inferred by the
     /// compiler.
     Quantified {
-        inferred: Vec<TypeConstructor<'src, A::Type>>,
+        inferred: Vec<Parameter<'src, A>>,
         explicit: Box<Self>,
     },
-    Constructor(TypeConstructor<'src, A::Type>),
+    Constructor(TypeConstructor<'src, A>),
     Arrow(Rc<Arrow<A::Type>>),
     Apply(Rc<Apply<A::Type>>),
 }
@@ -56,7 +91,10 @@ enum Type<'src, A: Annotation<'src>> {
 type InferenceType<'src> = <Inference as Annotation<'src>>::Type;
 
 impl<'src> Type<'src, Inference> {
-    fn unify(x: &mut Rc<InferenceType<'src>>, y: &mut Rc<InferenceType<'src>>) -> Result<(), ()> {
+    // TODO: This isn't quite right. We need to make sure we don't start copying
+    // parts of the type, as then we might end up unifying with one copy and not
+    // another.
+    fn unify(x: &mut Rc<InferenceType<'src>>, y: &mut Rc<InferenceType<'src>>) -> Result<()> {
         if Rc::ptr_eq(x, y) {
             return Ok(());
         }
@@ -86,9 +124,18 @@ struct Apply<Type> {
     typ: Type,
 }
 
-struct TypeConstructor<'src, Type> {
+struct TypeConstructor<'src, A: Annotation<'src>>(Value<'src, A>);
+struct Parameter<'src, A: Annotation<'src>>(Value<'src, A>);
+
+struct Value<'src, A: Annotation<'src>> {
     name: ast::Identifier<'src>,
-    typ: Rc<Type>,
+    typ: Rc<A::Type>,
+}
+
+impl<'src> Value<'src, Inference> {
+    fn build_context(&mut self, context: &mut Context<'src>) -> Result<()> {
+        context.insert(self.name.clone(), &mut self.typ)
+    }
 }
 
 #[cfg(test)]
