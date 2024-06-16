@@ -91,9 +91,12 @@ enum Type<'src, A: Annotation<'src>> {
 type InferenceType<'src> = <Inference as Annotation<'src>>::Type;
 
 impl<'src> Type<'src, Inference> {
-    // TODO: This isn't quite right. We need to make sure we don't start copying
-    // parts of the type, as then we might end up unifying with one copy and not
-    // another.
+    // TODO: We need `InferenceType` to be able to reference another
+    // `InferenceType`. We have to be careful not to copy parts of the type around,
+    // as then we might unify one copy and not another. Instead of an `Option`, use
+    // an enum with `Unknown`, Known` and `Reference(Rc)`. We can collapse replace
+    // the parameter `Rc` immediately, and if it's not unique, we can replace what
+    // the `Rc` points at with a `Reference`.
     fn unify(x: &mut Rc<InferenceType<'src>>, y: &mut Rc<InferenceType<'src>>) -> Result<()> {
         if Rc::ptr_eq(x, y) {
             return Ok(());
