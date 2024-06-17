@@ -1,6 +1,11 @@
 // TODO: Deny unused
 #![allow(unused)]
-use std::{cell::RefCell, collections::HashMap, rc::Rc, result};
+use std::{
+    cell::{RefCell, RefMut},
+    collections::HashMap,
+    rc::Rc,
+    result,
+};
 
 use bandit_parser::ast::{self, Identifier};
 
@@ -99,59 +104,65 @@ enum Type<'src, A: Annotation<'src>> {
 
 type InferenceType<'src> = <Inference as Annotation<'src>>::Type;
 
-impl<'src> Type<'src, Inference> {
-    fn follow_links(x: &mut Rc<InferenceType<'src>>) {
-        let x_ref = x.borrow();
-        let TypeKnowledge::Link(link) = &*x_ref else {
-            return;
-        };
+trait TypeReference<'src> {
+    fn follow_links(&mut self);
 
-        let link = link.clone();
-        drop(x_ref);
-        *x = link;
-        Self::follow_links(x);
-    }
+    fn known<'a>(&'a self) -> Option<RefMut<'a, Type<'src, Inference>>>;
 
-    fn unknown(x: &mut Rc<InferenceType<'src>>, y: &Rc<InferenceType<'src>>) -> bool {
-        let mut x_ref = x.borrow_mut();
-        let new_x = match &*x_ref {
-            TypeKnowledge::Known(_) => None,
-            TypeKnowledge::Unknown => {
-                *x_ref = TypeKnowledge::Link(y.clone());
-                Some(y.clone())
-            }
-            TypeKnowledge::Link(_) => None,
-        };
+    fn replace(&mut self, other: &Self);
+}
 
-        drop(x_ref);
+impl<'src> TypeReference<'src> for Rc<InferenceType<'src>> {
+    fn follow_links(&mut self) {
+        loop {
+            let borrowed = self.borrow();
+            let TypeKnowledge::Link(link) = &*borrowed else {
+                return;
+            };
 
-        if let Some(new_x) = new_x {
-            *x = new_x;
-            return false;
+            let link = link.clone();
+            drop(borrowed);
+            *self = link;
         }
-
-        true
     }
 
-    // TODO: We need `InferenceType` to be able to reference another
-    // `InferenceType`. We have to be careful not to copy parts of the type around,
-    // as then we might unify one copy and not another. Instead of an `Option`, use
-    // an enum with `Unknown`, Known` and `Reference(Rc)`. We can collapse replace
-    // the parameter `Rc` immediately, and if it's not unique, we can replace what
-    // the `Rc` points at with a `Reference`.
+    fn known<'a>(&'a self) -> Option<RefMut<'a, Type<'src, Inference>>> {
+        RefMut::filter_map(self.borrow_mut(), |x| {
+            if let TypeKnowledge::Known(known) = x {
+                Some(known)
+            } else {
+                None
+            }
+        })
+        .ok()
+    }
+
+    fn replace(&mut self, other: &Self) {
+        RefCell::replace(self, TypeKnowledge::Link(other.clone()));
+        *self = other.clone();
+    }
+}
+
+impl<'src> Type<'src, Inference> {
     fn unify(x: &mut Rc<InferenceType<'src>>, y: &mut Rc<InferenceType<'src>>) -> Result<()> {
-        Self::follow_links(x);
-        Self::follow_links(y);
+        x.follow_links();
+        y.follow_links();
 
         if Rc::ptr_eq(x, y) {
             return Ok(());
         }
 
-        if Self::unknown(x, y) || Self::unknown(y, x) {
+        let Some(x_ref) = x.known() else {
+            x.replace(y);
             return Ok(());
-        }
+        };
 
-        todo!()
+        let Some(y_ref) = y.known() else {
+            y.replace(x);
+            return Ok(());
+        };
+
+        todo!("replace x and y with the newly unified type")
     }
 }
 
