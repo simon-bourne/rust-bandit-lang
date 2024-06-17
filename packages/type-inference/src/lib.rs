@@ -52,7 +52,13 @@ pub trait Annotation<'src> {
 struct Inference;
 
 impl<'src> Annotation<'src> for Inference {
-    type Type = RefCell<Option<Type<'src, Self>>>;
+    type Type = RefCell<TypeKnowledge<'src>>;
+}
+
+enum TypeKnowledge<'src> {
+    Known(Type<'src, Inference>),
+    Unknown,
+    Link(Rc<InferenceType<'src>>),
 }
 
 struct Inferred;
@@ -94,6 +100,39 @@ enum Type<'src, A: Annotation<'src>> {
 type InferenceType<'src> = <Inference as Annotation<'src>>::Type;
 
 impl<'src> Type<'src, Inference> {
+    fn follow_links(x: &mut Rc<InferenceType<'src>>) {
+        let x_ref = x.borrow();
+        let TypeKnowledge::Link(link) = &*x_ref else {
+            return;
+        };
+
+        let link = link.clone();
+        drop(x_ref);
+        *x = link;
+        Self::follow_links(x);
+    }
+
+    fn unknown(x: &mut Rc<InferenceType<'src>>, y: &Rc<InferenceType<'src>>) -> bool {
+        let mut x_ref = x.borrow_mut();
+        let new_x = match &*x_ref {
+            TypeKnowledge::Known(_) => None,
+            TypeKnowledge::Unknown => {
+                *x_ref = TypeKnowledge::Link(y.clone());
+                Some(y.clone())
+            }
+            TypeKnowledge::Link(_) => None,
+        };
+
+        drop(x_ref);
+
+        if let Some(new_x) = new_x {
+            *x = new_x;
+            return false;
+        }
+
+        true
+    }
+
     // TODO: We need `InferenceType` to be able to reference another
     // `InferenceType`. We have to be careful not to copy parts of the type around,
     // as then we might unify one copy and not another. Instead of an `Option`, use
@@ -101,17 +140,14 @@ impl<'src> Type<'src, Inference> {
     // the parameter `Rc` immediately, and if it's not unique, we can replace what
     // the `Rc` points at with a `Reference`.
     fn unify(x: &mut Rc<InferenceType<'src>>, y: &mut Rc<InferenceType<'src>>) -> Result<()> {
+        Self::follow_links(x);
+        Self::follow_links(y);
+
         if Rc::ptr_eq(x, y) {
             return Ok(());
         }
 
-        if x.borrow().is_none() {
-            *x = y.clone();
-            return Ok(());
-        }
-
-        if y.borrow().is_none() {
-            *y = x.clone();
+        if Self::unknown(x, y) || Self::unknown(y, x) {
             return Ok(());
         }
 
