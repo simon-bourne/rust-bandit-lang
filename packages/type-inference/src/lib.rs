@@ -68,7 +68,11 @@ enum TypeKnowledge<'src> {
 
 impl<'src> TypeKnowledge<'src> {
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
-        todo!()
+        match self {
+            Self::Known(typ) => typ.infer_types(context),
+            Self::Unknown => Ok(()),
+            Self::Link(target) => target.borrow_mut().infer_types(context),
+        }
     }
 }
 
@@ -100,12 +104,18 @@ enum Type<'src, A: Annotation<'src>> {
     /// -> a -> b -> c`, where the first 3 arguments are inferred by the
     /// compiler.
     Quantified {
-        inferred: Vec<Parameter<'src, A>>,
+        implicit: Vec<Parameter<'src, A>>,
         explicit: Box<Self>,
     },
     Constructor(TypeConstructor<'src, A>),
     Arrow(Rc<Arrow<A::Type>>),
     Apply(Rc<Apply<A::Type>>),
+}
+
+impl<'src> Type<'src, Inference> {
+    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
+        todo!()
+    }
 }
 
 type InferenceType<'src> = <Inference as Annotation<'src>>::Type;
