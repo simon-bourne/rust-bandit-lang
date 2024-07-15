@@ -114,6 +114,9 @@ enum Type<'src, A: Annotation<'src>> {
 
 impl<'src> Type<'src, Inference> {
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
+        // TODO:
+        // For apply, we want to create a new type `a -> b`, unify `typ` with `b`,
+        // `left` with `a -> b`, and `right` with `a`.
         match self {
             Self::Base => todo!(),
             Self::Quantified { implicit, explicit } => todo!(),
@@ -122,6 +125,40 @@ impl<'src> Type<'src, Inference> {
             Self::Apply(apply) => todo!(),
         }
     }
+
+    fn unify(x: &mut Rc<InferenceType<'src>>, y: &mut Rc<InferenceType<'src>>) -> Result<()> {
+        x.follow_links();
+        y.follow_links();
+
+        if Rc::ptr_eq(x, y) {
+            return Ok(());
+        }
+
+        let Some(x_ref) = x.known() else {
+            x.replace(y);
+            return Ok(());
+        };
+
+        let Some(y_ref) = y.known() else {
+            y.replace(x);
+            return Ok(());
+        };
+
+        // TODO: Unify the types
+
+        todo!("replace x and y with the newly unified type")
+    }
+}
+
+struct Arrow<Type> {
+    left: Type,
+    right: Type,
+}
+
+struct Apply<Type> {
+    left: Type,
+    right: Type,
+    typ: Type,
 }
 
 type InferenceType<'src> = <Inference as Annotation<'src>>::Type;
@@ -163,40 +200,6 @@ impl<'src> TypeReference<'src> for Rc<InferenceType<'src>> {
         RefCell::replace(self, TypeKnowledge::Link(other.clone()));
         *self = other.clone();
     }
-}
-
-impl<'src> Type<'src, Inference> {
-    fn unify(x: &mut Rc<InferenceType<'src>>, y: &mut Rc<InferenceType<'src>>) -> Result<()> {
-        x.follow_links();
-        y.follow_links();
-
-        if Rc::ptr_eq(x, y) {
-            return Ok(());
-        }
-
-        let Some(x_ref) = x.known() else {
-            x.replace(y);
-            return Ok(());
-        };
-
-        let Some(y_ref) = y.known() else {
-            y.replace(x);
-            return Ok(());
-        };
-
-        todo!("replace x and y with the newly unified type")
-    }
-}
-
-struct Arrow<Type> {
-    left: Type,
-    right: Type,
-}
-
-struct Apply<Type> {
-    left: Type,
-    right: Type,
-    typ: Type,
 }
 
 struct TypeConstructor<'src, A: Annotation<'src>>(Value<'src, A>);
