@@ -114,7 +114,13 @@ enum Type<'src, A: Annotation<'src>> {
 
 impl<'src> Type<'src, Inference> {
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
-        todo!()
+        match self {
+            Self::Base => todo!(),
+            Self::Quantified { implicit, explicit } => todo!(),
+            Self::Constructor(_) => todo!(),
+            Self::Arrow(_) => todo!(),
+            Self::Apply(apply) => todo!(),
+        }
     }
 }
 
