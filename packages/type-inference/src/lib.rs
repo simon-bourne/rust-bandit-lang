@@ -66,6 +66,12 @@ enum TypeKnowledge<'src> {
     Link(Rc<InferenceType<'src>>),
 }
 
+impl<'src> TypeKnowledge<'src> {
+    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
+        todo!()
+    }
+}
+
 struct Inferred;
 
 impl<'src> Annotation<'src> for Inferred {
@@ -187,7 +193,8 @@ struct Value<'src, A: Annotation<'src>> {
 
 impl<'src> Value<'src, Inference> {
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
-        context.insert(&self.name, &mut self.typ)
+        context.insert(&self.name, &mut self.typ)?;
+        self.typ.borrow_mut().infer_types(context)
     }
 }
 
