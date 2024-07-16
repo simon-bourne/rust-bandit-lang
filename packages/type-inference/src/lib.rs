@@ -15,9 +15,6 @@ pub struct Program<'src, A: Annotation<'src>> {
 }
 
 impl<'src> Program<'src, Inference> {
-    // TODO: We need an `infer_types` method on `Type` to unify expressions,
-    // applications, and their arguments etc. We need to call this method on each
-    // type.
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         for d in &mut self.data {
             d.infer_types(context)?;
@@ -118,12 +115,20 @@ impl<'src> Type<'src, Inference> {
         // For apply, we want to create a new type `a -> b`, unify `typ` with `b`,
         // `left` with `a -> b`, and `right` with `a`.
         match self {
-            Self::Base => todo!(),
-            Self::Quantified { implicit, explicit } => todo!(),
-            Self::Constructor(_) => todo!(),
-            Self::Arrow(_) => todo!(),
+            Self::Base => (),
+            // We don't infer types across quantification boundaries to keep things simple.
+            Self::Quantified { .. } => (),
+            Self::Constructor(constructor) => {
+                constructor.0.typ.borrow_mut().infer_types(context)?
+            }
+            Self::Arrow(arrow) => {
+                arrow.left.borrow_mut().infer_types(context)?;
+                arrow.left.borrow_mut().infer_types(context)?
+            }
             Self::Apply(apply) => todo!(),
         }
+
+        Ok(())
     }
 
     fn typ(&self) -> InferenceType<'src> {
