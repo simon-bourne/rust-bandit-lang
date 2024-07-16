@@ -8,6 +8,7 @@ use std::{
 };
 
 use bandit_parser::ast::{self, Identifier};
+use derive_more::Constructor;
 
 pub struct Program<'src, A: Annotation<'src>> {
     data: Vec<DataDeclaration<'src, A>>,
@@ -64,6 +65,18 @@ enum TypeKnowledge<'src> {
 }
 
 impl<'src> TypeKnowledge<'src> {
+    fn known(typ: Type<'src, Inference>) -> Rc<RefCell<Self>> {
+        Self::shared(Self::Known(typ))
+    }
+
+    fn unknown() -> Rc<RefCell<Self>> {
+        Self::shared(Self::Unknown)
+    }
+
+    fn shared(self) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(self))
+    }
+
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         match self {
             Self::Known(typ) => typ.infer_types(context),
@@ -111,9 +124,6 @@ enum Type<'src, A: Annotation<'src>> {
 
 impl<'src> Type<'src, Inference> {
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
-        // TODO:
-        // For apply, we want to create a new type `a -> b`, unify `typ` with `b`,
-        // `left` with `a -> b`, and `right` with `a`.
         match self {
             Self::Base => (),
             // We don't infer types across quantification boundaries to keep things simple.
@@ -123,9 +133,16 @@ impl<'src> Type<'src, Inference> {
             }
             Self::Arrow(arrow) => {
                 arrow.left.borrow_mut().infer_types(context)?;
-                arrow.left.borrow_mut().infer_types(context)?
+                arrow.right.borrow_mut().infer_types(context)?
             }
-            Self::Apply(apply) => todo!(),
+            Self::Apply(apply) => {
+                let mut a = TypeKnowledge::unknown();
+                let mut b = TypeKnowledge::unknown();
+                let mut f = TypeKnowledge::known(Self::Arrow(Arrow::new(a.clone(), b.clone())));
+                Self::unify(&mut f, &mut apply.left)?;
+                Self::unify(&mut a, &mut apply.right)?;
+                Self::unify(&mut b, &mut apply.typ)?;
+            }
         }
 
         Ok(())
@@ -134,7 +151,7 @@ impl<'src> Type<'src, Inference> {
     fn typ(&self) -> InferenceType<'src> {
         match self {
             Self::Base | Self::Arrow(_) | Self::Quantified { .. } => {
-                Rc::new(RefCell::new(TypeKnowledge::Known(Self::Base)))
+                TypeKnowledge::known(Self::Base)
             }
             Self::Constructor(cons) => cons.0.typ.clone(),
             Self::Apply(apply) => apply.typ.clone(),
@@ -165,6 +182,7 @@ impl<'src> Type<'src, Inference> {
     }
 }
 
+#[derive(Constructor)]
 struct Arrow<Type> {
     left: Type,
     right: Type,
