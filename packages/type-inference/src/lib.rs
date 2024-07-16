@@ -176,6 +176,7 @@ impl<'src> Type<'src, Inference> {
             return Ok(());
         };
 
+        // TODO: Can we use mutable borrowing to do the occurs check for us?
         // TODO: Unify the types
 
         todo!("replace x and y with the newly unified type")
