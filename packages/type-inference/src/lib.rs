@@ -57,13 +57,13 @@ pub trait Annotation<'src> {
 struct Inference;
 
 impl<'src> Annotation<'src> for Inference {
-    type Type = RefCell<TypeKnowledge<'src>>;
+    type Type = Rc<RefCell<TypeKnowledge<'src>>>;
 }
 
 enum TypeKnowledge<'src> {
     Known(Type<'src, Inference>),
     Unknown,
-    Link(Rc<InferenceType<'src>>),
+    Link(InferenceType<'src>),
 }
 
 impl<'src> TypeKnowledge<'src> {
@@ -79,15 +79,15 @@ impl<'src> TypeKnowledge<'src> {
 struct Inferred;
 
 impl<'src> Annotation<'src> for Inferred {
-    type Type = Type<'src, Self>;
+    type Type = Box<Type<'src, Self>>;
 }
 
 struct Context<'src> {
-    types: HashMap<Identifier<'src>, Rc<InferenceType<'src>>>,
+    types: HashMap<Identifier<'src>, InferenceType<'src>>,
 }
 
 impl<'src> Context<'src> {
-    fn insert(&mut self, id: &Identifier<'src>, typ: &mut Rc<InferenceType<'src>>) -> Result<()> {
+    fn insert(&mut self, id: &Identifier<'src>, typ: &mut InferenceType<'src>) -> Result<()> {
         if let Some(existing) = self.types.get_mut(id) {
             Type::unify(existing, typ)?;
         } else {
@@ -105,11 +105,11 @@ enum Type<'src, A: Annotation<'src>> {
     /// compiler.
     Quantified {
         implicit: Vec<Parameter<'src, A>>,
-        explicit: Box<Self>,
+        explicit: A::Type,
     },
     Constructor(TypeConstructor<'src, A>),
-    Arrow(Rc<Arrow<A::Type>>),
-    Apply(Rc<Apply<A::Type>>),
+    Arrow(Arrow<A::Type>),
+    Apply(Apply<A::Type>),
 }
 
 impl<'src> Type<'src, Inference> {
@@ -126,7 +126,17 @@ impl<'src> Type<'src, Inference> {
         }
     }
 
-    fn unify(x: &mut Rc<InferenceType<'src>>, y: &mut Rc<InferenceType<'src>>) -> Result<()> {
+    fn typ(&self) -> InferenceType<'src> {
+        match self {
+            Self::Base | Self::Arrow(_) | Self::Quantified { .. } => {
+                Rc::new(RefCell::new(TypeKnowledge::Known(Self::Base)))
+            }
+            Self::Constructor(cons) => cons.0.typ.clone(),
+            Self::Apply(apply) => apply.typ.clone(),
+        }
+    }
+
+    fn unify(x: &mut InferenceType<'src>, y: &mut InferenceType<'src>) -> Result<()> {
         x.follow_links();
         y.follow_links();
 
@@ -171,7 +181,7 @@ trait TypeReference<'src> {
     fn replace(&mut self, other: &Self);
 }
 
-impl<'src> TypeReference<'src> for Rc<InferenceType<'src>> {
+impl<'src> TypeReference<'src> for InferenceType<'src> {
     fn follow_links(&mut self) {
         loop {
             let borrowed = self.borrow();
@@ -207,7 +217,7 @@ struct Parameter<'src, A: Annotation<'src>>(Value<'src, A>);
 
 struct Value<'src, A: Annotation<'src>> {
     name: ast::Identifier<'src>,
-    typ: Rc<A::Type>,
+    typ: A::Type,
 }
 
 impl<'src> Value<'src, Inference> {
