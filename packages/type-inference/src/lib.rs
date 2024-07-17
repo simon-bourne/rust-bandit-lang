@@ -116,6 +116,10 @@ enum Type<'src, A: Annotation<'src>> {
         right: A::Type,
         typ: A::Type,
     },
+    Variable {
+        name: ast::Identifier<'src>,
+        typ: A::Type,
+    },
 }
 
 impl<'src> Type<'src, Inference> {
@@ -135,6 +139,7 @@ impl<'src> Type<'src, Inference> {
                 Self::unify(&mut a, right)?;
                 Self::unify(&mut b, typ)?;
             }
+            Self::Variable { name, typ } => context.insert(name, typ)?,
         }
 
         Ok(())
@@ -145,6 +150,7 @@ impl<'src> Type<'src, Inference> {
             Self::Base => Self::type_of_type(),
             Self::Constructor(cons) => cons.typ(),
             Self::Apply { typ, .. } => typ.clone(),
+            Self::Variable { typ, .. } => typ.clone(),
         }
     }
 
