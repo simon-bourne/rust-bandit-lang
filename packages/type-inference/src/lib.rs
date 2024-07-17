@@ -174,11 +174,23 @@ impl<'src> Type<'src, Inference> {
         match (&mut *x_ref, &mut *y_ref) {
             (Type::Base, Type::Base) => (),
             (Type::Constructor(c1), Type::Constructor(c2)) => TypeConstructor::unify(c1, c2)?,
-            (Type::Apply { .. }, Type::Apply { .. }) => todo!(),
+            (
+                Type::Apply { left, right, typ },
+                Type::Apply {
+                    left: left1,
+                    right: right1,
+                    typ: typ1,
+                },
+            ) => {
+                Self::unify(left, left1)?;
+                Self::unify(right, right1)?;
+                Self::unify(typ, typ1)?;
+            }
             _ => Err(InferenceError)?,
         }
 
         drop(x_ref);
+        drop(y_ref);
         *x = y.clone();
 
         Ok(())
