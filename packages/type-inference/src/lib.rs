@@ -65,15 +65,15 @@ enum TypeKnowledge<'src> {
 }
 
 impl<'src> TypeKnowledge<'src> {
-    fn known(typ: Type<'src, Inference>) -> Rc<RefCell<Self>> {
-        Self::shared(Self::Known(typ))
+    fn new_known(typ: Type<'src, Inference>) -> Rc<RefCell<Self>> {
+        Self::new_shared(Self::Known(typ))
     }
 
-    fn unknown() -> Rc<RefCell<Self>> {
-        Self::shared(Self::Unknown)
+    fn new_unknown() -> Rc<RefCell<Self>> {
+        Self::new_shared(Self::Unknown)
     }
 
-    fn shared(self) -> Rc<RefCell<Self>> {
+    fn new_shared(self) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(self))
     }
 
@@ -136,9 +136,9 @@ impl<'src> Type<'src, Inference> {
                 arrow.right.borrow_mut().infer_types(context)?
             }
             Self::Apply(apply) => {
-                let mut a = TypeKnowledge::unknown();
-                let mut b = TypeKnowledge::unknown();
-                let mut f = TypeKnowledge::known(Self::Arrow(Arrow::new(a.clone(), b.clone())));
+                let mut a = TypeKnowledge::new_unknown();
+                let mut b = TypeKnowledge::new_unknown();
+                let mut f = TypeKnowledge::new_known(Self::Arrow(Arrow::new(a.clone(), b.clone())));
                 Self::unify(&mut f, &mut apply.left)?;
                 Self::unify(&mut a, &mut apply.right)?;
                 Self::unify(&mut b, &mut apply.typ)?;
@@ -151,7 +151,7 @@ impl<'src> Type<'src, Inference> {
     fn typ(&self) -> InferenceType<'src> {
         match self {
             Self::Base | Self::Arrow(_) | Self::Quantified { .. } => {
-                TypeKnowledge::known(Self::Base)
+                TypeKnowledge::new_known(Self::Base)
             }
             Self::Constructor(cons) => cons.0.typ.clone(),
             Self::Apply(apply) => apply.typ.clone(),
