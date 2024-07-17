@@ -138,6 +138,9 @@ impl<'src> Type<'src, Inference> {
                 Self::unify(&mut f, left)?;
                 Self::unify(&mut a, right)?;
                 Self::unify(&mut b, typ)?;
+
+                left.borrow_mut().infer_types(context)?;
+                right.borrow_mut().infer_types(context)?;
             }
             Self::Variable { name, typ } => context.insert(name, typ)?,
         }
