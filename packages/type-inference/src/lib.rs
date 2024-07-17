@@ -110,38 +110,30 @@ impl<'src> Context<'src> {
 
 enum Type<'src, A: Annotation<'src>> {
     Base,
-    /// `∀a b c. a -> b -> c` is a type `(a : Type) -> (b : Type) -> (c : Type)
-    /// -> a -> b -> c`, where the first 3 arguments are inferred by the
-    /// compiler.
-    Quantified {
-        implicit: Vec<Parameter<'src, A>>,
-        explicit: A::Type,
-    },
     Constructor(TypeConstructor<'src, A>),
-    Arrow(Arrow<A::Type>),
-    Apply(Apply<A::Type>),
+    Apply {
+        left: A::Type,
+        right: A::Type,
+        typ: A::Type,
+    },
 }
 
 impl<'src> Type<'src, Inference> {
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         match self {
             Self::Base => (),
-            // We don't infer types across quantification boundaries to keep things simple.
-            Self::Quantified { .. } => (),
             Self::Constructor(constructor) => {
-                constructor.0.typ.borrow_mut().infer_types(context)?
+                if let TypeConstructor::Named { name, typ } = constructor {
+                    context.insert(name, typ)?;
+                }
             }
-            Self::Arrow(arrow) => {
-                arrow.left.borrow_mut().infer_types(context)?;
-                arrow.right.borrow_mut().infer_types(context)?
-            }
-            Self::Apply(apply) => {
+            Self::Apply { left, right, typ } => {
                 let mut a = TypeKnowledge::new_unknown();
                 let mut b = TypeKnowledge::new_unknown();
-                let mut f = TypeKnowledge::new_known(Self::Arrow(Arrow::new(a.clone(), b.clone())));
-                Self::unify(&mut f, &mut apply.left)?;
-                Self::unify(&mut a, &mut apply.right)?;
-                Self::unify(&mut b, &mut apply.typ)?;
+                let mut f = TypeConstructor::arrow(a.clone(), b.clone());
+                Self::unify(&mut f, left)?;
+                Self::unify(&mut a, right)?;
+                Self::unify(&mut b, typ)?;
             }
         }
 
@@ -150,12 +142,14 @@ impl<'src> Type<'src, Inference> {
 
     fn typ(&self) -> InferenceType<'src> {
         match self {
-            Self::Base | Self::Arrow(_) | Self::Quantified { .. } => {
-                TypeKnowledge::new_known(Self::Base)
-            }
-            Self::Constructor(cons) => cons.0.typ.clone(),
-            Self::Apply(apply) => apply.typ.clone(),
+            Self::Base => Self::type_of_type(),
+            Self::Constructor(cons) => cons.typ(),
+            Self::Apply { typ, .. } => typ.clone(),
         }
+    }
+
+    fn type_of_type() -> InferenceType<'src> {
+        TypeKnowledge::new_known(Self::Base)
     }
 
     fn unify(x: &mut InferenceType<'src>, y: &mut InferenceType<'src>) -> Result<()> {
@@ -177,22 +171,7 @@ impl<'src> Type<'src, Inference> {
         };
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
-        // TODO: Unify the types
-
-        todo!("replace x and y with the newly unified type")
     }
-}
-
-#[derive(Constructor)]
-struct Arrow<Type> {
-    left: Type,
-    right: Type,
-}
-
-struct Apply<Type> {
-    left: Type,
-    right: Type,
-    typ: Type,
 }
 
 type InferenceType<'src> = <Inference as Annotation<'src>>::Type;
@@ -236,7 +215,60 @@ impl<'src> TypeReference<'src> for InferenceType<'src> {
     }
 }
 
-struct TypeConstructor<'src, A: Annotation<'src>>(Value<'src, A>);
+enum TypeConstructor<'src, A: Annotation<'src>> {
+    Arrow,
+    Named {
+        name: ast::Identifier<'src>,
+        typ: A::Type,
+    },
+}
+
+impl<'src> TypeConstructor<'src, Inference> {
+    fn arrow(left: InferenceType<'src>, right: InferenceType<'src>) -> InferenceType<'src> {
+        TypeKnowledge::new_known(Type::Apply {
+            left,
+            right,
+            typ: Self::arrow_type(),
+        })
+    }
+
+    fn arrow_type() -> InferenceType<'src> {
+        Self::arrow(
+            Type::type_of_type(),
+            Self::arrow(Type::type_of_type(), Type::type_of_type()),
+        )
+    }
+
+    fn typ(&self) -> InferenceType<'src> {
+        match self {
+            Self::Arrow => Self::arrow_type(),
+            Self::Named { name, typ } => typ.clone(),
+        }
+    }
+
+    fn unify(left: &mut Self, right: &mut Self) -> Result<()> {
+        match (left, right) {
+            (Self::Arrow, Self::Arrow) => (),
+            (
+                Self::Named { name, typ },
+                Self::Named {
+                    name: name1,
+                    typ: typ1,
+                },
+            ) => {
+                if name != name1 {
+                    Err(InferenceError)?;
+                }
+
+                Type::unify(typ, typ1)?;
+            }
+            _ => Err(InferenceError)?,
+        }
+
+        Ok(())
+    }
+}
+
 struct Parameter<'src, A: Annotation<'src>>(Value<'src, A>);
 
 struct Value<'src, A: Annotation<'src>> {
