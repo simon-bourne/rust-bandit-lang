@@ -160,17 +160,28 @@ impl<'src> Type<'src, Inference> {
             return Ok(());
         }
 
-        let Some(x_ref) = x.known() else {
+        let Some(mut x_ref) = x.known() else {
             x.replace(y);
             return Ok(());
         };
 
-        let Some(y_ref) = y.known() else {
+        let Some(mut y_ref) = y.known() else {
             y.replace(x);
             return Ok(());
         };
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
+        match (&mut *x_ref, &mut *y_ref) {
+            (Type::Base, Type::Base) => (),
+            (Type::Constructor(c1), Type::Constructor(c2)) => TypeConstructor::unify(c1, c2)?,
+            (Type::Apply { .. }, Type::Apply { .. }) => todo!(),
+            _ => Err(InferenceError)?,
+        }
+
+        drop(x_ref);
+        *x = y.clone();
+
+        Ok(())
     }
 }
 
