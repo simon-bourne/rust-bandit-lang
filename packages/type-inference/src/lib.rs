@@ -55,32 +55,22 @@ pub trait Annotation<'src> {
 struct Inference;
 
 impl<'src> Annotation<'src> for Inference {
-    type Type = Rc<RefCell<TypeKnowledge<'src>>>;
+    type Type = Rc<RefCell<TypeRef<'src>>>;
 }
 
-enum TypeKnowledge<'src> {
-    Known(Type<'src, Inference>),
-    Unknown,
+enum TypeRef<'src> {
+    Own(Type<'src, Inference>),
     Link(InferenceType<'src>),
 }
 
-impl<'src> TypeKnowledge<'src> {
-    fn new_known(typ: Type<'src, Inference>) -> Rc<RefCell<Self>> {
-        Self::new_shared(Self::Known(typ))
-    }
-
-    fn new_unknown() -> Rc<RefCell<Self>> {
-        Self::new_shared(Self::Unknown)
-    }
-
-    fn new_shared(self) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(self))
+impl<'src> TypeRef<'src> {
+    fn new(typ: Type<'src, Inference>) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::Own(typ)))
     }
 
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         match self {
-            Self::Known(typ) => typ.infer_types(context),
-            Self::Unknown => Ok(()),
+            Self::Own(typ) => typ.infer_types(context),
             Self::Link(target) => target.borrow_mut().infer_types(context),
         }
     }
@@ -89,7 +79,7 @@ impl<'src> TypeKnowledge<'src> {
 struct Inferred;
 
 impl<'src> Annotation<'src> for Inferred {
-    type Type = Box<Type<'src, Self>>;
+    type Type = Rc<Type<'src, Self>>;
 }
 
 struct Context<'src> {
@@ -116,16 +106,13 @@ enum Type<'src, A: Annotation<'src>> {
         right: A::Type,
         typ: A::Type,
     },
-    Variable {
-        name: ast::Identifier<'src>,
-        typ: A::Type,
-    },
+    Variable,
 }
 
 impl<'src> Type<'src, Inference> {
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         match self {
-            Self::Base => (),
+            Self::Base | Self::Variable => (),
             Self::Constructor(constructor) => {
                 if let TypeConstructor::Named { name, typ } = constructor {
                     context.insert(name, typ)?;
@@ -133,8 +120,8 @@ impl<'src> Type<'src, Inference> {
                 }
             }
             Self::Apply { left, right, typ } => {
-                let mut a = TypeKnowledge::new_unknown();
-                let mut b = TypeKnowledge::new_unknown();
+                let mut a = TypeRef::new(Self::Variable);
+                let mut b = TypeRef::new(Self::Variable);
                 let mut f = TypeConstructor::arrow(a.clone(), b.clone());
                 Self::unify(&mut f, left)?;
                 Self::unify(&mut a, right)?;
@@ -144,26 +131,13 @@ impl<'src> Type<'src, Inference> {
                 right.borrow_mut().infer_types(context)?;
                 typ.borrow_mut().infer_types(context)?;
             }
-            Self::Variable { name, typ } => {
-                context.insert(name, typ)?;
-                typ.borrow_mut().infer_types(context)?;
-            }
         }
 
         Ok(())
     }
 
-    fn typ(&self) -> InferenceType<'src> {
-        match self {
-            Self::Base => Self::type_of_type(),
-            Self::Constructor(cons) => cons.typ(),
-            Self::Apply { typ, .. } => typ.clone(),
-            Self::Variable { typ, .. } => typ.clone(),
-        }
-    }
-
     fn type_of_type() -> InferenceType<'src> {
-        TypeKnowledge::new_known(Self::Base)
+        TypeRef::new(Self::Base)
     }
 
     fn unify(x: &mut InferenceType<'src>, y: &mut InferenceType<'src>) -> Result<()> {
@@ -174,12 +148,12 @@ impl<'src> Type<'src, Inference> {
             return Ok(());
         }
 
-        let Some(mut x_ref) = x.known() else {
+        let Some(mut x_ref) = x.non_variable() else {
             x.replace(y);
             return Ok(());
         };
 
-        let Some(mut y_ref) = y.known() else {
+        let Some(mut y_ref) = y.non_variable() else {
             y.replace(x);
             return Ok(());
         };
@@ -216,7 +190,7 @@ type InferenceType<'src> = <Inference as Annotation<'src>>::Type;
 trait TypeReference<'src> {
     fn follow_links(&mut self);
 
-    fn known<'a>(&'a self) -> Option<RefMut<'a, Type<'src, Inference>>>;
+    fn non_variable<'a>(&'a self) -> Option<RefMut<'a, Type<'src, Inference>>>;
 
     fn replace(&mut self, other: &Self);
 }
@@ -225,7 +199,7 @@ impl<'src> TypeReference<'src> for InferenceType<'src> {
     fn follow_links(&mut self) {
         loop {
             let borrowed = self.borrow();
-            let TypeKnowledge::Link(link) = &*borrowed else {
+            let TypeRef::Link(link) = &*borrowed else {
                 return;
             };
 
@@ -235,10 +209,11 @@ impl<'src> TypeReference<'src> for InferenceType<'src> {
         }
     }
 
-    fn known<'a>(&'a self) -> Option<RefMut<'a, Type<'src, Inference>>> {
+    fn non_variable<'a>(&'a self) -> Option<RefMut<'a, Type<'src, Inference>>> {
         RefMut::filter_map(self.borrow_mut(), |x| {
-            if let TypeKnowledge::Known(known) = x {
-                Some(known)
+            if let TypeRef::Own(owned) = x {
+                let non_variable = !matches!(owned, Type::Variable);
+                non_variable.then_some(owned)
             } else {
                 None
             }
@@ -247,7 +222,7 @@ impl<'src> TypeReference<'src> for InferenceType<'src> {
     }
 
     fn replace(&mut self, other: &Self) {
-        RefCell::replace(self, TypeKnowledge::Link(other.clone()));
+        RefCell::replace(self, TypeRef::Link(other.clone()));
         *self = other.clone();
     }
 }
@@ -262,7 +237,7 @@ enum TypeConstructor<'src, A: Annotation<'src>> {
 
 impl<'src> TypeConstructor<'src, Inference> {
     fn arrow(left: InferenceType<'src>, right: InferenceType<'src>) -> InferenceType<'src> {
-        TypeKnowledge::new_known(Type::Apply {
+        TypeRef::new(Type::Apply {
             left,
             right,
             typ: Self::arrow_type(),
@@ -274,13 +249,6 @@ impl<'src> TypeConstructor<'src, Inference> {
             Type::type_of_type(),
             Self::arrow(Type::type_of_type(), Type::type_of_type()),
         )
-    }
-
-    fn typ(&self) -> InferenceType<'src> {
-        match self {
-            Self::Arrow => Self::arrow_type(),
-            Self::Named { name, typ } => typ.clone(),
-        }
     }
 
     fn unify(left: &mut Self, right: &mut Self) -> Result<()> {
