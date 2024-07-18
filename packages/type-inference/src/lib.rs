@@ -129,6 +129,7 @@ impl<'src> Type<'src, Inference> {
             Self::Constructor(constructor) => {
                 if let TypeConstructor::Named { name, typ } = constructor {
                     context.insert(name, typ)?;
+                    typ.borrow_mut().infer_types(context)?;
                 }
             }
             Self::Apply { left, right, typ } => {
@@ -141,8 +142,12 @@ impl<'src> Type<'src, Inference> {
 
                 left.borrow_mut().infer_types(context)?;
                 right.borrow_mut().infer_types(context)?;
+                typ.borrow_mut().infer_types(context)?;
             }
-            Self::Variable { name, typ } => context.insert(name, typ)?,
+            Self::Variable { name, typ } => {
+                context.insert(name, typ)?;
+                typ.borrow_mut().infer_types(context)?;
+            }
         }
 
         Ok(())
