@@ -7,3 +7,4 @@ publish = false
 [dependencies]
 bandit-parser.workspace = true
 derive_more.workspace = true
+slotmap.workspace = true

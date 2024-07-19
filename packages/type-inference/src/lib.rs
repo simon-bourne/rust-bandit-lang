@@ -7,8 +7,8 @@ use std::{
     result,
 };
 
-use bandit_parser::ast::{self, Identifier};
 use derive_more::Constructor;
+use slotmap::{new_key_type, SlotMap};
 
 pub struct Program<'src, A: Annotation<'src>> {
     data: Vec<DataDeclaration<'src, A>>,
@@ -34,7 +34,7 @@ type Result<T> = result::Result<T, InferenceError>;
 struct InferenceError;
 
 struct DataDeclaration<'src, A: Annotation<'src>> {
-    name: ast::Identifier<'src>,
+    id: Id,
     parameters: Vec<Parameter<'src, A>>,
 }
 
@@ -83,15 +83,15 @@ impl<'src> Annotation<'src> for Inferred {
 }
 
 struct Context<'src> {
-    types: HashMap<Identifier<'src>, InferenceType<'src>>,
+    types: SlotMap<Id, InferenceType<'src>>,
 }
 
 impl<'src> Context<'src> {
-    fn insert(&mut self, id: &Identifier<'src>, typ: &mut InferenceType<'src>) -> Result<()> {
+    fn insert(&mut self, id: Id, typ: &mut InferenceType<'src>) -> Result<()> {
         if let Some(existing) = self.types.get_mut(id) {
             Type::unify(existing, typ)?;
         } else {
-            self.types.insert(id.clone(), typ.clone());
+            self.types.insert(typ.clone());
         }
 
         Ok(())
@@ -114,8 +114,8 @@ impl<'src> Type<'src, Inference> {
         match self {
             Self::Base | Self::Variable => (),
             Self::Constructor(constructor) => {
-                if let TypeConstructor::Named { name, typ } = constructor {
-                    context.insert(name, typ)?;
+                if let TypeConstructor::Named { id, typ } = constructor {
+                    context.insert(*id, typ)?;
                     typ.borrow_mut().infer_types(context)?;
                 }
             }
@@ -229,10 +229,7 @@ impl<'src> TypeReference<'src> for InferenceType<'src> {
 
 enum TypeConstructor<'src, A: Annotation<'src>> {
     Arrow,
-    Named {
-        name: ast::Identifier<'src>,
-        typ: A::Type,
-    },
+    Named { id: Id, typ: A::Type },
 }
 
 impl<'src> TypeConstructor<'src, Inference> {
@@ -254,14 +251,8 @@ impl<'src> TypeConstructor<'src, Inference> {
     fn unify(left: &mut Self, right: &mut Self) -> Result<()> {
         match (left, right) {
             (Self::Arrow, Self::Arrow) => (),
-            (
-                Self::Named { name, typ },
-                Self::Named {
-                    name: name1,
-                    typ: typ1,
-                },
-            ) => {
-                if name != name1 {
+            (Self::Named { id, typ }, Self::Named { id: id1, typ: typ1 }) => {
+                if id != id1 {
                     Err(InferenceError)?;
                 }
 
@@ -277,15 +268,19 @@ impl<'src> TypeConstructor<'src, Inference> {
 struct Parameter<'src, A: Annotation<'src>>(Value<'src, A>);
 
 struct Value<'src, A: Annotation<'src>> {
-    name: ast::Identifier<'src>,
+    id: Id,
     typ: A::Type,
 }
 
 impl<'src> Value<'src, Inference> {
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
-        context.insert(&self.name, &mut self.typ)?;
+        context.insert(self.id, &mut self.typ)?;
         self.typ.borrow_mut().infer_types(context)
     }
+}
+
+new_key_type! {
+    struct Id;
 }
 
 #[cfg(test)]
