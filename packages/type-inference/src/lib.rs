@@ -179,7 +179,7 @@ impl<'src> Type<'src, Inference> {
 
         drop(x_ref);
         drop(y_ref);
-        *x = y.clone();
+        x.replace(y);
 
         Ok(())
     }
