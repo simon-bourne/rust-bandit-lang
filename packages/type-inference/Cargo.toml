@@ -10,4 +10,3 @@ slotmap.workspace = true
 
 [dev-dependencies]
 goldenfile.workspace = true
-indoc.workspace = true
