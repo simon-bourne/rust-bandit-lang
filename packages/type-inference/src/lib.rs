@@ -269,23 +269,16 @@ impl<'src> TypeConstructor<'src, Inference> {
         TypeRef::new(Type::Apply {
             left,
             right,
+            // TODO: Should be `right.typ()`
             typ: Type::type_of_type(),
         })
     }
 
     fn arrow(left: InferenceType<'src>, right: InferenceType<'src>) -> InferenceType<'src> {
-        let arrow = TypeRef::new(Type::Constructor(Self::Arrow));
-
-        TypeRef::new(Type::Apply {
-            left: TypeRef::new(Type::Apply {
-                left: arrow,
-                right: left,
-                // TODO: What should `typ` be?
-                typ: Type::type_of_type(),
-            }),
+        Self::apply(
+            Self::apply(TypeRef::new(Type::Constructor(Self::Arrow)), left),
             right,
-            typ: Type::type_of_type(),
-        })
+        )
     }
 
     fn unify(left: &mut Self, right: &mut Self) -> Result<()> {
