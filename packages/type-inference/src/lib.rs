@@ -46,6 +46,7 @@ impl<'src> Data<'src, Inference> {
     }
 }
 
+#[derive(Debug)]
 pub struct ValueConstructor<'src, A: Annotation<'src>> {
     id: Id,
     typ: A::Type,
@@ -80,12 +81,14 @@ pub trait Annotation<'src> {
     type Type;
 }
 
+#[derive(Debug)]
 struct Inference;
 
 impl<'src> Annotation<'src> for Inference {
     type Type = Rc<RefCell<TypeRef<'src>>>;
 }
 
+#[derive(Debug)]
 enum TypeRef<'src> {
     Own(Type<'src, Inference>),
     Link(InferenceType<'src>),
@@ -125,6 +128,7 @@ impl<'src> Context<'src> {
     }
 }
 
+#[derive(Debug)]
 enum Type<'src, A: Annotation<'src>> {
     Base,
     Constructor(TypeConstructor<'src, A>),
@@ -254,15 +258,31 @@ impl<'src> TypeReference<'src> for InferenceType<'src> {
     }
 }
 
+#[derive(Debug)]
 enum TypeConstructor<'src, A: Annotation<'src>> {
     Arrow,
     Named { id: Id, typ: A::Type },
 }
 
 impl<'src> TypeConstructor<'src, Inference> {
-    fn arrow(left: InferenceType<'src>, right: InferenceType<'src>) -> InferenceType<'src> {
+    fn apply(left: InferenceType<'src>, right: InferenceType<'src>) -> InferenceType<'src> {
         TypeRef::new(Type::Apply {
             left,
+            right,
+            typ: Type::type_of_type(),
+        })
+    }
+
+    fn arrow(left: InferenceType<'src>, right: InferenceType<'src>) -> InferenceType<'src> {
+        let arrow = TypeRef::new(Type::Constructor(Self::Arrow));
+
+        TypeRef::new(Type::Apply {
+            left: TypeRef::new(Type::Apply {
+                left: arrow,
+                right: left,
+                // TODO: What should `typ` be?
+                typ: Type::type_of_type(),
+            }),
             right,
             typ: Type::type_of_type(),
         })
@@ -305,6 +325,10 @@ new_key_type! {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
+    use goldenfile::Mint;
+
     use super::*;
 
     // TODO: This sholuld be removed once we actually use the types
@@ -316,13 +340,13 @@ mod tests {
     }
 
     #[test]
-    fn basic() {
+    fn infer_kinds() {
         // data X m a = C : (m a) -> X
         let m = TypeRef::new(Type::Variable);
         let a = TypeRef::new(Type::Variable);
 
-        // TODO: Don't use `Type::Variable`
-        let constructor_type = TypeRef::new(Type::Variable);
+        // TODO: `C : (m a) -> X`, not `C : (m a)`
+        let constructor_type = TypeConstructor::apply(m, a);
         let mut types = SlotMap::with_key();
         let cons_id = types.insert(constructor_type.clone());
         let context = &mut Context { types };
@@ -332,5 +356,11 @@ mod tests {
         };
 
         constructor.infer_types(context);
+
+        let mut mint = Mint::new("tests/goldenfiles");
+        let mut output = mint.new_goldenfile("infer-kinds.txt").unwrap();
+
+        // TODO: Fix goldenfile output
+        write!(output, "{constructor:#?}").unwrap();
     }
 }

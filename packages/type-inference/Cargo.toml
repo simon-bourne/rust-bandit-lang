@@ -7,3 +7,7 @@ publish = false
 [dependencies]
 derive_more.workspace = true
 slotmap.workspace = true
+
+[dev-dependencies]
+goldenfile.workspace = true
+indoc.workspace = true
