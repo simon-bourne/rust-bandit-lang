@@ -326,5 +326,19 @@ mod tests {
     fn basic() {
         // data X m a = C (m a)
         // TODO: Implement
+        let m = TypeRef::new(Type::Variable);
+        let a = TypeRef::new(Type::Variable);
+
+        // TODO: Don't use `Type::Variable`
+        let constructor_type = TypeRef::new(Type::Variable);
+        let mut types = SlotMap::with_key();
+        let cons_id = types.insert(constructor_type.clone());
+        let context = &mut Context { types };
+        let mut constructor = ValueConstructor {
+            id: cons_id,
+            typ: constructor_type,
+        };
+
+        constructor.infer_types(context);
     }
 }
