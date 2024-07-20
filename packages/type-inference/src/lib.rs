@@ -214,6 +214,14 @@ impl<'src> Type<'src, Inference> {
 
         Ok(())
     }
+
+    fn typ(&self) -> InferenceType<'src> {
+        match self {
+            Self::Base | Self::Variable => Self::type_of_type(),
+            Self::Constructor(cons) => cons.typ(),
+            Self::Apply { left, right, typ } => typ.clone(),
+        }
+    }
 }
 
 type InferenceType<'src> = <Inference as Annotation<'src>>::Type;
@@ -224,6 +232,8 @@ trait TypeReference<'src> {
     fn non_variable<'a>(&'a self) -> Option<RefMut<'a, Type<'src, Inference>>>;
 
     fn replace(&mut self, other: &Self);
+
+    fn typ(&self) -> Self;
 }
 
 impl<'src> TypeReference<'src> for InferenceType<'src> {
@@ -256,6 +266,13 @@ impl<'src> TypeReference<'src> for InferenceType<'src> {
         RefCell::replace(self, TypeRef::Link(other.clone()));
         *self = other.clone();
     }
+
+    fn typ(&self) -> Self {
+        match &*self.borrow() {
+            TypeRef::Own(owned) => owned.typ(),
+            TypeRef::Link(target) => target.typ(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -266,12 +283,8 @@ enum TypeConstructor<'src, A: Annotation<'src>> {
 
 impl<'src> TypeConstructor<'src, Inference> {
     fn apply(left: InferenceType<'src>, right: InferenceType<'src>) -> InferenceType<'src> {
-        TypeRef::new(Type::Apply {
-            left,
-            right,
-            // TODO: Should be `right.typ()`
-            typ: Type::type_of_type(),
-        })
+        let typ = right.typ();
+        TypeRef::new(Type::Apply { left, right, typ })
     }
 
     fn arrow(left: InferenceType<'src>, right: InferenceType<'src>) -> InferenceType<'src> {
@@ -295,6 +308,16 @@ impl<'src> TypeConstructor<'src, Inference> {
         }
 
         Ok(())
+    }
+
+    fn typ(&self) -> InferenceType<'src> {
+        match self {
+            Self::Arrow => Self::arrow(
+                Type::type_of_type(),
+                Self::arrow(Type::type_of_type(), Type::type_of_type()),
+            ),
+            Self::Named { id, typ } => typ.clone(),
+        }
     }
 }
 
