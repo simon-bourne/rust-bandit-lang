@@ -264,16 +264,8 @@ impl<'src> TypeConstructor<'src, Inference> {
         TypeRef::new(Type::Apply {
             left,
             right,
-            typ: Self::arrow_type(),
+            typ: Type::type_of_type(),
         })
-    }
-
-    fn arrow_type() -> InferenceType<'src> {
-        // TODO: This would recurse forever
-        Self::arrow(
-            Type::type_of_type(),
-            Self::arrow(Type::type_of_type(), Type::type_of_type()),
-        )
     }
 
     fn unify(left: &mut Self, right: &mut Self) -> Result<()> {
