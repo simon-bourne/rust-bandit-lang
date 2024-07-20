@@ -87,14 +87,13 @@ struct Context<'src> {
 }
 
 impl<'src> Context<'src> {
-    fn insert(&mut self, id: Id, typ: &mut InferenceType<'src>) -> Result<()> {
-        if let Some(existing) = self.types.get_mut(id) {
-            Type::unify(existing, typ)?;
-        } else {
-            self.types.insert(typ.clone());
-        }
+    fn unify(&mut self, id: Id, typ: &mut InferenceType<'src>) -> Result<()> {
+        let Some(item) = self.types.get_mut(id) else {
+            return Err(InferenceError);
+        };
 
-        Ok(())
+        // TODO: Instantiate `item` with fresh variables.
+        Type::unify(item, typ)
     }
 }
 
@@ -115,7 +114,7 @@ impl<'src> Type<'src, Inference> {
             Self::Base | Self::Variable => (),
             Self::Constructor(constructor) => {
                 if let TypeConstructor::Named { id, typ } = constructor {
-                    context.insert(*id, typ)?;
+                    context.unify(*id, typ)?;
                     typ.borrow_mut().infer_types(context)?;
                 }
             }
@@ -274,7 +273,7 @@ struct Value<'src, A: Annotation<'src>> {
 
 impl<'src> Value<'src, Inference> {
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
-        context.insert(self.id, &mut self.typ)?;
+        context.unify(self.id, &mut self.typ)?;
         self.typ.borrow_mut().infer_types(context)
     }
 }
