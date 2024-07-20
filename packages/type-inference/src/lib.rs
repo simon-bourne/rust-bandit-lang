@@ -29,6 +29,34 @@ impl<'src> Program<'src, Inference> {
     }
 }
 
+pub struct Data<'src, A: Annotation<'src>> {
+    declaration: DataDeclaration<'src, A>,
+    constructors: Vec<ValueConstructor<'src, A>>,
+}
+
+impl<'src> Data<'src, Inference> {
+    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
+        self.declaration.infer_types(context)?;
+
+        for c in &mut self.constructors {
+            c.infer_types(context)?;
+        }
+
+        Ok(())
+    }
+}
+
+pub struct ValueConstructor<'src, A: Annotation<'src>> {
+    id: Id,
+    typ: A::Type,
+}
+
+impl<'src> ValueConstructor<'src, Inference> {
+    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
+        self.typ.borrow_mut().infer_types(context)
+    }
+}
+
 type Result<T> = result::Result<T, InferenceError>;
 
 struct InferenceError;
@@ -292,5 +320,11 @@ mod tests {
     fn build() {
         let _inferred = Type::<'static, Inferred>::Base;
         let _inference = Type::<'static, Inference>::Base;
+    }
+
+    #[test]
+    fn basic() {
+        // data X m a = C (m a)
+        // TODO: Implement
     }
 }
