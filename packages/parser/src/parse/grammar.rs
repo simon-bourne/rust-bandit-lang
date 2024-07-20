@@ -144,8 +144,7 @@ fn item_list<'src, T: 'src>(item: impl TTParser<'src, T>) -> impl TTParser<'src,
         .or(item.separated_by(comma()).at_least(1).collect())
 }
 
-// Windows line endings are a pain, so just skip the parser tests
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod tests {
     use std::io::Write;
 
