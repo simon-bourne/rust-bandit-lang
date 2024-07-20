@@ -269,6 +269,7 @@ impl<'src> TypeConstructor<'src, Inference> {
     }
 
     fn arrow_type() -> InferenceType<'src> {
+        // TODO: This would recurse forever
         Self::arrow(
             Type::type_of_type(),
             Self::arrow(Type::type_of_type(), Type::type_of_type()),
@@ -324,8 +325,7 @@ mod tests {
 
     #[test]
     fn basic() {
-        // data X m a = C (m a)
-        // TODO: Implement
+        // data X m a = C : (m a) -> X
         let m = TypeRef::new(Type::Variable);
         let a = TypeRef::new(Type::Variable);
 
