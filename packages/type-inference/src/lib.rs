@@ -108,87 +108,11 @@ impl<'src> TypeRef<'src> {
         }
     }
 
-    fn apply(left: SharedMut<Self>, right: SharedMut<Self>) -> SharedMut<Self> {
-        let typ = right.typ();
-        TypeRef::new(Type::Apply { left, right, typ })
+    fn type_of_type() -> SharedMut<Self> {
+        Self::new(Type::Base)
     }
 
-    fn arrow(left: SharedMut<Self>, right: SharedMut<Self>) -> SharedMut<Self> {
-        Self::apply(
-            Self::apply(
-                TypeRef::new(Type::Constructor(TypeConstructor::Arrow)),
-                left,
-            ),
-            right,
-        )
-    }
-}
-
-struct Inferred;
-
-impl<'src> Annotation<'src> for Inferred {
-    type Type = Rc<Type<'src, Self>>;
-}
-
-struct Context<'src> {
-    types: SlotMap<Id, InferenceType<'src>>,
-}
-
-impl<'src> Context<'src> {
-    fn unify(&mut self, id: Id, typ: &mut InferenceType<'src>) -> Result<()> {
-        let Some(item) = self.types.get_mut(id) else {
-            return Err(InferenceError);
-        };
-
-        // TODO: Instantiate `item` with fresh variables.
-        Type::unify(item, typ)
-    }
-}
-
-#[derive(Debug)]
-enum Type<'src, A: Annotation<'src>> {
-    Base,
-    Constructor(TypeConstructor<'src, A>),
-    Apply {
-        left: A::Type,
-        right: A::Type,
-        typ: A::Type,
-    },
-    Variable,
-}
-
-impl<'src> Type<'src, Inference> {
-    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
-        match self {
-            Self::Base | Self::Variable => (),
-            Self::Constructor(constructor) => {
-                if let TypeConstructor::Named { id, typ } = constructor {
-                    context.unify(*id, typ)?;
-                    typ.borrow_mut().infer_types(context)?;
-                }
-            }
-            Self::Apply { left, right, typ } => {
-                let mut a = TypeRef::new(Self::Variable);
-                let mut b = TypeRef::new(Self::Variable);
-                let mut f = TypeRef::arrow(a.clone(), b.clone());
-                Self::unify(&mut f, left)?;
-                Self::unify(&mut a, right)?;
-                Self::unify(&mut b, typ)?;
-
-                left.borrow_mut().infer_types(context)?;
-                right.borrow_mut().infer_types(context)?;
-                typ.borrow_mut().infer_types(context)?;
-            }
-        }
-
-        Ok(())
-    }
-
-    fn type_of_type() -> InferenceType<'src> {
-        TypeRef::new(Self::Base)
-    }
-
-    fn unify(x: &mut InferenceType<'src>, y: &mut InferenceType<'src>) -> Result<()> {
+    fn unify(x: &mut SharedMut<Self>, y: &mut SharedMut<Self>) -> Result<()> {
         x.follow_links();
         y.follow_links();
 
@@ -232,9 +156,85 @@ impl<'src> Type<'src, Inference> {
         Ok(())
     }
 
+    fn apply(left: SharedMut<Self>, right: SharedMut<Self>) -> SharedMut<Self> {
+        let typ = right.typ();
+        Self::new(Type::Apply { left, right, typ })
+    }
+
+    fn arrow(left: SharedMut<Self>, right: SharedMut<Self>) -> SharedMut<Self> {
+        Self::apply(
+            Self::apply(
+                Self::new(Type::Constructor(TypeConstructor::Arrow)),
+                left,
+            ),
+            right,
+        )
+    }
+}
+
+struct Inferred;
+
+impl<'src> Annotation<'src> for Inferred {
+    type Type = Rc<Type<'src, Self>>;
+}
+
+struct Context<'src> {
+    types: SlotMap<Id, InferenceType<'src>>,
+}
+
+impl<'src> Context<'src> {
+    fn unify(&mut self, id: Id, typ: &mut InferenceType<'src>) -> Result<()> {
+        let Some(item) = self.types.get_mut(id) else {
+            return Err(InferenceError);
+        };
+
+        // TODO: Instantiate `item` with fresh variables.
+        TypeRef::unify(item, typ)
+    }
+}
+
+#[derive(Debug)]
+enum Type<'src, A: Annotation<'src>> {
+    Base,
+    Constructor(TypeConstructor<'src, A>),
+    Apply {
+        left: A::Type,
+        right: A::Type,
+        typ: A::Type,
+    },
+    Variable,
+}
+
+impl<'src> Type<'src, Inference> {
+    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
+        match self {
+            Self::Base | Self::Variable => (),
+            Self::Constructor(constructor) => {
+                if let TypeConstructor::Named { id, typ } = constructor {
+                    context.unify(*id, typ)?;
+                    typ.borrow_mut().infer_types(context)?;
+                }
+            }
+            Self::Apply { left, right, typ } => {
+                let mut a = TypeRef::new(Self::Variable);
+                let mut b = TypeRef::new(Self::Variable);
+                let mut f = TypeRef::arrow(a.clone(), b.clone());
+                TypeRef::unify(&mut f, left)?;
+                TypeRef::unify(&mut a, right)?;
+                TypeRef::unify(&mut b, typ)?;
+
+                left.borrow_mut().infer_types(context)?;
+                right.borrow_mut().infer_types(context)?;
+                typ.borrow_mut().infer_types(context)?;
+            }
+        }
+
+        Ok(())
+    }
+
     fn typ(&self) -> InferenceType<'src> {
         match self {
-            Self::Base | Self::Variable => Self::type_of_type(),
+            Self::Base | Self::Variable => TypeRef::type_of_type(),
             Self::Constructor(cons) => cons.typ(),
             Self::Apply { left, right, typ } => typ.clone(),
         }
@@ -307,7 +307,7 @@ impl<'src> TypeConstructor<'src, Inference> {
                     Err(InferenceError)?;
                 }
 
-                Type::unify(typ, typ1)?;
+                TypeRef::unify(typ, typ1)?;
             }
             _ => Err(InferenceError)?,
         }
@@ -318,8 +318,8 @@ impl<'src> TypeConstructor<'src, Inference> {
     fn typ(&self) -> InferenceType<'src> {
         match self {
             Self::Arrow => TypeRef::arrow(
-                Type::type_of_type(),
-                TypeRef::arrow(Type::type_of_type(), Type::type_of_type()),
+                TypeRef::type_of_type(),
+                TypeRef::arrow(TypeRef::type_of_type(), TypeRef::type_of_type()),
             ),
             Self::Named { id, typ } => typ.clone(),
         }
