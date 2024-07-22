@@ -10,6 +10,8 @@ use std::{
 use derive_more::Constructor;
 use slotmap::{new_key_type, SlotMap};
 
+type SharedMut<T> = Rc<RefCell<T>>;
+
 pub struct Program<'src, A: Annotation<'src>> {
     data: Vec<DataDeclaration<'src, A>>,
     values: Vec<Value<'src, A>>,
@@ -85,7 +87,7 @@ pub trait Annotation<'src> {
 struct Inference;
 
 impl<'src> Annotation<'src> for Inference {
-    type Type = Rc<RefCell<TypeRef<'src>>>;
+    type Type = SharedMut<TypeRef<'src>>;
 }
 
 #[derive(Debug)]
@@ -95,7 +97,7 @@ enum TypeRef<'src> {
 }
 
 impl<'src> TypeRef<'src> {
-    fn new(typ: Type<'src, Inference>) -> Rc<RefCell<Self>> {
+    fn new(typ: Type<'src, Inference>) -> SharedMut<Self> {
         Rc::new(RefCell::new(Self::Own(typ)))
     }
 
