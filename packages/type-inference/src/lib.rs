@@ -107,6 +107,21 @@ impl<'src> TypeRef<'src> {
             Self::Link(target) => target.borrow_mut().infer_types(context),
         }
     }
+
+    fn apply(left: SharedMut<Self>, right: SharedMut<Self>) -> SharedMut<Self> {
+        let typ = right.typ();
+        TypeRef::new(Type::Apply { left, right, typ })
+    }
+
+    fn arrow(left: SharedMut<Self>, right: SharedMut<Self>) -> SharedMut<Self> {
+        Self::apply(
+            Self::apply(
+                TypeRef::new(Type::Constructor(TypeConstructor::Arrow)),
+                left,
+            ),
+            right,
+        )
+    }
 }
 
 struct Inferred;
@@ -155,7 +170,7 @@ impl<'src> Type<'src, Inference> {
             Self::Apply { left, right, typ } => {
                 let mut a = TypeRef::new(Self::Variable);
                 let mut b = TypeRef::new(Self::Variable);
-                let mut f = TypeConstructor::arrow(a.clone(), b.clone());
+                let mut f = TypeRef::arrow(a.clone(), b.clone());
                 Self::unify(&mut f, left)?;
                 Self::unify(&mut a, right)?;
                 Self::unify(&mut b, typ)?;
@@ -284,18 +299,6 @@ enum TypeConstructor<'src, A: Annotation<'src>> {
 }
 
 impl<'src> TypeConstructor<'src, Inference> {
-    fn apply(left: InferenceType<'src>, right: InferenceType<'src>) -> InferenceType<'src> {
-        let typ = right.typ();
-        TypeRef::new(Type::Apply { left, right, typ })
-    }
-
-    fn arrow(left: InferenceType<'src>, right: InferenceType<'src>) -> InferenceType<'src> {
-        Self::apply(
-            Self::apply(TypeRef::new(Type::Constructor(Self::Arrow)), left),
-            right,
-        )
-    }
-
     fn unify(left: &mut Self, right: &mut Self) -> Result<()> {
         match (left, right) {
             (Self::Arrow, Self::Arrow) => (),
@@ -314,9 +317,9 @@ impl<'src> TypeConstructor<'src, Inference> {
 
     fn typ(&self) -> InferenceType<'src> {
         match self {
-            Self::Arrow => Self::arrow(
+            Self::Arrow => TypeRef::arrow(
                 Type::type_of_type(),
-                Self::arrow(Type::type_of_type(), Type::type_of_type()),
+                TypeRef::arrow(Type::type_of_type(), Type::type_of_type()),
             ),
             Self::Named { id, typ } => typ.clone(),
         }
@@ -364,7 +367,7 @@ mod tests {
         let a = TypeRef::new(Type::Variable);
 
         // TODO: `C : (m a) -> X`, not `C : (m a)`
-        let constructor_type = TypeConstructor::apply(m, a);
+        let constructor_type = TypeRef::apply(m, a);
         let mut types = SlotMap::with_key();
         let cons_id = types.insert(constructor_type.clone());
         let context = &mut Context { types };
