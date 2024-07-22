@@ -163,10 +163,7 @@ impl<'src> TypeRef<'src> {
 
     fn arrow(left: SharedMut<Self>, right: SharedMut<Self>) -> SharedMut<Self> {
         Self::apply(
-            Self::apply(
-                Self::new(Type::Constructor(TypeConstructor::Arrow)),
-                left,
-            ),
+            Self::apply(Self::new(Type::Constructor(TypeConstructor::Arrow)), left),
             right,
         )
     }
