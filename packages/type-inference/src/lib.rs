@@ -8,9 +8,11 @@ use std::{
 };
 
 use derive_more::Constructor;
+use pretty::RcDoc;
 use slotmap::{new_key_type, SlotMap};
 
 type SharedMut<T> = Rc<RefCell<T>>;
+type PrettyDoc = RcDoc<'static>;
 
 pub struct Program<'src, A: Annotation<'src>> {
     data: Vec<DataDeclaration<'src, A>>,
@@ -54,6 +56,21 @@ pub struct ValueConstructor<'src, A: Annotation<'src>> {
     typ: A::Type,
 }
 
+impl<'src, A> ValueConstructor<'src, A>
+where
+    A: Annotation<'src>,
+{
+    fn pretty(&self) -> PrettyDoc {
+        PrettyDoc::concat([
+            PrettyDoc::text("("),
+            PrettyDoc::text("ValueConstructor"),
+            PrettyDoc::text(":"),
+            self.typ.pretty(),
+            PrettyDoc::text(")"),
+        ])
+    }
+}
+
 impl<'src> ValueConstructor<'src, Inference> {
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         self.typ.borrow_mut().infer_types(context)
@@ -80,7 +97,11 @@ impl<'src> DataDeclaration<'src, Inference> {
 }
 
 pub trait Annotation<'src> {
-    type Type;
+    type Type: Pretty;
+}
+
+pub trait Pretty {
+    fn pretty(&self) -> PrettyDoc;
 }
 
 #[derive(Debug)]
@@ -88,6 +109,15 @@ struct Inference;
 
 impl<'src> Annotation<'src> for Inference {
     type Type = SharedMut<TypeRef<'src>>;
+}
+
+impl<'src> Pretty for SharedMut<TypeRef<'src>> {
+    fn pretty(&self) -> PrettyDoc {
+        match &*self.borrow() {
+            TypeRef::Own(owned) => owned.pretty(),
+            TypeRef::Link(linked) => linked.pretty(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -175,6 +205,12 @@ impl<'src> Annotation<'src> for Inferred {
     type Type = Rc<Type<'src, Self>>;
 }
 
+impl<'src> Pretty for Rc<Type<'src, Inferred>> {
+    fn pretty(&self) -> PrettyDoc {
+        self.as_ref().pretty()
+    }
+}
+
 struct Context<'src> {
     types: SlotMap<Id, InferenceType<'src>>,
 }
@@ -200,6 +236,27 @@ enum Type<'src, A: Annotation<'src>> {
         typ: A::Type,
     },
     Variable,
+}
+
+impl<'src, A: Annotation<'src>> Type<'src, A> {
+    fn pretty(&self) -> PrettyDoc {
+        match self {
+            Type::Base => PrettyDoc::text("Type"),
+            Type::Constructor(cons) => cons.pretty(),
+            Type::Apply { left, right, typ } => PrettyDoc::concat([
+                PrettyDoc::text("("),
+                PrettyDoc::text("("),
+                left.pretty(),
+                PrettyDoc::space(),
+                right.pretty(),
+                PrettyDoc::text(")"),
+                PrettyDoc::text(":"),
+                typ.pretty(),
+                PrettyDoc::text(")"),
+            ]),
+            Type::Variable => PrettyDoc::text("variable"),
+        }
+    }
 }
 
 impl<'src> Type<'src, Inference> {
@@ -295,6 +352,21 @@ enum TypeConstructor<'src, A: Annotation<'src>> {
     Named { id: Id, typ: A::Type },
 }
 
+impl<'src, A: Annotation<'src>> TypeConstructor<'src, A> {
+    fn pretty(&self) -> PrettyDoc {
+        match self {
+            TypeConstructor::Arrow => PrettyDoc::text("(->)"),
+            TypeConstructor::Named { id, typ } => PrettyDoc::concat([
+                PrettyDoc::text("("),
+                PrettyDoc::text("TypeConstructor"),
+                PrettyDoc::text(":"),
+                typ.pretty(),
+                PrettyDoc::text(")"),
+            ]),
+        }
+    }
+}
+
 impl<'src> TypeConstructor<'src, Inference> {
     fn unify(left: &mut Self, right: &mut Self) -> Result<()> {
         match (left, right) {
@@ -375,10 +447,13 @@ mod tests {
 
         constructor.infer_types(context);
 
-        let mut mint = Mint::new("tests/goldenfiles");
-        let mut output = mint.new_goldenfile("infer-kinds.txt").unwrap();
-
         // TODO: Fix goldenfile output
+        let mut mint = Mint::new("tests/goldenfiles");
+
+        let mut output = mint.new_goldenfile("infer-kinds.txt").unwrap();
         write!(output, "{constructor:#?}").unwrap();
+
+        let mut pretty_output = mint.new_goldenfile("infer-kinds-pretty.txt").unwrap();
+        constructor.pretty().render(80, &mut pretty_output).unwrap();
     }
 }

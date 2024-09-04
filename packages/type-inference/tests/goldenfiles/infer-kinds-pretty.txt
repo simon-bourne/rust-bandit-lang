@@ -1,0 +1,1 @@
+(ValueConstructor:(((((((->) variable):Type) Type):Type) variable):Type))
