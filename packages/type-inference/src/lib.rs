@@ -448,13 +448,8 @@ mod tests {
 
         constructor.infer_types(context);
 
-        // TODO: Fix goldenfile output
         let mut mint = Mint::new("tests/goldenfiles");
-
         let mut output = mint.new_goldenfile("infer-kinds.txt").unwrap();
-        write!(output, "{constructor:#?}").unwrap();
-
-        let mut pretty_output = mint.new_goldenfile("infer-kinds-pretty.txt").unwrap();
-        constructor.pretty().render(80, &mut pretty_output).unwrap();
+        constructor.pretty().render(80, &mut output).unwrap();
     }
 }
