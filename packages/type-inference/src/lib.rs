@@ -236,6 +236,7 @@ enum Type<'src, A: Annotation<'src>> {
         typ: A::Type,
     },
     Variable,
+    // TODO: Add an `Unknown` variant instead of using `Variable` for unknowns.
 }
 
 impl<'src, A: Annotation<'src>> Type<'src, A> {
