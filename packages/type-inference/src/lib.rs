@@ -79,6 +79,7 @@ impl<'src> ValueConstructor<'src, Inference> {
 
 type Result<T> = result::Result<T, InferenceError>;
 
+#[derive(Debug)]
 struct InferenceError;
 
 struct DataDeclaration<'src, A: Annotation<'src>> {
@@ -114,7 +115,8 @@ impl<'src> Annotation<'src> for Inference {
 impl<'src> Pretty for SharedMut<TypeRef<'src>> {
     fn pretty(&self) -> PrettyDoc {
         match &*self.borrow() {
-            TypeRef::Own(owned) => owned.pretty(),
+            TypeRef::Known(owned) => owned.pretty(),
+            TypeRef::Unknown => PrettyDoc::text("<unknown>"),
             TypeRef::Link(linked) => linked.pretty(),
         }
     }
@@ -122,18 +124,24 @@ impl<'src> Pretty for SharedMut<TypeRef<'src>> {
 
 #[derive(Debug)]
 enum TypeRef<'src> {
-    Own(Type<'src, Inference>),
+    Known(Type<'src, Inference>),
+    Unknown,
     Link(InferenceType<'src>),
 }
 
 impl<'src> TypeRef<'src> {
     fn new(typ: Type<'src, Inference>) -> SharedMut<Self> {
-        Rc::new(RefCell::new(Self::Own(typ)))
+        Rc::new(RefCell::new(Self::Known(typ)))
+    }
+
+    fn unknown() -> SharedMut<Self> {
+        Rc::new(RefCell::new(Self::Unknown))
     }
 
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         match self {
-            Self::Own(typ) => typ.infer_types(context),
+            Self::Known(typ) => typ.infer_types(context),
+            Self::Unknown => Ok(()),
             Self::Link(target) => target.borrow_mut().infer_types(context),
         }
     }
@@ -150,12 +158,12 @@ impl<'src> TypeRef<'src> {
             return Ok(());
         }
 
-        let Some(mut x_ref) = x.non_variable() else {
+        let Some(mut x_ref) = x.known() else {
             x.replace(y);
             return Ok(());
         };
 
-        let Some(mut y_ref) = y.non_variable() else {
+        let Some(mut y_ref) = y.known() else {
             y.replace(x);
             return Ok(());
         };
@@ -235,8 +243,7 @@ enum Type<'src, A: Annotation<'src>> {
         right: A::Type,
         typ: A::Type,
     },
-    Variable,
-    // TODO: Add an `Unknown` variant instead of using `Variable` for unknowns.
+    Variable(A::Type),
 }
 
 impl<'src, A: Annotation<'src>> Type<'src, A> {
@@ -255,7 +262,13 @@ impl<'src, A: Annotation<'src>> Type<'src, A> {
                 typ.pretty(),
                 PrettyDoc::text(")"),
             ]),
-            Type::Variable => PrettyDoc::text("variable"),
+            Type::Variable(typ) => PrettyDoc::concat([
+                PrettyDoc::text("("),
+                PrettyDoc::text("variable"),
+                PrettyDoc::text(":"),
+                typ.pretty(),
+                PrettyDoc::text(")"),
+            ]),
         }
     }
 }
@@ -263,7 +276,8 @@ impl<'src, A: Annotation<'src>> Type<'src, A> {
 impl<'src> Type<'src, Inference> {
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         match self {
-            Self::Base | Self::Variable => (),
+            Self::Base => (),
+            Self::Variable(typ) => typ.borrow_mut().infer_types(context)?,
             Self::Constructor(constructor) => {
                 if let TypeConstructor::Named { id, typ } = constructor {
                     context.unify(*id, typ)?;
@@ -271,14 +285,15 @@ impl<'src> Type<'src, Inference> {
                 }
             }
             Self::Apply { left, right, typ } => {
-                let mut a = TypeRef::new(Self::Variable);
-                let mut b = TypeRef::new(Self::Variable);
+                let mut a = TypeRef::unknown();
+                let mut b = TypeRef::unknown();
                 let mut f = TypeRef::arrow(a.clone(), b.clone());
-                TypeRef::unify(&mut f, left)?;
-                TypeRef::unify(&mut a, right)?;
+                TypeRef::unify(&mut f, &mut left.typ())?;
+                TypeRef::unify(&mut a, &mut right.typ())?;
                 TypeRef::unify(&mut b, typ)?;
 
-                left.borrow_mut().infer_types(context)?;
+                // TODO: Why does this create a loop?
+                // left.borrow_mut().infer_types(context)?;
                 right.borrow_mut().infer_types(context)?;
                 typ.borrow_mut().infer_types(context)?;
             }
@@ -289,7 +304,8 @@ impl<'src> Type<'src, Inference> {
 
     fn typ(&self) -> InferenceType<'src> {
         match self {
-            Self::Base | Self::Variable => TypeRef::type_of_type(),
+            Self::Base => TypeRef::type_of_type(),
+            Self::Variable(typ) => typ.clone(),
             Self::Constructor(cons) => cons.typ(),
             Self::Apply { left, right, typ } => typ.clone(),
         }
@@ -301,7 +317,7 @@ type InferenceType<'src> = <Inference as Annotation<'src>>::Type;
 trait TypeReference<'src> {
     fn follow_links(&mut self);
 
-    fn non_variable<'a>(&'a self) -> Option<RefMut<'a, Type<'src, Inference>>>;
+    fn known<'a>(&'a self) -> Option<RefMut<'a, Type<'src, Inference>>>;
 
     fn replace(&mut self, other: &Self);
 
@@ -322,11 +338,10 @@ impl<'src> TypeReference<'src> for InferenceType<'src> {
         }
     }
 
-    fn non_variable<'a>(&'a self) -> Option<RefMut<'a, Type<'src, Inference>>> {
+    fn known<'a>(&'a self) -> Option<RefMut<'a, Type<'src, Inference>>> {
         RefMut::filter_map(self.borrow_mut(), |x| {
-            if let TypeRef::Own(owned) = x {
-                let non_variable = !matches!(owned, Type::Variable);
-                non_variable.then_some(owned)
+            if let TypeRef::Known(known) = x {
+                Some(known)
             } else {
                 None
             }
@@ -341,7 +356,8 @@ impl<'src> TypeReference<'src> for InferenceType<'src> {
 
     fn typ(&self) -> Self {
         match &*self.borrow() {
-            TypeRef::Own(owned) => owned.typ(),
+            TypeRef::Known(owned) => owned.typ(),
+            TypeRef::Unknown => self.clone(),
             TypeRef::Link(target) => target.typ(),
         }
     }
@@ -388,8 +404,8 @@ impl<'src> TypeConstructor<'src, Inference> {
     fn typ(&self) -> InferenceType<'src> {
         match self {
             Self::Arrow => TypeRef::arrow(
-                TypeRef::type_of_type(),
-                TypeRef::arrow(TypeRef::type_of_type(), TypeRef::type_of_type()),
+                TypeRef::unknown(),
+                TypeRef::arrow(TypeRef::unknown(), TypeRef::unknown()),
             ),
             Self::Named { id, typ } => typ.clone(),
         }
@@ -433,8 +449,8 @@ mod tests {
     #[test]
     fn infer_kinds() {
         // data X m a = C : (m a) -> X
-        let m = TypeRef::new(Type::Variable);
-        let a = TypeRef::new(Type::Variable);
+        let m = TypeRef::new(Type::Variable(TypeRef::unknown()));
+        let a = TypeRef::new(Type::Variable(TypeRef::unknown()));
 
         // TODO: `C : (m a) -> X`, not `C : (m a)`
         let constructor_type = TypeRef::apply(m, a);
@@ -446,7 +462,7 @@ mod tests {
             typ: constructor_type,
         };
 
-        constructor.infer_types(context);
+        constructor.infer_types(context).unwrap();
 
         let mut mint = Mint::new("tests/goldenfiles");
         let mut output = mint.new_goldenfile("infer-kinds.txt").unwrap();
