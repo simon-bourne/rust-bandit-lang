@@ -285,17 +285,17 @@ impl<'src> Type<'src, Inference> {
                 }
             }
             Self::Apply { left, right, typ } => {
+                // TODO: Why does this create a loop, but only when called after `unify`?
+                left.borrow_mut().infer_types(context)?;
+                right.borrow_mut().infer_types(context)?;
+                typ.borrow_mut().infer_types(context)?;
+
                 let mut a = TypeRef::unknown();
                 let mut b = TypeRef::unknown();
                 let mut f = TypeRef::arrow(a.clone(), b.clone());
                 TypeRef::unify(&mut f, &mut left.typ())?;
                 TypeRef::unify(&mut a, &mut right.typ())?;
                 TypeRef::unify(&mut b, typ)?;
-
-                // TODO: Why does this create a loop?
-                // left.borrow_mut().infer_types(context)?;
-                right.borrow_mut().infer_types(context)?;
-                typ.borrow_mut().infer_types(context)?;
             }
         }
 
