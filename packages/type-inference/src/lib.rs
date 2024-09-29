@@ -285,7 +285,8 @@ impl<'src> Type<'src, Inference> {
                 }
             }
             Self::Apply { left, right, typ } => {
-                // TODO: Why does this create a loop, but only when called after `unify`?
+                // TODO: Why does the stack overflow when this is after:
+                // `TypeRef::unify(&mut f, &mut left.typ())`?
                 left.borrow_mut().infer_types(context)?;
                 right.borrow_mut().infer_types(context)?;
                 typ.borrow_mut().infer_types(context)?;
@@ -357,7 +358,11 @@ impl<'src> TypeReference<'src> for InferenceType<'src> {
     fn typ(&self) -> Self {
         match &*self.borrow() {
             TypeRef::Known(owned) => owned.typ(),
-            TypeRef::Unknown => self.clone(),
+            TypeRef::Unknown => {
+                // TODO: This can create multiple inference variables where there should only be
+                // one.
+                TypeRef::unknown()
+            }
             TypeRef::Link(target) => target.typ(),
         }
     }
