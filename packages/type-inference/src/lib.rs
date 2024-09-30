@@ -358,11 +358,7 @@ impl<'src> TypeReference<'src> for InferenceType<'src> {
     fn typ(&self) -> Self {
         match &*self.borrow() {
             TypeRef::Known(owned) => owned.typ(),
-            TypeRef::Unknown => {
-                // TODO: This can create multiple inference variables where there should only be
-                // one.
-                TypeRef::unknown()
-            }
+            TypeRef::Unknown => TypeRef::type_of_type(),
             TypeRef::Link(target) => target.typ(),
         }
     }
