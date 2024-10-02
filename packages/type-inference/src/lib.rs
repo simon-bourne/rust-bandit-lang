@@ -295,6 +295,8 @@ impl<'src> Type<'src, Inference> {
                 let mut b = TypeRef::unknown();
                 let mut f = TypeRef::arrow(a.clone(), b.clone());
                 TypeRef::unify(&mut f, &mut left.typ())?;
+                // TODO: `right.typ()` and `typ` are the same (from the constructor of
+                // `TypeRef::apply`), which implies we're unifying `a` and `b` which is wrong.
                 TypeRef::unify(&mut a, &mut right.typ())?;
                 TypeRef::unify(&mut b, typ)?;
             }
