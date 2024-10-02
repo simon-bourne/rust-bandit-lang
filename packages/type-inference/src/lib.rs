@@ -173,15 +173,19 @@ impl<'src> TypeRef<'src> {
             (Type::Base, Type::Base) => (),
             (Type::Constructor(c1), Type::Constructor(c2)) => TypeConstructor::unify(c1, c2)?,
             (
-                Type::Apply { left, right, typ },
                 Type::Apply {
-                    left: left1,
-                    right: right1,
+                    function,
+                    argument,
+                    typ,
+                },
+                Type::Apply {
+                    function: function1,
+                    argument: argument1,
                     typ: typ1,
                 },
             ) => {
-                Self::unify(left, left1)?;
-                Self::unify(right, right1)?;
+                Self::unify(function, function1)?;
+                Self::unify(argument, argument1)?;
                 Self::unify(typ, typ1)?;
             }
             _ => Err(InferenceError)?,
@@ -194,9 +198,12 @@ impl<'src> TypeRef<'src> {
         Ok(())
     }
 
-    fn apply(left: SharedMut<Self>, right: SharedMut<Self>) -> SharedMut<Self> {
-        let typ = right.typ();
-        Self::new(Type::Apply { left, right, typ })
+    fn apply(function: SharedMut<Self>, argument: SharedMut<Self>) -> SharedMut<Self> {
+        Self::new(Type::Apply {
+            function,
+            argument,
+            typ: TypeRef::unknown(),
+        })
     }
 
     fn arrow(left: SharedMut<Self>, right: SharedMut<Self>) -> SharedMut<Self> {
@@ -239,8 +246,8 @@ enum Type<'src, A: Annotation<'src>> {
     Base,
     Constructor(TypeConstructor<'src, A>),
     Apply {
-        left: A::Type,
-        right: A::Type,
+        function: A::Type,
+        argument: A::Type,
         typ: A::Type,
     },
     Variable(A::Type),
@@ -251,7 +258,11 @@ impl<'src, A: Annotation<'src>> Type<'src, A> {
         match self {
             Type::Base => PrettyDoc::text("Type"),
             Type::Constructor(cons) => cons.pretty(),
-            Type::Apply { left, right, typ } => PrettyDoc::concat([
+            Type::Apply {
+                function: left,
+                argument: right,
+                typ,
+            } => PrettyDoc::concat([
                 PrettyDoc::text("("),
                 PrettyDoc::text("("),
                 left.pretty(),
@@ -284,21 +295,18 @@ impl<'src> Type<'src, Inference> {
                     typ.borrow_mut().infer_types(context)?;
                 }
             }
-            Self::Apply { left, right, typ } => {
-                // TODO: Why does the stack overflow when this is after:
-                // `TypeRef::unify(&mut f, &mut left.typ())`?
-                left.borrow_mut().infer_types(context)?;
-                right.borrow_mut().infer_types(context)?;
+            Self::Apply {
+                function,
+                argument,
+                typ,
+            } => {
+                function.borrow_mut().infer_types(context)?;
+                argument.borrow_mut().infer_types(context)?;
                 typ.borrow_mut().infer_types(context)?;
 
-                let mut a = TypeRef::unknown();
-                let mut b = TypeRef::unknown();
-                let mut f = TypeRef::arrow(a.clone(), b.clone());
-                TypeRef::unify(&mut f, &mut left.typ())?;
-                // TODO: `right.typ()` and `typ` are the same (from the constructor of
-                // `TypeRef::apply`), which implies we're unifying `a` and `b` which is wrong.
-                TypeRef::unify(&mut a, &mut right.typ())?;
-                TypeRef::unify(&mut b, typ)?;
+                // TODO: If we unify first, we get a stack overflow
+                let mut f = TypeRef::arrow(argument.typ(), typ.clone());
+                TypeRef::unify(&mut f, &mut function.typ())?;
             }
         }
 
@@ -310,7 +318,7 @@ impl<'src> Type<'src, Inference> {
             Self::Base => TypeRef::type_of_type(),
             Self::Variable(typ) => typ.clone(),
             Self::Constructor(cons) => cons.typ(),
-            Self::Apply { left, right, typ } => typ.clone(),
+            Self::Apply { typ, .. } => typ.clone(),
         }
     }
 }
