@@ -198,7 +198,11 @@ impl<'src> TypeRef<'src> {
         Ok(())
     }
 
-    fn apply(function: SharedMut<Self>, argument: SharedMut<Self>) -> SharedMut<Self> {
+    fn apply(
+        function: SharedMut<Self>,
+        argument: SharedMut<Self>,
+        typ: SharedMut<Self>,
+    ) -> SharedMut<Self> {
         Self::new(Type::Apply {
             function,
             argument,
@@ -207,10 +211,12 @@ impl<'src> TypeRef<'src> {
     }
 
     fn arrow(left: SharedMut<Self>, right: SharedMut<Self>) -> SharedMut<Self> {
-        Self::apply(
-            Self::apply(Self::new(Type::Constructor(TypeConstructor::Arrow)), left),
-            right,
-        )
+        let typ = TypeRef::type_of_type;
+        let arrow_op = || Self::new(Type::Constructor(TypeConstructor::Arrow));
+        // TODO: This is wrong. Is the type of arrow infinite if we try and give every
+        // sub expression a type?
+        let apply1_type = Self::apply(arrow_op(), typ(), typ());
+        Self::apply(Self::apply(arrow_op(), left, apply1_type), right, typ())
     }
 }
 
@@ -415,8 +421,8 @@ impl<'src> TypeConstructor<'src, Inference> {
     fn typ(&self) -> InferenceType<'src> {
         match self {
             Self::Arrow => TypeRef::arrow(
-                TypeRef::unknown(),
-                TypeRef::arrow(TypeRef::unknown(), TypeRef::unknown()),
+                TypeRef::type_of_type(),
+                TypeRef::arrow(TypeRef::type_of_type(), TypeRef::type_of_type()),
             ),
             Self::Named { id, typ } => typ.clone(),
         }
@@ -464,7 +470,7 @@ mod tests {
         let a = TypeRef::new(Type::Variable(TypeRef::unknown()));
 
         // TODO: `C : (m a) -> X`, not `C : (m a)`
-        let constructor_type = TypeRef::apply(m, a);
+        let constructor_type = TypeRef::apply(m, a, TypeRef::unknown());
         let mut types = SlotMap::with_key();
         let cons_id = types.insert(constructor_type.clone());
         let context = &mut Context { types };
