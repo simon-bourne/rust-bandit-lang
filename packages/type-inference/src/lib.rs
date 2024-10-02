@@ -305,8 +305,8 @@ impl<'src> Type<'src, Inference> {
                 typ.borrow_mut().infer_types(context)?;
 
                 // TODO: If we unify first, we get a stack overflow
-                let mut f = TypeRef::arrow(argument.typ(), typ.clone());
-                TypeRef::unify(&mut f, &mut function.typ())?;
+                let function_type = &mut TypeRef::arrow(argument.typ(), typ.clone());
+                TypeRef::unify(function_type, &mut function.typ())?;
             }
         }
 
