@@ -213,8 +213,9 @@ impl<'src> TypeRef<'src> {
     fn arrow(left: SharedMut<Self>, right: SharedMut<Self>) -> SharedMut<Self> {
         let typ = TypeRef::type_of_type;
         let arrow_op = || Self::new(Type::Constructor(TypeConstructor::Arrow));
-        // TODO: This is wrong. Is the type of arrow infinite if we try and give every
-        // sub expression a type?
+        // TODO: This is wrong. The type of arrow is infinite if we try and give every
+        // sub expression a type. i.e `(Type ->) : Type -> Type` has `(Type ->)`
+        // as a sub expression of `Type -> Type`.
         let apply1_type = Self::apply(arrow_op(), typ(), typ());
         Self::apply(Self::apply(arrow_op(), left, apply1_type), right, typ())
     }
