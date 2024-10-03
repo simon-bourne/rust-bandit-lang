@@ -211,13 +211,20 @@ impl<'src> TypeRef<'src> {
     }
 
     fn arrow(left: SharedMut<Self>, right: SharedMut<Self>) -> SharedMut<Self> {
-        let typ = TypeRef::type_of_type;
-        let arrow_op = || Self::new(Type::Constructor(TypeConstructor::Arrow));
-        // TODO: This is wrong. The type of arrow is infinite if we try and give every
-        // sub expression a type. i.e `(Type ->) : Type -> Type` has `(Type ->)`
-        // as a sub expression of `Type -> Type`.
-        let apply1_type = Self::apply(arrow_op(), typ(), typ());
-        Self::apply(Self::apply(arrow_op(), left, apply1_type), right, typ())
+        let arrow_op = Self::new(Type::Constructor(TypeConstructor::Arrow));
+        Self::apply(
+            Self::apply(arrow_op, left, TypeRef::unknown()),
+            right,
+            TypeRef::type_of_type(),
+        )
+    }
+
+    fn is_arrow_operator(&self) -> bool {
+        match self {
+            TypeRef::Known(expr) => expr.is_arrow_operator(),
+            TypeRef::Unknown => false,
+            TypeRef::Link(linked) => linked.borrow().is_arrow_operator(),
+        }
     }
 }
 
@@ -289,6 +296,10 @@ impl<'src, A: Annotation<'src>> Type<'src, A> {
             ]),
         }
     }
+
+    fn is_arrow_operator(&self) -> bool {
+        matches!(self, Self::Constructor(TypeConstructor::Arrow))
+    }
 }
 
 impl<'src> Type<'src, Inference> {
@@ -307,13 +318,20 @@ impl<'src> Type<'src, Inference> {
                 argument,
                 typ,
             } => {
-                function.borrow_mut().infer_types(context)?;
-                argument.borrow_mut().infer_types(context)?;
-                typ.borrow_mut().infer_types(context)?;
-
-                // TODO: If we unify first, we get a stack overflow
                 let function_type = &mut TypeRef::arrow(argument.typ(), typ.clone());
                 TypeRef::unify(function_type, &mut function.typ())?;
+
+                function.borrow_mut().infer_types(context)?;
+                argument.borrow_mut().infer_types(context)?;
+
+                // `(Type ->)` has type `Type -> Type`. `Type -> Type` has `(Type ->)` as a sub
+                // expression, so we end up with an infinite expression if we try to infer types
+                // on `typ`.
+                if function.borrow().is_arrow_operator() {
+                    TypeRef::unify(argument, &mut TypeRef::type_of_type());
+                } else {
+                    typ.borrow_mut().infer_types(context)?;
+                }
             }
         }
 
