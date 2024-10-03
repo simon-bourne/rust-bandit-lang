@@ -191,8 +191,8 @@ impl<'src> TypeRef<'src> {
                 Self::unify(argument, argument1)?;
                 Self::unify(typ, typ1)?;
             }
-            (Type::ApplyArrowTo(left0), Type::ApplyArrowTo(left1)) => {
-                Self::unify(left0, left1)?;
+            (Type::ApplyArrowTo(argument0), Type::ApplyArrowTo(argument1)) => {
+                Self::unify(argument0, argument1)?;
             }
             _ => Err(InferenceError)?,
         }
@@ -298,7 +298,9 @@ impl<'src, A: Annotation<'src>> Type<'src, A> {
                 typ.pretty(),
                 PrettyDoc::text(")"),
             ]),
-            Self::ApplyArrowTo(left) => PrettyDoc::concat([left.pretty(), PrettyDoc::text(" ->")]),
+            Self::ApplyArrowTo(argument) => {
+                PrettyDoc::concat([argument.pretty(), PrettyDoc::text(" ->")])
+            }
             Self::Variable(typ) => PrettyDoc::concat([
                 PrettyDoc::text("("),
                 PrettyDoc::text("variable"),
@@ -337,9 +339,9 @@ impl<'src> Type<'src, Inference> {
                 argument.borrow_mut().infer_types(context)?;
                 typ.borrow_mut().infer_types(context)?;
             }
-            Self::ApplyArrowTo(left) => {
-                TypeRef::unify(left, &mut TypeRef::type_of_type())?;
-                left.borrow_mut().infer_types(context)?;
+            Self::ApplyArrowTo(argument) => {
+                TypeRef::unify(argument, &mut TypeRef::type_of_type())?;
+                argument.borrow_mut().infer_types(context)?;
             }
         }
 
