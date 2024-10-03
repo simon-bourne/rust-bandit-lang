@@ -1,1 +1,1 @@
-(ValueConstructor:(((variable:(((((->) Type):(((((->) Type):<unknown>) Type):<unknown>)) <unknown>):Type)) (variable:Type)):<unknown>))
+(ValueConstructor:(((variable:(({unknown} -> {unknown}):Type)) (variable:{unknown})):{unknown}))

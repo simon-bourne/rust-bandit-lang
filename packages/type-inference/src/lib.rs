@@ -116,7 +116,7 @@ impl<'src> Pretty for SharedMut<TypeRef<'src>> {
     fn pretty(&self) -> PrettyDoc {
         match &*self.borrow() {
             TypeRef::Known(owned) => owned.pretty(),
-            TypeRef::Unknown => PrettyDoc::text("<unknown>"),
+            TypeRef::Unknown => PrettyDoc::text("{unknown}"),
             TypeRef::Link(linked) => linked.pretty(),
         }
     }
@@ -168,6 +168,9 @@ impl<'src> TypeRef<'src> {
             return Ok(());
         };
 
+        x_ref.normalize_apply_arrow();
+        y_ref.normalize_apply_arrow();
+
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
             (Type::Base, Type::Base) => (),
@@ -188,6 +191,9 @@ impl<'src> TypeRef<'src> {
                 Self::unify(argument, argument1)?;
                 Self::unify(typ, typ1)?;
             }
+            (Type::ApplyArrowTo(left0), Type::ApplyArrowTo(left1)) => {
+                Self::unify(left0, left1)?;
+            }
             _ => Err(InferenceError)?,
         }
 
@@ -206,14 +212,14 @@ impl<'src> TypeRef<'src> {
         Self::new(Type::Apply {
             function,
             argument,
-            typ: TypeRef::unknown(),
+            typ,
         })
     }
 
     fn arrow(left: SharedMut<Self>, right: SharedMut<Self>) -> SharedMut<Self> {
         let arrow_op = Self::new(Type::Constructor(TypeConstructor::Arrow));
         Self::apply(
-            Self::apply(arrow_op, left, TypeRef::unknown()),
+            Self::new(Type::ApplyArrowTo(left)),
             right,
             TypeRef::type_of_type(),
         )
@@ -255,8 +261,10 @@ impl<'src> Context<'src> {
     }
 }
 
+// TODO: Rename this to `Expression``
 #[derive(Debug)]
 enum Type<'src, A: Annotation<'src>> {
+    // TODO: Rename this to `Type`
     Base,
     Constructor(TypeConstructor<'src, A>),
     Apply {
@@ -264,15 +272,18 @@ enum Type<'src, A: Annotation<'src>> {
         argument: A::Type,
         typ: A::Type,
     },
+    // Apply `->` to it's first argument. This is required because `(Type ->)` has type ` Type ->
+    // Type`, and `Type -> Type` has `(Type ->)` as a sub expression.
+    ApplyArrowTo(A::Type),
     Variable(A::Type),
 }
 
 impl<'src, A: Annotation<'src>> Type<'src, A> {
     fn pretty(&self) -> PrettyDoc {
         match self {
-            Type::Base => PrettyDoc::text("Type"),
-            Type::Constructor(cons) => cons.pretty(),
-            Type::Apply {
+            Self::Base => PrettyDoc::text("Type"),
+            Self::Constructor(cons) => cons.pretty(),
+            Self::Apply {
                 function: left,
                 argument: right,
                 typ,
@@ -287,7 +298,8 @@ impl<'src, A: Annotation<'src>> Type<'src, A> {
                 typ.pretty(),
                 PrettyDoc::text(")"),
             ]),
-            Type::Variable(typ) => PrettyDoc::concat([
+            Self::ApplyArrowTo(left) => PrettyDoc::concat([left.pretty(), PrettyDoc::text(" ->")]),
+            Self::Variable(typ) => PrettyDoc::concat([
                 PrettyDoc::text("("),
                 PrettyDoc::text("variable"),
                 PrettyDoc::text(":"),
@@ -323,19 +335,32 @@ impl<'src> Type<'src, Inference> {
 
                 function.borrow_mut().infer_types(context)?;
                 argument.borrow_mut().infer_types(context)?;
-
-                // `(Type ->)` has type `Type -> Type`. `Type -> Type` has `(Type ->)` as a sub
-                // expression, so we end up with an infinite expression if we try to infer types
-                // on `typ`.
-                if function.borrow().is_arrow_operator() {
-                    TypeRef::unify(argument, &mut TypeRef::type_of_type());
-                } else {
-                    typ.borrow_mut().infer_types(context)?;
-                }
+                typ.borrow_mut().infer_types(context)?;
+            }
+            Self::ApplyArrowTo(left) => {
+                TypeRef::unify(left, &mut TypeRef::type_of_type())?;
+                left.borrow_mut().infer_types(context)?;
             }
         }
 
         Ok(())
+    }
+
+    fn normalize_apply_arrow(&mut self) {
+        if let Self::Apply {
+            function,
+            argument,
+            typ,
+        } = self
+        {
+            if function.borrow().is_arrow_operator() {
+                TypeRef::unify(
+                    typ,
+                    &mut TypeRef::arrow(TypeRef::type_of_type(), TypeRef::type_of_type()),
+                );
+                *self = Self::ApplyArrowTo(argument.clone())
+            }
+        }
     }
 
     fn typ(&self) -> InferenceType<'src> {
@@ -344,6 +369,9 @@ impl<'src> Type<'src, Inference> {
             Self::Variable(typ) => typ.clone(),
             Self::Constructor(cons) => cons.typ(),
             Self::Apply { typ, .. } => typ.clone(),
+            Self::ApplyArrowTo(_) => {
+                TypeRef::arrow(TypeRef::type_of_type(), TypeRef::type_of_type())
+            }
         }
     }
 }
