@@ -340,7 +340,7 @@ impl<'src> Type<'src, Inference> {
                 typ.borrow_mut().infer_types(context)?;
             }
             Self::ApplyArrowTo(argument) => {
-                TypeRef::unify(argument, &mut TypeRef::type_of_type())?;
+                TypeRef::unify(&mut argument.typ(), &mut TypeRef::type_of_type())?;
                 argument.borrow_mut().infer_types(context)?;
             }
         }
