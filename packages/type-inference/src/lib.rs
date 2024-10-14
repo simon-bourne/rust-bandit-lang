@@ -203,21 +203,31 @@ impl<'src> TypeRef<'src> {
                     variable: variable0,
                     in_expression: in_expression0,
                 },
-            ) => todo!("replace variable0 with variable in expression0, and unify expressions"),
+            ) => {
+                variable0.replace(variable);
+                Self::unify(in_expression, in_expression0)?
+            }
             (
                 Type::Forall {
                     variable,
                     in_expression,
                 },
-                expression,
-            ) => todo!("replace variable with unknown in expression, and unify expressions"),
+                _,
+            ) => {
+                variable.replace(&TypeRef::unknown());
+                // TODO: It's a bit horrible that we have to clone `y` (or `x` below)
+                Self::unify(in_expression, &mut y.clone())?
+            }
             (
-                expression,
+                _,
                 Type::Forall {
                     variable,
                     in_expression,
                 },
-            ) => todo!("replace variable with unknown in expression, and unify expressions"),
+            ) => {
+                variable.replace(&TypeRef::unknown());
+                Self::unify(in_expression, &mut x.clone())?
+            }
             _ => Err(InferenceError)?,
         }
 
