@@ -214,9 +214,13 @@ impl<'src> TypeRef<'src> {
                 },
                 _,
             ) => {
+                // TODO: Factor this out.
                 variable.replace(&TypeRef::unknown());
-                // TODO: It's a bit horrible that we have to clone `y` (or `x` below)
-                Self::unify(in_expression, &mut y.clone())?
+                drop(y_ref);
+                Self::unify(in_expression, y)?;
+                drop(x_ref);
+                x.replace(y);
+                return Ok(());
             }
             (
                 _,
@@ -226,7 +230,11 @@ impl<'src> TypeRef<'src> {
                 },
             ) => {
                 variable.replace(&TypeRef::unknown());
-                Self::unify(in_expression, &mut x.clone())?
+                drop(x_ref);
+                Self::unify(in_expression, x)?;
+                drop(y_ref);
+                y.replace(x);
+                return Ok(());
             }
             _ => Err(InferenceError)?,
         }
