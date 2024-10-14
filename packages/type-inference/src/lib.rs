@@ -194,6 +194,30 @@ impl<'src> TypeRef<'src> {
             (Type::ApplyArrowTo(argument0), Type::ApplyArrowTo(argument1)) => {
                 Self::unify(argument0, argument1)?;
             }
+            (
+                Type::Forall {
+                    variable,
+                    in_expression,
+                },
+                Type::Forall {
+                    variable: variable0,
+                    in_expression: in_expression0,
+                },
+            ) => todo!("replace variable0 with variable in expression0, and unify expressions"),
+            (
+                Type::Forall {
+                    variable,
+                    in_expression,
+                },
+                expression,
+            ) => todo!("replace variable with unknown in expression, and unify expressions"),
+            (
+                expression,
+                Type::Forall {
+                    variable,
+                    in_expression,
+                },
+            ) => todo!("replace variable with unknown in expression, and unify expressions"),
             _ => Err(InferenceError)?,
         }
 
@@ -276,6 +300,10 @@ enum Type<'src, A: Annotation<'src>> {
     // Type`, and `Type -> Type` has `(Type ->)` as a sub expression.
     ApplyArrowTo(A::Type),
     Variable(A::Type),
+    Forall {
+        variable: A::Type,
+        in_expression: A::Type,
+    },
 }
 
 impl<'src, A: Annotation<'src>> Type<'src, A> {
@@ -306,6 +334,15 @@ impl<'src, A: Annotation<'src>> Type<'src, A> {
                 PrettyDoc::text("variable"),
                 PrettyDoc::text(":"),
                 typ.pretty(),
+                PrettyDoc::text(")"),
+            ]),
+            Self::Forall {
+                variable,
+                in_expression,
+            } => PrettyDoc::concat([
+                PrettyDoc::text("("),
+                PrettyDoc::text("forall variable. "),
+                in_expression.pretty(),
                 PrettyDoc::text(")"),
             ]),
         }
@@ -343,6 +380,12 @@ impl<'src> Type<'src, Inference> {
                 TypeRef::unify(&mut argument.typ(), &mut TypeRef::type_of_type())?;
                 argument.borrow_mut().infer_types(context)?;
             }
+            Self::Forall {
+                variable,
+                in_expression,
+            } => {
+                in_expression.borrow_mut().infer_types(context)?;
+            }
         }
 
         Ok(())
@@ -374,6 +417,10 @@ impl<'src> Type<'src, Inference> {
             Self::ApplyArrowTo(_) => {
                 TypeRef::arrow(TypeRef::type_of_type(), TypeRef::type_of_type())
             }
+            Self::Forall {
+                variable,
+                in_expression,
+            } => TypeRef::type_of_type(),
         }
     }
 }
