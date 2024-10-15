@@ -438,7 +438,7 @@ impl<'src> Type<'src, Inference> {
             Self::Forall {
                 variable,
                 in_expression,
-            } => TypeRef::type_of_type(),
+            } => in_expression.typ(),
         }
     }
 }
