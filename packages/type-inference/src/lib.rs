@@ -1,13 +1,9 @@
-// TODO: Deny unused
-#![allow(unused)]
 use std::{
     cell::{RefCell, RefMut},
-    collections::HashMap,
     rc::Rc,
     result,
 };
 
-use derive_more::Constructor;
 use pretty::RcDoc;
 use slotmap::{new_key_type, SlotMap};
 
@@ -20,7 +16,7 @@ pub struct Program<'src, A: Annotation<'src>> {
 }
 
 impl<'src> Program<'src, Inference> {
-    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
+    pub fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         for d in &mut self.data {
             d.infer_types(context)?;
         }
@@ -39,7 +35,7 @@ pub struct Data<'src, A: Annotation<'src>> {
 }
 
 impl<'src> Data<'src, Inference> {
-    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
+    pub fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         self.declaration.infer_types(context)?;
 
         for c in &mut self.constructors {
@@ -52,7 +48,6 @@ impl<'src> Data<'src, Inference> {
 
 #[derive(Debug)]
 pub struct ValueConstructor<'src, A: Annotation<'src>> {
-    id: Id,
     typ: A::Type,
 }
 
@@ -60,7 +55,7 @@ impl<'src, A> ValueConstructor<'src, A>
 where
     A: Annotation<'src>,
 {
-    fn pretty(&self) -> PrettyDoc {
+    pub fn pretty(&self) -> PrettyDoc {
         PrettyDoc::concat([
             PrettyDoc::text("("),
             PrettyDoc::text("ValueConstructor"),
@@ -72,23 +67,22 @@ where
 }
 
 impl<'src> ValueConstructor<'src, Inference> {
-    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
-        self.typ.borrow_mut().infer_types(context)
+    pub fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
+        self.typ.infer_types(context)
     }
 }
 
-type Result<T> = result::Result<T, InferenceError>;
+pub type Result<T> = result::Result<T, InferenceError>;
 
 #[derive(Debug)]
-struct InferenceError;
+pub struct InferenceError;
 
 struct DataDeclaration<'src, A: Annotation<'src>> {
-    id: Id,
     parameters: Vec<Parameter<'src, A>>,
 }
 
 impl<'src> DataDeclaration<'src, Inference> {
-    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
+    pub fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         for param in &mut self.parameters {
             param.0.infer_types(context)?;
         }
@@ -106,55 +100,102 @@ pub trait Pretty {
 }
 
 #[derive(Debug)]
-struct Inference;
+pub struct Inference;
 
 impl<'src> Annotation<'src> for Inference {
-    type Type = SharedMut<TypeRef<'src>>;
+    type Type = TypeRef<'src>;
 }
 
-impl<'src> Pretty for SharedMut<TypeRef<'src>> {
+impl<'src> Pretty for TypeRef<'src> {
     fn pretty(&self) -> PrettyDoc {
-        match &*self.borrow() {
-            TypeRef::Known(owned) => owned.pretty(),
-            TypeRef::Unknown => PrettyDoc::text("{unknown}"),
-            TypeRef::Link(linked) => linked.pretty(),
+        match &*self.0.borrow() {
+            TypeRefVariants::Known(owned) => owned.pretty(),
+            TypeRefVariants::Unknown => PrettyDoc::text("{unknown}"),
+            TypeRefVariants::Link(linked) => linked.pretty(),
         }
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct TypeRef<'src>(SharedMut<TypeRefVariants<'src>>);
+
 #[derive(Debug)]
-enum TypeRef<'src> {
+enum TypeRefVariants<'src> {
     Known(Type<'src, Inference>),
     Unknown,
-    Link(InferenceType<'src>),
+    Link(TypeRef<'src>),
 }
 
 impl<'src> TypeRef<'src> {
-    fn new(typ: Type<'src, Inference>) -> SharedMut<Self> {
-        Rc::new(RefCell::new(Self::Known(typ)))
+    pub fn unknown() -> Self {
+        Self(Rc::new(RefCell::new(TypeRefVariants::Unknown)))
     }
 
-    fn unknown() -> SharedMut<Self> {
-        Rc::new(RefCell::new(Self::Unknown))
-    }
-
-    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
-        match self {
-            Self::Known(typ) => typ.infer_types(context),
-            Self::Unknown => Ok(()),
-            Self::Link(target) => target.borrow_mut().infer_types(context),
-        }
-    }
-
-    fn type_of_type() -> SharedMut<Self> {
+    pub fn type_of_type() -> Self {
         Self::new(Type::Base)
     }
 
-    fn unify(x: &mut SharedMut<Self>, y: &mut SharedMut<Self>) -> Result<()> {
+    pub fn apply(function: Self, argument: Self, typ: Self) -> Self {
+        Self::new(Type::Apply {
+            function,
+            argument,
+            typ,
+        })
+    }
+
+    pub fn arrow(left: Self, right: Self) -> Self {
+        Self::apply(
+            Self::new(Type::ApplyArrowTo(left)),
+            right,
+            Self::type_of_type(),
+        )
+    }
+
+    pub fn type_constructor(cons: TypeConstructor<'src, Inference>) -> Self {
+        Self::new(Type::Constructor(cons))
+    }
+
+    pub fn variable(typ: Self) -> Self {
+        Self::new(Type::Variable(typ))
+    }
+
+    pub fn forall(variable: Self, in_expression: Self) -> Self {
+        Self::new(Type::Forall {
+            variable,
+            in_expression,
+        })
+    }
+
+    fn new(typ: Type<'src, Inference>) -> Self {
+        Self(Rc::new(RefCell::new(TypeRefVariants::Known(typ))))
+    }
+
+    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
+        match &mut *self.0.borrow_mut() {
+            TypeRefVariants::Known(typ) => typ.infer_types(context),
+            TypeRefVariants::Unknown => Ok(()),
+            TypeRefVariants::Link(target) => target.infer_types(context),
+        }
+    }
+
+    fn follow_links(&mut self) {
+        loop {
+            let borrowed = self.0.borrow();
+            let TypeRefVariants::Link(link) = &*borrowed else {
+                return;
+            };
+
+            let link = link.clone();
+            drop(borrowed);
+            *self = link;
+        }
+    }
+
+    fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
         x.follow_links();
         y.follow_links();
 
-        if Rc::ptr_eq(x, y) {
+        if Rc::ptr_eq(&x.0, &y.0) {
             return Ok(());
         }
 
@@ -168,8 +209,8 @@ impl<'src> TypeRef<'src> {
             return Ok(());
         };
 
-        x_ref.normalize_apply_arrow();
-        y_ref.normalize_apply_arrow();
+        x_ref.normalize_apply_arrow()?;
+        y_ref.normalize_apply_arrow()?;
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
@@ -215,7 +256,7 @@ impl<'src> TypeRef<'src> {
                 _,
             ) => {
                 // TODO: Factor this out.
-                variable.replace(&TypeRef::unknown());
+                variable.replace(&Self::unknown());
                 drop(y_ref);
                 Self::unify(in_expression, y)?;
                 drop(x_ref);
@@ -229,7 +270,7 @@ impl<'src> TypeRef<'src> {
                     in_expression,
                 },
             ) => {
-                variable.replace(&TypeRef::unknown());
+                variable.replace(&Self::unknown());
                 drop(x_ref);
                 Self::unify(in_expression, x)?;
                 drop(y_ref);
@@ -246,32 +287,35 @@ impl<'src> TypeRef<'src> {
         Ok(())
     }
 
-    fn apply(
-        function: SharedMut<Self>,
-        argument: SharedMut<Self>,
-        typ: SharedMut<Self>,
-    ) -> SharedMut<Self> {
-        Self::new(Type::Apply {
-            function,
-            argument,
-            typ,
-        })
+    fn replace(&mut self, other: &Self) {
+        RefCell::replace(&self.0, TypeRefVariants::Link(other.clone()));
+        *self = other.clone();
     }
 
-    fn arrow(left: SharedMut<Self>, right: SharedMut<Self>) -> SharedMut<Self> {
-        let arrow_op = Self::new(Type::Constructor(TypeConstructor::Arrow));
-        Self::apply(
-            Self::new(Type::ApplyArrowTo(left)),
-            right,
-            TypeRef::type_of_type(),
-        )
+    fn known<'a>(&'a self) -> Option<RefMut<'a, Type<'src, Inference>>> {
+        RefMut::filter_map(self.0.borrow_mut(), |x| {
+            if let TypeRefVariants::Known(known) = x {
+                Some(known)
+            } else {
+                None
+            }
+        })
+        .ok()
+    }
+
+    fn typ(&self) -> Self {
+        match &*self.0.borrow() {
+            TypeRefVariants::Known(owned) => owned.typ(),
+            TypeRefVariants::Unknown => Self::type_of_type(),
+            TypeRefVariants::Link(target) => target.typ(),
+        }
     }
 
     fn is_arrow_operator(&self) -> bool {
-        match self {
-            TypeRef::Known(expr) => expr.is_arrow_operator(),
-            TypeRef::Unknown => false,
-            TypeRef::Link(linked) => linked.borrow().is_arrow_operator(),
+        match &*self.0.borrow() {
+            TypeRefVariants::Known(expr) => expr.is_arrow_operator(),
+            TypeRefVariants::Unknown => false,
+            TypeRefVariants::Link(linked) => linked.is_arrow_operator(),
         }
     }
 }
@@ -288,12 +332,12 @@ impl<'src> Pretty for Rc<Type<'src, Inferred>> {
     }
 }
 
-struct Context<'src> {
-    types: SlotMap<Id, InferenceType<'src>>,
+pub struct Context<'src> {
+    types: SlotMap<Id, TypeRef<'src>>,
 }
 
 impl<'src> Context<'src> {
-    fn unify(&mut self, id: Id, typ: &mut InferenceType<'src>) -> Result<()> {
+    fn unify(&mut self, id: Id, typ: &mut TypeRef<'src>) -> Result<()> {
         let Some(item) = self.types.get_mut(id) else {
             return Err(InferenceError);
         };
@@ -354,10 +398,7 @@ impl<'src, A: Annotation<'src>> Type<'src, A> {
                 typ.pretty(),
                 PrettyDoc::text(")"),
             ]),
-            Self::Forall {
-                variable,
-                in_expression,
-            } => PrettyDoc::concat([
+            Self::Forall { in_expression, .. } => PrettyDoc::concat([
                 PrettyDoc::text("("),
                 PrettyDoc::text("forall variable. "),
                 in_expression.pretty(),
@@ -375,11 +416,11 @@ impl<'src> Type<'src, Inference> {
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         match self {
             Self::Base => (),
-            Self::Variable(typ) => typ.borrow_mut().infer_types(context)?,
+            Self::Variable(typ) => typ.infer_types(context)?,
             Self::Constructor(constructor) => {
                 if let TypeConstructor::Named { id, typ } = constructor {
                     context.unify(*id, typ)?;
-                    typ.borrow_mut().infer_types(context)?;
+                    typ.infer_types(context)?;
                 }
             }
             Self::Apply {
@@ -390,43 +431,42 @@ impl<'src> Type<'src, Inference> {
                 let function_type = &mut TypeRef::arrow(argument.typ(), typ.clone());
                 TypeRef::unify(function_type, &mut function.typ())?;
 
-                function.borrow_mut().infer_types(context)?;
-                argument.borrow_mut().infer_types(context)?;
-                typ.borrow_mut().infer_types(context)?;
+                function.infer_types(context)?;
+                argument.infer_types(context)?;
+                typ.infer_types(context)?;
             }
             Self::ApplyArrowTo(argument) => {
                 TypeRef::unify(&mut argument.typ(), &mut TypeRef::type_of_type())?;
-                argument.borrow_mut().infer_types(context)?;
+                argument.infer_types(context)?;
             }
-            Self::Forall {
-                variable,
-                in_expression,
-            } => {
-                in_expression.borrow_mut().infer_types(context)?;
+            Self::Forall { in_expression, .. } => {
+                in_expression.infer_types(context)?;
             }
         }
 
         Ok(())
     }
 
-    fn normalize_apply_arrow(&mut self) {
+    fn normalize_apply_arrow(&mut self) -> Result<()> {
         if let Self::Apply {
             function,
             argument,
             typ,
         } = self
         {
-            if function.borrow().is_arrow_operator() {
+            if function.is_arrow_operator() {
                 TypeRef::unify(
                     typ,
                     &mut TypeRef::arrow(TypeRef::type_of_type(), TypeRef::type_of_type()),
-                );
+                )?;
                 *self = Self::ApplyArrowTo(argument.clone())
             }
         }
+
+        Ok(())
     }
 
-    fn typ(&self) -> InferenceType<'src> {
+    fn typ(&self) -> TypeRef<'src> {
         match self {
             Self::Base => TypeRef::type_of_type(),
             Self::Variable(typ) => typ.clone(),
@@ -435,67 +475,13 @@ impl<'src> Type<'src, Inference> {
             Self::ApplyArrowTo(_) => {
                 TypeRef::arrow(TypeRef::type_of_type(), TypeRef::type_of_type())
             }
-            Self::Forall {
-                variable,
-                in_expression,
-            } => in_expression.typ(),
-        }
-    }
-}
-
-type InferenceType<'src> = <Inference as Annotation<'src>>::Type;
-
-trait TypeReference<'src> {
-    fn follow_links(&mut self);
-
-    fn known<'a>(&'a self) -> Option<RefMut<'a, Type<'src, Inference>>>;
-
-    fn replace(&mut self, other: &Self);
-
-    fn typ(&self) -> Self;
-}
-
-impl<'src> TypeReference<'src> for InferenceType<'src> {
-    fn follow_links(&mut self) {
-        loop {
-            let borrowed = self.borrow();
-            let TypeRef::Link(link) = &*borrowed else {
-                return;
-            };
-
-            let link = link.clone();
-            drop(borrowed);
-            *self = link;
-        }
-    }
-
-    fn known<'a>(&'a self) -> Option<RefMut<'a, Type<'src, Inference>>> {
-        RefMut::filter_map(self.borrow_mut(), |x| {
-            if let TypeRef::Known(known) = x {
-                Some(known)
-            } else {
-                None
-            }
-        })
-        .ok()
-    }
-
-    fn replace(&mut self, other: &Self) {
-        RefCell::replace(self, TypeRef::Link(other.clone()));
-        *self = other.clone();
-    }
-
-    fn typ(&self) -> Self {
-        match &*self.borrow() {
-            TypeRef::Known(owned) => owned.typ(),
-            TypeRef::Unknown => TypeRef::type_of_type(),
-            TypeRef::Link(target) => target.typ(),
+            Self::Forall { in_expression, .. } => in_expression.typ(),
         }
     }
 }
 
 #[derive(Debug)]
-enum TypeConstructor<'src, A: Annotation<'src>> {
+pub enum TypeConstructor<'src, A: Annotation<'src>> {
     Arrow,
     Named { id: Id, typ: A::Type },
 }
@@ -504,7 +490,7 @@ impl<'src, A: Annotation<'src>> TypeConstructor<'src, A> {
     fn pretty(&self) -> PrettyDoc {
         match self {
             TypeConstructor::Arrow => PrettyDoc::text("(->)"),
-            TypeConstructor::Named { id, typ } => PrettyDoc::concat([
+            TypeConstructor::Named { typ, .. } => PrettyDoc::concat([
                 PrettyDoc::text("("),
                 PrettyDoc::text("TypeConstructor"),
                 PrettyDoc::text(":"),
@@ -532,13 +518,13 @@ impl<'src> TypeConstructor<'src, Inference> {
         Ok(())
     }
 
-    fn typ(&self) -> InferenceType<'src> {
+    fn typ(&self) -> TypeRef<'src> {
         match self {
             Self::Arrow => TypeRef::arrow(
                 TypeRef::type_of_type(),
                 TypeRef::arrow(TypeRef::type_of_type(), TypeRef::type_of_type()),
             ),
-            Self::Named { id, typ } => typ.clone(),
+            Self::Named { typ, .. } => typ.clone(),
         }
     }
 }
@@ -553,18 +539,16 @@ struct Value<'src, A: Annotation<'src>> {
 impl<'src> Value<'src, Inference> {
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         context.unify(self.id, &mut self.typ)?;
-        self.typ.borrow_mut().infer_types(context)
+        self.typ.infer_types(context)
     }
 }
 
 new_key_type! {
-    struct Id;
+    pub struct Id;
 }
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
-
     use goldenfile::Mint;
 
     use super::*;
@@ -580,16 +564,14 @@ mod tests {
     #[test]
     fn infer_kinds() {
         // data X m a = C : (m a) -> X
-        let m = TypeRef::new(Type::Variable(TypeRef::unknown()));
-        let a = TypeRef::new(Type::Variable(TypeRef::unknown()));
+        let m = TypeRef::variable(TypeRef::unknown());
+        let a = TypeRef::variable(TypeRef::unknown());
 
         // TODO: `C : (m a) -> X`, not `C : (m a)`
         let constructor_type = TypeRef::apply(m, a, TypeRef::unknown());
-        let mut types = SlotMap::with_key();
-        let cons_id = types.insert(constructor_type.clone());
+        let types = SlotMap::with_key();
         let context = &mut Context { types };
         let mut constructor = ValueConstructor {
-            id: cons_id,
             typ: constructor_type,
         };
 
