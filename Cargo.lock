@@ -128,7 +128,6 @@ dependencies = [
 name = "bandit-type-inference"
 version = "0.1.0"
 dependencies = [
- "derive_more",
  "goldenfile",
  "pretty",
  "slotmap",
