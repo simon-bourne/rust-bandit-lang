@@ -88,7 +88,7 @@ pub enum Token<'src> {
 }
 
 impl<'src> Token<'src> {
-    pub fn layout(source: &'src str) -> impl Iterator<Item = SrcToken<'src>> + '_ {
+    pub fn layout(source: &'src str) -> impl Iterator<Item = SrcToken<'src>> + 'src {
         let tokens = Self::lexer(source).spanned().map(|(tok, span)| match tok {
             Ok(tok) => (tok, Span::from(span)),
             Err(()) => (Self::Error(Error::UnknownToken), span.into()),

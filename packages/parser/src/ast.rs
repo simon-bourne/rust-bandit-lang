@@ -67,7 +67,7 @@ pub enum Expression<'src> {
     // TODO: Add abstraction (quantification/lambdas)
 }
 
-impl<'src> Expression<'src> {
+impl Expression<'_> {
     pub fn apply(left: Self, right: Self) -> Self {
         Self::BinaryOperator {
             name: Operator::Apply,

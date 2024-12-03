@@ -106,7 +106,7 @@ impl<'src> Annotation<'src> for Inference {
     type Type = TypeRef<'src>;
 }
 
-impl<'src> Pretty for TypeRef<'src> {
+impl Pretty for TypeRef<'_> {
     fn pretty(&self) -> PrettyDoc {
         match &*self.0.borrow() {
             TypeRefVariants::Known(owned) => owned.pretty(),
@@ -326,7 +326,7 @@ impl<'src> Annotation<'src> for Inferred {
     type Type = Rc<Type<'src, Self>>;
 }
 
-impl<'src> Pretty for Rc<Type<'src, Inferred>> {
+impl Pretty for Rc<Type<'_, Inferred>> {
     fn pretty(&self) -> PrettyDoc {
         self.as_ref().pretty()
     }
