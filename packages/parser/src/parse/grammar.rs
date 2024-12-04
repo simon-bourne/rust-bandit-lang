@@ -93,6 +93,8 @@ fn expression<'src>() -> impl TTParser<'src, Expression<'src>> {
     })
 }
 
+type InfixArgs<'src> = (Expression<'src>, Operator, Expression<'src>);
+
 fn infix<'src>(
     associativity: Associativity,
     name: NamedOperator,
@@ -100,7 +102,7 @@ fn infix<'src>(
     impl TTParser<'src, Operator>,
     impl Fn(Expression<'src>, Operator, Expression<'src>) -> Expression<'src> + Clone,
     Operator,
-    (Expression<'src>, Operator, Expression<'src>),
+    InfixArgs<'src>,
 > {
     pratt::infix(associativity, operator(name), Expression::binary_operator)
 }
