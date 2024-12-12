@@ -261,15 +261,15 @@ where
     type Item = I::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let item = self.0.next();
+        let item = self.0.next()?;
 
-        if matches!(item, Some((Token::LineEnd, _)))
+        if matches!(item.0, Token::LineEnd)
             && self.0.peek().map_or(true, |next| next.0.continues_line())
         {
             return self.0.next();
         }
 
-        item
+        Some(item)
     }
 }
 
