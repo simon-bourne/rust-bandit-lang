@@ -13,32 +13,6 @@ pub mod context;
 type SharedMut<T> = Rc<RefCell<T>>;
 type PrettyDoc = RcDoc<'static>;
 
-#[derive(Debug)]
-pub struct ValueConstructor<'src, A: Annotation<'src>> {
-    typ: A::Expression,
-}
-
-impl<'src, A> ValueConstructor<'src, A>
-where
-    A: Annotation<'src>,
-{
-    pub fn pretty(&self) -> PrettyDoc {
-        PrettyDoc::concat([
-            PrettyDoc::text("("),
-            PrettyDoc::text("ValueConstructor"),
-            PrettyDoc::text(":"),
-            self.typ.pretty(),
-            PrettyDoc::text(")"),
-        ])
-    }
-}
-
-impl<'src> ValueConstructor<'src, Inference> {
-    pub fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
-        self.typ.infer_types(context)
-    }
-}
-
 pub type Result<T> = result::Result<T, InferenceError>;
 
 #[derive(Debug)]
@@ -118,7 +92,7 @@ impl<'src> ExpressionRef<'src> {
         Self(Rc::new(RefCell::new(ExprRefVariants::Known(typ))))
     }
 
-    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
+    pub fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         match &mut *self.0.borrow_mut() {
             ExprRefVariants::Known(typ) => typ.infer_types(context),
             ExprRefVariants::Unknown => Ok(()),
@@ -365,16 +339,13 @@ mod tests {
         let a = ExpressionRef::variable(ExpressionRef::unknown());
 
         // TODO: `C : (m a) -> X`, not `C : (m a)`
-        let constructor_type = ExpressionRef::apply(m, a, ExpressionRef::unknown());
+        let mut constructor_type = ExpressionRef::apply(m, a, ExpressionRef::unknown());
         let context = &mut Context::default();
-        let mut constructor = ValueConstructor {
-            typ: constructor_type,
-        };
 
-        constructor.infer_types(context).unwrap();
+        constructor_type.infer_types(context).unwrap();
 
         let mut mint = Mint::new("tests/goldenfiles");
         let mut output = mint.new_goldenfile("infer-kinds.txt").unwrap();
-        constructor.pretty().render(80, &mut output).unwrap();
+        constructor_type.pretty().render(80, &mut output).unwrap();
     }
 }
