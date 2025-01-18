@@ -7,6 +7,8 @@ use std::{
 use pretty::RcDoc;
 use slotmap::{new_key_type, SlotMap};
 
+pub mod context;
+
 type SharedMut<T> = Rc<RefCell<T>>;
 type PrettyDoc = RcDoc<'static>;
 
@@ -53,40 +55,40 @@ pub trait Pretty {
 pub struct Inference;
 
 impl<'src> Annotation<'src> for Inference {
-    type Type = TypeRef<'src>;
+    type Type = ExpressionRef<'src>;
 }
 
-impl Pretty for TypeRef<'_> {
+impl Pretty for ExpressionRef<'_> {
     fn pretty(&self) -> PrettyDoc {
         match &*self.0.borrow() {
-            TypeRefVariants::Known(owned) => owned.pretty(),
-            TypeRefVariants::Unknown => PrettyDoc::text("{unknown}"),
-            TypeRefVariants::Link(linked) => linked.pretty(),
+            ExprRefVariants::Known(owned) => owned.pretty(),
+            ExprRefVariants::Unknown => PrettyDoc::text("{unknown}"),
+            ExprRefVariants::Link(linked) => linked.pretty(),
         }
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct TypeRef<'src>(SharedMut<TypeRefVariants<'src>>);
+pub struct ExpressionRef<'src>(SharedMut<ExprRefVariants<'src>>);
 
 #[derive(Debug)]
-enum TypeRefVariants<'src> {
-    Known(Type<'src, Inference>),
+enum ExprRefVariants<'src> {
+    Known(Expression<'src, Inference>),
     Unknown,
-    Link(TypeRef<'src>),
+    Link(ExpressionRef<'src>),
 }
 
-impl<'src> TypeRef<'src> {
+impl<'src> ExpressionRef<'src> {
     pub fn unknown() -> Self {
-        Self(Rc::new(RefCell::new(TypeRefVariants::Unknown)))
+        Self(Rc::new(RefCell::new(ExprRefVariants::Unknown)))
     }
 
     pub fn type_of_type() -> Self {
-        Self::new(Type::Base)
+        Self::new(Expression::Type)
     }
 
     pub fn apply(function: Self, argument: Self, typ: Self) -> Self {
-        Self::new(Type::Apply {
+        Self::new(Expression::Apply {
             function,
             argument,
             typ,
@@ -95,43 +97,43 @@ impl<'src> TypeRef<'src> {
 
     pub fn arrow(left: Self, right: Self) -> Self {
         Self::apply(
-            Self::new(Type::ApplyArrowTo(left)),
+            Self::new(Expression::ApplyArrowTo(left)),
             right,
             Self::type_of_type(),
         )
     }
 
     pub fn type_constructor(cons: TypeConstructor<'src, Inference>) -> Self {
-        Self::new(Type::Constructor(cons))
+        Self::new(Expression::Constructor(cons))
     }
 
     pub fn variable(typ: Self) -> Self {
-        Self::new(Type::Variable(typ))
+        Self::new(Expression::Variable(typ))
     }
 
     pub fn forall(variable: Self, in_expression: Self) -> Self {
-        Self::new(Type::Forall {
+        Self::new(Expression::Forall {
             variable,
             in_expression,
         })
     }
 
-    fn new(typ: Type<'src, Inference>) -> Self {
-        Self(Rc::new(RefCell::new(TypeRefVariants::Known(typ))))
+    fn new(typ: Expression<'src, Inference>) -> Self {
+        Self(Rc::new(RefCell::new(ExprRefVariants::Known(typ))))
     }
 
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         match &mut *self.0.borrow_mut() {
-            TypeRefVariants::Known(typ) => typ.infer_types(context),
-            TypeRefVariants::Unknown => Ok(()),
-            TypeRefVariants::Link(target) => target.infer_types(context),
+            ExprRefVariants::Known(typ) => typ.infer_types(context),
+            ExprRefVariants::Unknown => Ok(()),
+            ExprRefVariants::Link(target) => target.infer_types(context),
         }
     }
 
     fn follow_links(&mut self) {
         loop {
             let borrowed = self.0.borrow();
-            let TypeRefVariants::Link(link) = &*borrowed else {
+            let ExprRefVariants::Link(link) = &*borrowed else {
                 return;
             };
 
@@ -164,15 +166,15 @@ impl<'src> TypeRef<'src> {
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
-            (Type::Base, Type::Base) => (),
-            (Type::Constructor(c1), Type::Constructor(c2)) => TypeConstructor::unify(c1, c2)?,
+            (Expression::Type, Expression::Type) => (),
+            (Expression::Constructor(c1), Expression::Constructor(c2)) => TypeConstructor::unify(c1, c2)?,
             (
-                Type::Apply {
+                Expression::Apply {
                     function,
                     argument,
                     typ,
                 },
-                Type::Apply {
+                Expression::Apply {
                     function: function1,
                     argument: argument1,
                     typ: typ1,
@@ -182,15 +184,15 @@ impl<'src> TypeRef<'src> {
                 Self::unify(argument, argument1)?;
                 Self::unify(typ, typ1)?;
             }
-            (Type::ApplyArrowTo(argument0), Type::ApplyArrowTo(argument1)) => {
+            (Expression::ApplyArrowTo(argument0), Expression::ApplyArrowTo(argument1)) => {
                 Self::unify(argument0, argument1)?;
             }
             (
-                Type::Forall {
+                Expression::Forall {
                     variable,
                     in_expression,
                 },
-                Type::Forall {
+                Expression::Forall {
                     variable: variable0,
                     in_expression: in_expression0,
                 },
@@ -199,7 +201,7 @@ impl<'src> TypeRef<'src> {
                 Self::unify(in_expression, in_expression0)?
             }
             (
-                Type::Forall {
+                Expression::Forall {
                     variable,
                     in_expression,
                 },
@@ -215,7 +217,7 @@ impl<'src> TypeRef<'src> {
             }
             (
                 _,
-                Type::Forall {
+                Expression::Forall {
                     variable,
                     in_expression,
                 },
@@ -238,13 +240,13 @@ impl<'src> TypeRef<'src> {
     }
 
     fn replace(&mut self, other: &Self) {
-        RefCell::replace(&self.0, TypeRefVariants::Link(other.clone()));
+        RefCell::replace(&self.0, ExprRefVariants::Link(other.clone()));
         *self = other.clone();
     }
 
-    fn known<'a>(&'a self) -> Option<RefMut<'a, Type<'src, Inference>>> {
+    fn known<'a>(&'a self) -> Option<RefMut<'a, Expression<'src, Inference>>> {
         RefMut::filter_map(self.0.borrow_mut(), |x| {
-            if let TypeRefVariants::Known(known) = x {
+            if let ExprRefVariants::Known(known) = x {
                 Some(known)
             } else {
                 None
@@ -255,17 +257,17 @@ impl<'src> TypeRef<'src> {
 
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            TypeRefVariants::Known(owned) => owned.typ(),
-            TypeRefVariants::Unknown => Self::type_of_type(),
-            TypeRefVariants::Link(target) => target.typ(),
+            ExprRefVariants::Known(owned) => owned.typ(),
+            ExprRefVariants::Unknown => Self::type_of_type(),
+            ExprRefVariants::Link(target) => target.typ(),
         }
     }
 
     fn is_arrow_operator(&self) -> bool {
         match &*self.0.borrow() {
-            TypeRefVariants::Known(expr) => expr.is_arrow_operator(),
-            TypeRefVariants::Unknown => false,
-            TypeRefVariants::Link(linked) => linked.is_arrow_operator(),
+            ExprRefVariants::Known(expr) => expr.is_arrow_operator(),
+            ExprRefVariants::Unknown => false,
+            ExprRefVariants::Link(linked) => linked.is_arrow_operator(),
         }
     }
 }
@@ -273,35 +275,33 @@ impl<'src> TypeRef<'src> {
 struct Inferred;
 
 impl<'src> Annotation<'src> for Inferred {
-    type Type = Rc<Type<'src, Self>>;
+    type Type = Rc<Expression<'src, Self>>;
 }
 
-impl Pretty for Rc<Type<'_, Inferred>> {
+impl Pretty for Rc<Expression<'_, Inferred>> {
     fn pretty(&self) -> PrettyDoc {
         self.as_ref().pretty()
     }
 }
 
 pub struct Context<'src> {
-    types: SlotMap<Id, TypeRef<'src>>,
+    types: SlotMap<Id, ExpressionRef<'src>>,
 }
 
 impl<'src> Context<'src> {
-    fn unify(&mut self, id: Id, typ: &mut TypeRef<'src>) -> Result<()> {
+    fn unify(&mut self, id: Id, typ: &mut ExpressionRef<'src>) -> Result<()> {
         let Some(item) = self.types.get_mut(id) else {
             return Err(InferenceError);
         };
 
         // TODO: Instantiate `item` with fresh variables.
-        TypeRef::unify(item, typ)
+        ExpressionRef::unify(item, typ)
     }
 }
 
-// TODO: Rename this to `Expression``
 #[derive(Debug)]
-enum Type<'src, A: Annotation<'src>> {
-    // TODO: Rename this to `Type`
-    Base,
+enum Expression<'src, A: Annotation<'src>> {
+    Type,
     Constructor(TypeConstructor<'src, A>),
     Apply {
         function: A::Type,
@@ -318,10 +318,10 @@ enum Type<'src, A: Annotation<'src>> {
     },
 }
 
-impl<'src, A: Annotation<'src>> Type<'src, A> {
+impl<'src, A: Annotation<'src>> Expression<'src, A> {
     fn pretty(&self) -> PrettyDoc {
         match self {
-            Self::Base => PrettyDoc::text("Type"),
+            Self::Type => PrettyDoc::text("Type"),
             Self::Constructor(cons) => cons.pretty(),
             Self::Apply {
                 function: left,
@@ -362,10 +362,10 @@ impl<'src, A: Annotation<'src>> Type<'src, A> {
     }
 }
 
-impl<'src> Type<'src, Inference> {
+impl<'src> Expression<'src, Inference> {
     fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
         match self {
-            Self::Base => (),
+            Self::Type => (),
             Self::Variable(typ) => typ.infer_types(context)?,
             Self::Constructor(constructor) => {
                 if let TypeConstructor::Named { id, typ } = constructor {
@@ -378,15 +378,15 @@ impl<'src> Type<'src, Inference> {
                 argument,
                 typ,
             } => {
-                let function_type = &mut TypeRef::arrow(argument.typ(), typ.clone());
-                TypeRef::unify(function_type, &mut function.typ())?;
+                let function_type = &mut ExpressionRef::arrow(argument.typ(), typ.clone());
+                ExpressionRef::unify(function_type, &mut function.typ())?;
 
                 function.infer_types(context)?;
                 argument.infer_types(context)?;
                 typ.infer_types(context)?;
             }
             Self::ApplyArrowTo(argument) => {
-                TypeRef::unify(&mut argument.typ(), &mut TypeRef::type_of_type())?;
+                ExpressionRef::unify(&mut argument.typ(), &mut ExpressionRef::type_of_type())?;
                 argument.infer_types(context)?;
             }
             Self::Forall { in_expression, .. } => {
@@ -405,9 +405,9 @@ impl<'src> Type<'src, Inference> {
         } = self
         {
             if function.is_arrow_operator() {
-                TypeRef::unify(
+                ExpressionRef::unify(
                     typ,
-                    &mut TypeRef::arrow(TypeRef::type_of_type(), TypeRef::type_of_type()),
+                    &mut ExpressionRef::arrow(ExpressionRef::type_of_type(), ExpressionRef::type_of_type()),
                 )?;
                 *self = Self::ApplyArrowTo(argument.clone())
             }
@@ -416,14 +416,14 @@ impl<'src> Type<'src, Inference> {
         Ok(())
     }
 
-    fn typ(&self) -> TypeRef<'src> {
+    fn typ(&self) -> ExpressionRef<'src> {
         match self {
-            Self::Base => TypeRef::type_of_type(),
+            Self::Type => ExpressionRef::type_of_type(),
             Self::Variable(typ) => typ.clone(),
             Self::Constructor(cons) => cons.typ(),
             Self::Apply { typ, .. } => typ.clone(),
             Self::ApplyArrowTo(_) => {
-                TypeRef::arrow(TypeRef::type_of_type(), TypeRef::type_of_type())
+                ExpressionRef::arrow(ExpressionRef::type_of_type(), ExpressionRef::type_of_type())
             }
             Self::Forall { in_expression, .. } => in_expression.typ(),
         }
@@ -460,7 +460,7 @@ impl<'src> TypeConstructor<'src, Inference> {
                     Err(InferenceError)?;
                 }
 
-                TypeRef::unify(typ, typ1)?;
+                ExpressionRef::unify(typ, typ1)?;
             }
             _ => Err(InferenceError)?,
         }
@@ -468,11 +468,11 @@ impl<'src> TypeConstructor<'src, Inference> {
         Ok(())
     }
 
-    fn typ(&self) -> TypeRef<'src> {
+    fn typ(&self) -> ExpressionRef<'src> {
         match self {
-            Self::Arrow => TypeRef::arrow(
-                TypeRef::type_of_type(),
-                TypeRef::arrow(TypeRef::type_of_type(), TypeRef::type_of_type()),
+            Self::Arrow => ExpressionRef::arrow(
+                ExpressionRef::type_of_type(),
+                ExpressionRef::arrow(ExpressionRef::type_of_type(), ExpressionRef::type_of_type()),
             ),
             Self::Named { typ, .. } => typ.clone(),
         }
@@ -493,18 +493,18 @@ mod tests {
     // Check there are no cycles in the types
     #[test]
     fn build() {
-        let _inferred = Type::<'static, Inferred>::Base;
-        let _inference = Type::<'static, Inference>::Base;
+        let _inferred = Expression::<'static, Inferred>::Type;
+        let _inference = Expression::<'static, Inference>::Type;
     }
 
     #[test]
     fn infer_kinds() {
         // data X m a = C : (m a) -> X
-        let m = TypeRef::variable(TypeRef::unknown());
-        let a = TypeRef::variable(TypeRef::unknown());
+        let m = ExpressionRef::variable(ExpressionRef::unknown());
+        let a = ExpressionRef::variable(ExpressionRef::unknown());
 
         // TODO: `C : (m a) -> X`, not `C : (m a)`
-        let constructor_type = TypeRef::apply(m, a, TypeRef::unknown());
+        let constructor_type = ExpressionRef::apply(m, a, ExpressionRef::unknown());
         let types = SlotMap::with_key();
         let context = &mut Context { types };
         let mut constructor = ValueConstructor {
