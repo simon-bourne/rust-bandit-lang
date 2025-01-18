@@ -1,7 +1,6 @@
 use std::{cmp::Ordering, iter::Peekable};
 
-use chumsky::span::SimpleSpan;
-use logos::Logos;
+use logos::{Logos, Span};
 
 #[derive(Logos, Debug, PartialEq, Eq, Copy, Clone)]
 #[logos(skip r"[ \t\r\f]+")]
@@ -91,7 +90,7 @@ impl<'src> Token<'src> {
     pub fn layout(source: &'src str) -> impl Iterator<Item = SrcToken<'src>> + 'src {
         let tokens = Self::lexer(source).spanned().map(|(tok, span)| match tok {
             Ok(tok) => (tok, Span::from(span)),
-            Err(()) => (Self::Error(Error::UnknownToken), span.into()),
+            Err(()) => (Self::Error(Error::UnknownToken), span),
         });
 
         LayoutIter::new(ContinuedLines(tokens.peekable()), source)
@@ -102,7 +101,6 @@ impl<'src> Token<'src> {
     }
 }
 
-pub type Span = SimpleSpan<usize>;
 pub type Spanned<T> = (T, Span);
 pub type SrcToken<'src> = Spanned<Token<'src>>;
 
@@ -286,7 +284,7 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
         Self {
             iter,
             src,
-            last_span: Span::splat(0),
+            last_span: Span { start: 0, end: 0 },
             current_indent: Indent::default(),
             indent_stack: Vec::new(),
         }
@@ -297,7 +295,7 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
 
         match self.current_indent.cmp(top) {
             Ordering::Less => {
-                let result = self.close_block(span);
+                let result = self.close_block(span.clone());
 
                 if self
                     .indent_stack
@@ -323,16 +321,16 @@ impl<'src, I: Iterator<Item = SrcToken<'src>>> LayoutIter<'src, I> {
 
     fn finish(&mut self) -> Option<SrcToken<'src>> {
         self.current_indent = Indent::default();
-        self.try_close_block(self.last_span)
+        self.try_close_block(self.last_span.clone())
     }
 
     fn handle_indent(&mut self, span: Span) -> SrcToken<'src> {
-        let new_indent = Indent::new(self.src, span);
+        let new_indent = Indent::new(self.src, span.clone());
 
         match new_indent.cmp(&self.current_indent) {
             Ordering::Less => {
                 self.current_indent = new_indent;
-                self.try_close_block(span)
+                self.try_close_block(span.clone())
                     .unwrap_or((Token::Error(Error::Dedent), span))
             }
             Ordering::Equal => (Token::LineEnd, span),
@@ -352,7 +350,7 @@ where
     type Item = SrcToken<'src>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(token) = self.try_close_block(self.last_span) {
+        if let Some(token) = self.try_close_block(self.last_span.clone()) {
             return Some(token);
         }
 
@@ -360,7 +358,7 @@ where
             return self.finish();
         };
 
-        self.last_span = token.1;
+        self.last_span = token.1.clone();
 
         let result = if token.0 == Token::LineEnd {
             self.handle_indent(token.1)
@@ -378,7 +376,7 @@ struct Indent(usize);
 impl Indent {
     fn new(src: &str, span: Span) -> Self {
         Self(
-            src[span.into_range()]
+            src[span]
                 .rsplit_once('\n')
                 .map(|(_head, tail)| tail.len())
                 .unwrap_or(0),
@@ -568,7 +566,7 @@ mod tests {
                 Token::Close(Grouping::Block) => ">>",
                 Token::LineEnd => ",",
                 Token::Error(_) => "<error>",
-                _ => &src[span.into_range()],
+                _ => &src[span],
             })
             .join(" ")
     }
