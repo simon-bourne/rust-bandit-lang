@@ -19,8 +19,5 @@ goldenfile = "1.7.1"
 indoc = "2.0.4"
 itertools = "0.12.1"
 logos = "0.15.0"
-num-bigint = "0.4.4"
 xtask-base = { git = "https://github.com/simon-bourne/rust-xtask-base" }
-derive_more = "0.99"
-slotmap = "1.0.7"
 pretty = "0.12.3"

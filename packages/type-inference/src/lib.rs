@@ -4,8 +4,8 @@ use std::{
     result,
 };
 
+use context::Context;
 use pretty::RcDoc;
-use slotmap::{new_key_type, SlotMap};
 
 pub mod context;
 
@@ -110,10 +110,6 @@ impl<'src> ExpressionRef<'src> {
         }))
     }
 
-    pub fn type_constructor(cons: TypeConstructor<'src, Inference>) -> Self {
-        Self::new(Expression::Constructor(cons))
-    }
-
     pub fn variable(typ: Self) -> Self {
         Self::new(Expression::Variable(typ))
     }
@@ -167,9 +163,6 @@ impl<'src> ExpressionRef<'src> {
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
             (Expression::Type, Expression::Type) => (),
-            (Expression::Constructor(c1), Expression::Constructor(c2)) => {
-                TypeConstructor::unify(c1, c2)?
-            }
             (
                 Expression::Apply {
                     function,
@@ -239,21 +232,6 @@ impl Pretty for Rc<Expression<'_, Inferred>> {
     }
 }
 
-pub struct Context<'src> {
-    types: SlotMap<Id, ExpressionRef<'src>>,
-}
-
-impl<'src> Context<'src> {
-    fn unify(&mut self, id: Id, typ: &mut ExpressionRef<'src>) -> Result<()> {
-        let Some(item) = self.types.get_mut(id) else {
-            return Err(InferenceError);
-        };
-
-        // TODO: Instantiate `item` with fresh variables.
-        ExpressionRef::unify(item, typ)
-    }
-}
-
 #[derive(Debug)]
 enum Expression<'src, A: Annotation<'src>> {
     Type,
@@ -266,7 +244,6 @@ enum Expression<'src, A: Annotation<'src>> {
     Lambda(VariableBinding<'src, A>),
     // TODO: Use debruijn index
     Variable(A::Expression),
-    Constructor(TypeConstructor<'src, A>),
 }
 
 #[derive(Debug)]
@@ -293,7 +270,6 @@ impl<'src, A: Annotation<'src>> Expression<'src, A> {
     fn pretty(&self) -> PrettyDoc {
         match self {
             Self::Type => PrettyDoc::text("Type"),
-            Self::Constructor(cons) => cons.pretty(),
             Self::Apply {
                 function: left,
                 argument: right,
@@ -341,11 +317,6 @@ impl<'src> Expression<'src, Inference> {
         match self {
             Self::Type => (),
             Self::Variable(typ) => typ.infer_types(context)?,
-            Self::Constructor(constructor) => {
-                let TypeConstructor::Named { id, typ } = constructor;
-                context.unify(*id, typ)?;
-                typ.infer_types(context)?;
-            }
             Self::Apply {
                 function,
                 argument,
@@ -374,57 +345,11 @@ impl<'src> Expression<'src, Inference> {
         match self {
             Self::Type => ExpressionRef::type_of_type(),
             Self::Variable(typ) => typ.clone(),
-            Self::Constructor(cons) => cons.typ(),
             Self::Apply { typ, .. } => typ.clone(),
             Self::FunctionType(_binding) => ExpressionRef::type_of_type(),
             Self::Lambda(binding) => binding.in_expression.typ(),
         }
     }
-}
-
-#[derive(Debug)]
-pub enum TypeConstructor<'src, A: Annotation<'src>> {
-    Named { id: Id, typ: A::Expression },
-}
-
-impl<'src, A: Annotation<'src>> TypeConstructor<'src, A> {
-    fn pretty(&self) -> PrettyDoc {
-        match self {
-            TypeConstructor::Named { typ, .. } => PrettyDoc::concat([
-                PrettyDoc::text("("),
-                PrettyDoc::text("TypeConstructor"),
-                PrettyDoc::text(":"),
-                typ.pretty(),
-                PrettyDoc::text(")"),
-            ]),
-        }
-    }
-}
-
-impl<'src> TypeConstructor<'src, Inference> {
-    fn unify(left: &mut Self, right: &mut Self) -> Result<()> {
-        match (left, right) {
-            (Self::Named { id, typ }, Self::Named { id: id1, typ: typ1 }) => {
-                if id != id1 {
-                    Err(InferenceError)?;
-                }
-
-                ExpressionRef::unify(typ, typ1)?;
-            }
-        }
-
-        Ok(())
-    }
-
-    fn typ(&self) -> ExpressionRef<'src> {
-        match self {
-            Self::Named { typ, .. } => typ.clone(),
-        }
-    }
-}
-
-new_key_type! {
-    pub struct Id;
 }
 
 #[cfg(test)]
@@ -449,8 +374,7 @@ mod tests {
 
         // TODO: `C : (m a) -> X`, not `C : (m a)`
         let constructor_type = ExpressionRef::apply(m, a, ExpressionRef::unknown());
-        let types = SlotMap::with_key();
-        let context = &mut Context { types };
+        let context = &mut Context::default();
         let mut constructor = ValueConstructor {
             typ: constructor_type,
         };
