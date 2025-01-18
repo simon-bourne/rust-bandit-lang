@@ -358,14 +358,6 @@ mod tests {
 
     use super::*;
 
-    // TODO: This sholuld be removed once we actually use the types
-    // Check there are no cycles in the types
-    #[test]
-    fn build() {
-        let _inferred = Expression::<'static, Inferred>::Type;
-        let _inference = Expression::<'static, Inference>::Type;
-    }
-
     #[test]
     fn infer_kinds() {
         // data X m a = C : (m a) -> X
