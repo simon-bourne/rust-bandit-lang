@@ -10,42 +10,6 @@ use slotmap::{new_key_type, SlotMap};
 type SharedMut<T> = Rc<RefCell<T>>;
 type PrettyDoc = RcDoc<'static>;
 
-pub struct Program<'src, A: Annotation<'src>> {
-    data: Vec<DataDeclaration<'src, A>>,
-    values: Vec<Value<'src, A>>,
-}
-
-impl<'src> Program<'src, Inference> {
-    pub fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
-        for d in &mut self.data {
-            d.infer_types(context)?;
-        }
-
-        for v in &mut self.values {
-            v.infer_types(context)?;
-        }
-
-        Ok(())
-    }
-}
-
-pub struct Data<'src, A: Annotation<'src>> {
-    declaration: DataDeclaration<'src, A>,
-    constructors: Vec<ValueConstructor<'src, A>>,
-}
-
-impl<'src> Data<'src, Inference> {
-    pub fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
-        self.declaration.infer_types(context)?;
-
-        for c in &mut self.constructors {
-            c.infer_types(context)?;
-        }
-
-        Ok(())
-    }
-}
-
 #[derive(Debug)]
 pub struct ValueConstructor<'src, A: Annotation<'src>> {
     typ: A::Type,
@@ -76,20 +40,6 @@ pub type Result<T> = result::Result<T, InferenceError>;
 
 #[derive(Debug)]
 pub struct InferenceError;
-
-struct DataDeclaration<'src, A: Annotation<'src>> {
-    parameters: Vec<Parameter<'src, A>>,
-}
-
-impl<'src> DataDeclaration<'src, Inference> {
-    pub fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
-        for param in &mut self.parameters {
-            param.0.infer_types(context)?;
-        }
-
-        Ok(())
-    }
-}
 
 pub trait Annotation<'src> {
     type Type: Pretty;
@@ -526,20 +476,6 @@ impl<'src> TypeConstructor<'src, Inference> {
             ),
             Self::Named { typ, .. } => typ.clone(),
         }
-    }
-}
-
-struct Parameter<'src, A: Annotation<'src>>(Value<'src, A>);
-
-struct Value<'src, A: Annotation<'src>> {
-    id: Id,
-    typ: A::Type,
-}
-
-impl<'src> Value<'src, Inference> {
-    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
-        context.unify(self.id, &mut self.typ)?;
-        self.typ.infer_types(context)
     }
 }
 
