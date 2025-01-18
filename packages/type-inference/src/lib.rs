@@ -9,6 +9,7 @@ use slotmap::{new_key_type, SlotMap};
 
 pub mod context;
 
+// TODO: Use actual refs, not `Rc`
 type SharedMut<T> = Rc<RefCell<T>>;
 type PrettyDoc = RcDoc<'static>;
 
@@ -167,7 +168,9 @@ impl<'src> ExpressionRef<'src> {
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
             (Expression::Type, Expression::Type) => (),
-            (Expression::Constructor(c1), Expression::Constructor(c2)) => TypeConstructor::unify(c1, c2)?,
+            (Expression::Constructor(c1), Expression::Constructor(c2)) => {
+                TypeConstructor::unify(c1, c2)?
+            }
             (
                 Expression::Apply {
                     function,
@@ -407,7 +410,10 @@ impl<'src> Expression<'src, Inference> {
             if function.is_arrow_operator() {
                 ExpressionRef::unify(
                     typ,
-                    &mut ExpressionRef::arrow(ExpressionRef::type_of_type(), ExpressionRef::type_of_type()),
+                    &mut ExpressionRef::arrow(
+                        ExpressionRef::type_of_type(),
+                        ExpressionRef::type_of_type(),
+                    ),
                 )?;
                 *self = Self::ApplyArrowTo(argument.clone())
             }
