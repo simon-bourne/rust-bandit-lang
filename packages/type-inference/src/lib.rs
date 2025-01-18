@@ -96,20 +96,18 @@ impl<'src> ExpressionRef<'src> {
         })
     }
 
-    pub fn function_type(binding: VariableBinding<'src, Inference>) -> Self {
-        Self::new(Expression::FunctionType(binding))
+    pub fn function_type(argument_type: Self, result_type: Self) -> Self {
+        Self::new(Expression::FunctionType(VariableBinding {
+            variable_type: argument_type,
+            in_expression: result_type,
+        }))
     }
 
-    pub fn lambda(binding: VariableBinding<'src, Inference>) -> Self {
-        Self::new(Expression::Lambda(binding))
-    }
-
-    pub fn arrow(left: Self, right: Self) -> Self {
-        Self::apply(
-            Self::new(Expression::ApplyArrowTo(left)),
-            right,
-            Self::type_of_type(),
-        )
+    pub fn lambda(argument_type: Self, in_expression: Self) -> Self {
+        Self::new(Expression::Lambda(VariableBinding {
+            variable_type: argument_type,
+            in_expression,
+        }))
     }
 
     pub fn type_constructor(cons: TypeConstructor<'src, Inference>) -> Self {
@@ -118,13 +116,6 @@ impl<'src> ExpressionRef<'src> {
 
     pub fn variable(typ: Self) -> Self {
         Self::new(Expression::Variable(typ))
-    }
-
-    pub fn forall(variable: Self, in_expression: Self) -> Self {
-        Self::new(Expression::Forall {
-            variable,
-            in_expression,
-        })
     }
 
     fn new(typ: Expression<'src, Inference>) -> Self {
@@ -170,8 +161,8 @@ impl<'src> ExpressionRef<'src> {
             return Ok(());
         };
 
-        x_ref.normalize_apply_arrow()?;
-        y_ref.normalize_apply_arrow()?;
+        x_ref.normalize()?;
+        y_ref.normalize()?;
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
@@ -200,51 +191,6 @@ impl<'src> ExpressionRef<'src> {
             }
             (Expression::Lambda(binding0), Expression::Lambda(binding1)) => {
                 VariableBinding::unify(binding0, binding1)?
-            }
-            (Expression::ApplyArrowTo(argument0), Expression::ApplyArrowTo(argument1)) => {
-                Self::unify(argument0, argument1)?;
-            }
-            (
-                Expression::Forall {
-                    variable,
-                    in_expression,
-                },
-                Expression::Forall {
-                    variable: variable0,
-                    in_expression: in_expression0,
-                },
-            ) => {
-                variable0.replace(variable);
-                Self::unify(in_expression, in_expression0)?
-            }
-            (
-                Expression::Forall {
-                    variable,
-                    in_expression,
-                },
-                _,
-            ) => {
-                // TODO: Factor this out.
-                variable.replace(&Self::unknown());
-                drop(y_ref);
-                Self::unify(in_expression, y)?;
-                drop(x_ref);
-                x.replace(y);
-                return Ok(());
-            }
-            (
-                _,
-                Expression::Forall {
-                    variable,
-                    in_expression,
-                },
-            ) => {
-                variable.replace(&Self::unknown());
-                drop(x_ref);
-                Self::unify(in_expression, x)?;
-                drop(y_ref);
-                y.replace(x);
-                return Ok(());
             }
             _ => Err(InferenceError)?,
         }
@@ -277,14 +223,6 @@ impl<'src> ExpressionRef<'src> {
             ExprRefVariants::Known(owned) => owned.typ(),
             ExprRefVariants::Unknown => Self::type_of_type(),
             ExprRefVariants::Link(target) => target.typ(),
-        }
-    }
-
-    fn is_arrow_operator(&self) -> bool {
-        match &*self.0.borrow() {
-            ExprRefVariants::Known(expr) => expr.is_arrow_operator(),
-            ExprRefVariants::Unknown => false,
-            ExprRefVariants::Link(linked) => linked.is_arrow_operator(),
         }
     }
 }
@@ -328,19 +266,11 @@ enum Expression<'src, A: Annotation<'src>> {
     Lambda(VariableBinding<'src, A>),
     // TODO: Use debruijn index
     Variable(A::Expression),
-    // TODO: Remove all these
     Constructor(TypeConstructor<'src, A>),
-    // Apply `->` to it's first argument. This is required because `(Type ->)` has type ` Type ->
-    // Type`, and `Type -> Type` has `(Type ->)` as a sub expression.
-    ApplyArrowTo(A::Expression),
-    Forall {
-        variable: A::Expression,
-        in_expression: A::Expression,
-    },
 }
 
 #[derive(Debug)]
-pub struct VariableBinding<'src, A: Annotation<'src>> {
+struct VariableBinding<'src, A: Annotation<'src>> {
     variable_type: A::Expression,
     in_expression: A::Expression,
 }
@@ -382,7 +312,7 @@ impl<'src, A: Annotation<'src>> Expression<'src, A> {
             Self::FunctionType(binding) => PrettyDoc::concat([
                 PrettyDoc::text("("),
                 binding.variable_type.pretty(),
-                PrettyDoc::text("->"),
+                PrettyDoc::text(" -> "),
                 binding.in_expression.pretty(),
                 PrettyDoc::text(")"),
             ]),
@@ -391,13 +321,10 @@ impl<'src, A: Annotation<'src>> Expression<'src, A> {
                 PrettyDoc::text("_"),
                 PrettyDoc::text(":"),
                 binding.variable_type.pretty(),
-                PrettyDoc::text("->"),
+                PrettyDoc::text(" -> "),
                 binding.in_expression.pretty(),
                 PrettyDoc::text(")"),
             ]),
-            Self::ApplyArrowTo(argument) => {
-                PrettyDoc::concat([argument.pretty(), PrettyDoc::text(" ->")])
-            }
             Self::Variable(typ) => PrettyDoc::concat([
                 PrettyDoc::text("("),
                 PrettyDoc::text("variable"),
@@ -405,17 +332,7 @@ impl<'src, A: Annotation<'src>> Expression<'src, A> {
                 typ.pretty(),
                 PrettyDoc::text(")"),
             ]),
-            Self::Forall { in_expression, .. } => PrettyDoc::concat([
-                PrettyDoc::text("("),
-                PrettyDoc::text("forall variable. "),
-                in_expression.pretty(),
-                PrettyDoc::text(")"),
-            ]),
         }
-    }
-
-    fn is_arrow_operator(&self) -> bool {
-        matches!(self, Self::Constructor(TypeConstructor::Arrow))
     }
 }
 
@@ -425,17 +342,16 @@ impl<'src> Expression<'src, Inference> {
             Self::Type => (),
             Self::Variable(typ) => typ.infer_types(context)?,
             Self::Constructor(constructor) => {
-                if let TypeConstructor::Named { id, typ } = constructor {
-                    context.unify(*id, typ)?;
-                    typ.infer_types(context)?;
-                }
+                let TypeConstructor::Named { id, typ } = constructor;
+                context.unify(*id, typ)?;
+                typ.infer_types(context)?;
             }
             Self::Apply {
                 function,
                 argument,
                 typ,
             } => {
-                let function_type = &mut ExpressionRef::arrow(argument.typ(), typ.clone());
+                let function_type = &mut ExpressionRef::function_type(argument.typ(), typ.clone());
                 ExpressionRef::unify(function_type, &mut function.typ())?;
 
                 function.infer_types(context)?;
@@ -444,37 +360,13 @@ impl<'src> Expression<'src, Inference> {
             }
             Self::FunctionType(binding) => binding.infer_types(context)?,
             Self::Lambda(binding) => binding.infer_types(context)?,
-            Self::ApplyArrowTo(argument) => {
-                ExpressionRef::unify(&mut argument.typ(), &mut ExpressionRef::type_of_type())?;
-                argument.infer_types(context)?;
-            }
-            Self::Forall { in_expression, .. } => {
-                in_expression.infer_types(context)?;
-            }
         }
 
         Ok(())
     }
 
-    fn normalize_apply_arrow(&mut self) -> Result<()> {
-        if let Self::Apply {
-            function,
-            argument,
-            typ,
-        } = self
-        {
-            if function.is_arrow_operator() {
-                ExpressionRef::unify(
-                    typ,
-                    &mut ExpressionRef::arrow(
-                        ExpressionRef::type_of_type(),
-                        ExpressionRef::type_of_type(),
-                    ),
-                )?;
-                *self = Self::ApplyArrowTo(argument.clone())
-            }
-        }
-
+    fn normalize(&mut self) -> Result<()> {
+        // TODO: Normalize by evaluation
         Ok(())
     }
 
@@ -486,24 +378,18 @@ impl<'src> Expression<'src, Inference> {
             Self::Apply { typ, .. } => typ.clone(),
             Self::FunctionType(_binding) => ExpressionRef::type_of_type(),
             Self::Lambda(binding) => binding.in_expression.typ(),
-            Self::ApplyArrowTo(_) => {
-                ExpressionRef::arrow(ExpressionRef::type_of_type(), ExpressionRef::type_of_type())
-            }
-            Self::Forall { in_expression, .. } => in_expression.typ(),
         }
     }
 }
 
 #[derive(Debug)]
 pub enum TypeConstructor<'src, A: Annotation<'src>> {
-    Arrow,
     Named { id: Id, typ: A::Expression },
 }
 
 impl<'src, A: Annotation<'src>> TypeConstructor<'src, A> {
     fn pretty(&self) -> PrettyDoc {
         match self {
-            TypeConstructor::Arrow => PrettyDoc::text("(->)"),
             TypeConstructor::Named { typ, .. } => PrettyDoc::concat([
                 PrettyDoc::text("("),
                 PrettyDoc::text("TypeConstructor"),
@@ -518,7 +404,6 @@ impl<'src, A: Annotation<'src>> TypeConstructor<'src, A> {
 impl<'src> TypeConstructor<'src, Inference> {
     fn unify(left: &mut Self, right: &mut Self) -> Result<()> {
         match (left, right) {
-            (Self::Arrow, Self::Arrow) => (),
             (Self::Named { id, typ }, Self::Named { id: id1, typ: typ1 }) => {
                 if id != id1 {
                     Err(InferenceError)?;
@@ -526,7 +411,6 @@ impl<'src> TypeConstructor<'src, Inference> {
 
                 ExpressionRef::unify(typ, typ1)?;
             }
-            _ => Err(InferenceError)?,
         }
 
         Ok(())
@@ -534,10 +418,6 @@ impl<'src> TypeConstructor<'src, Inference> {
 
     fn typ(&self) -> ExpressionRef<'src> {
         match self {
-            Self::Arrow => ExpressionRef::arrow(
-                ExpressionRef::type_of_type(),
-                ExpressionRef::arrow(ExpressionRef::type_of_type(), ExpressionRef::type_of_type()),
-            ),
             Self::Named { typ, .. } => typ.clone(),
         }
     }
