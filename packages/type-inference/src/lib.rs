@@ -15,7 +15,7 @@ type PrettyDoc = RcDoc<'static>;
 
 #[derive(Debug)]
 pub struct ValueConstructor<'src, A: Annotation<'src>> {
-    typ: A::Type,
+    typ: A::Expression,
 }
 
 impl<'src, A> ValueConstructor<'src, A>
@@ -45,7 +45,7 @@ pub type Result<T> = result::Result<T, InferenceError>;
 pub struct InferenceError;
 
 pub trait Annotation<'src> {
-    type Type: Pretty;
+    type Expression: Pretty;
 }
 
 pub trait Pretty {
@@ -56,7 +56,7 @@ pub trait Pretty {
 pub struct Inference;
 
 impl<'src> Annotation<'src> for Inference {
-    type Type = ExpressionRef<'src>;
+    type Expression = ExpressionRef<'src>;
 }
 
 impl Pretty for ExpressionRef<'_> {
@@ -278,7 +278,7 @@ impl<'src> ExpressionRef<'src> {
 struct Inferred;
 
 impl<'src> Annotation<'src> for Inferred {
-    type Type = Rc<Expression<'src, Self>>;
+    type Expression = Rc<Expression<'src, Self>>;
 }
 
 impl Pretty for Rc<Expression<'_, Inferred>> {
@@ -307,23 +307,23 @@ enum Expression<'src, A: Annotation<'src>> {
     Type,
     Constructor(TypeConstructor<'src, A>),
     Apply {
-        function: A::Type,
-        argument: A::Type,
-        typ: A::Type,
+        function: A::Expression,
+        argument: A::Expression,
+        typ: A::Expression,
     },
     // Apply `->` to it's first argument. This is required because `(Type ->)` has type ` Type ->
     // Type`, and `Type -> Type` has `(Type ->)` as a sub expression.
-    ApplyArrowTo(A::Type),
-    Variable(A::Type),
+    ApplyArrowTo(A::Expression),
+    Variable(A::Expression),
     Forall {
-        variable: A::Type,
-        in_expression: A::Type,
+        variable: A::Expression,
+        in_expression: A::Expression,
     },
 }
 
 struct VariableBinding<'src, A: Annotation<'src>> {
-    variable_type: A::Type,
-    in_expression: A::Type,
+    variable_type: A::Expression,
+    in_expression: A::Expression,
 }
 
 impl<'src, A: Annotation<'src>> Expression<'src, A> {
@@ -444,7 +444,7 @@ impl<'src> Expression<'src, Inference> {
 #[derive(Debug)]
 pub enum TypeConstructor<'src, A: Annotation<'src>> {
     Arrow,
-    Named { id: Id, typ: A::Type },
+    Named { id: Id, typ: A::Expression },
 }
 
 impl<'src, A: Annotation<'src>> TypeConstructor<'src, A> {
