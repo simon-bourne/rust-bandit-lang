@@ -96,6 +96,14 @@ impl<'src> ExpressionRef<'src> {
         })
     }
 
+    pub fn function_type(binding: VariableBinding<'src, Inference>) -> Self {
+        Self::new(Expression::FunctionType(binding))
+    }
+
+    pub fn lambda(binding: VariableBinding<'src, Inference>) -> Self {
+        Self::new(Expression::Lambda(binding))
+    }
+
     pub fn arrow(left: Self, right: Self) -> Self {
         Self::apply(
             Self::new(Expression::ApplyArrowTo(left)),
@@ -187,6 +195,8 @@ impl<'src> ExpressionRef<'src> {
                 Self::unify(argument, argument1)?;
                 Self::unify(typ, typ1)?;
             }
+            (Expression::FunctionType(_binding0), Expression::FunctionType(_binding1)) => todo!(),
+            (Expression::Lambda(_binding0), Expression::Lambda(_binding1)) => todo!(),
             (Expression::ApplyArrowTo(argument0), Expression::ApplyArrowTo(argument1)) => {
                 Self::unify(argument0, argument1)?;
             }
@@ -305,25 +315,30 @@ impl<'src> Context<'src> {
 #[derive(Debug)]
 enum Expression<'src, A: Annotation<'src>> {
     Type,
-    Constructor(TypeConstructor<'src, A>),
     Apply {
         function: A::Expression,
         argument: A::Expression,
         typ: A::Expression,
     },
+    FunctionType(VariableBinding<'src, A>),
+    Lambda(VariableBinding<'src, A>),
+    // TODO: Use debruijn index
+    Variable(A::Expression),
+    // TODO: Remove all these
+    Constructor(TypeConstructor<'src, A>),
     // Apply `->` to it's first argument. This is required because `(Type ->)` has type ` Type ->
     // Type`, and `Type -> Type` has `(Type ->)` as a sub expression.
     ApplyArrowTo(A::Expression),
-    Variable(A::Expression),
     Forall {
         variable: A::Expression,
         in_expression: A::Expression,
     },
 }
 
-struct VariableBinding<'src, A: Annotation<'src>> {
-    variable_type: A::Expression,
-    in_expression: A::Expression,
+#[derive(Debug)]
+pub struct VariableBinding<'src, A: Annotation<'src>> {
+    _variable_type: A::Expression,
+    _in_expression: A::Expression,
 }
 
 impl<'src, A: Annotation<'src>> Expression<'src, A> {
@@ -346,6 +361,8 @@ impl<'src, A: Annotation<'src>> Expression<'src, A> {
                 typ.pretty(),
                 PrettyDoc::text(")"),
             ]),
+            Self::FunctionType(_binding) => todo!(),
+            Self::Lambda(_binding) => todo!(),
             Self::ApplyArrowTo(argument) => {
                 PrettyDoc::concat([argument.pretty(), PrettyDoc::text(" ->")])
             }
@@ -393,6 +410,8 @@ impl<'src> Expression<'src, Inference> {
                 argument.infer_types(context)?;
                 typ.infer_types(context)?;
             }
+            Self::FunctionType(_binding) => todo!(),
+            Self::Lambda(_binding) => todo!(),
             Self::ApplyArrowTo(argument) => {
                 ExpressionRef::unify(&mut argument.typ(), &mut ExpressionRef::type_of_type())?;
                 argument.infer_types(context)?;
@@ -433,6 +452,8 @@ impl<'src> Expression<'src, Inference> {
             Self::Variable(typ) => typ.clone(),
             Self::Constructor(cons) => cons.typ(),
             Self::Apply { typ, .. } => typ.clone(),
+            Self::FunctionType(_binding) => todo!(),
+            Self::Lambda(_binding) => todo!(),
             Self::ApplyArrowTo(_) => {
                 ExpressionRef::arrow(ExpressionRef::type_of_type(), ExpressionRef::type_of_type())
             }
