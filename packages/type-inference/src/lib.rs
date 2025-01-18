@@ -321,6 +321,11 @@ enum Expression<'src, A: Annotation<'src>> {
     },
 }
 
+struct VariableBinding<'src, A: Annotation<'src>> {
+    variable_type: A::Type,
+    in_expression: A::Type,
+}
+
 impl<'src, A: Annotation<'src>> Expression<'src, A> {
     fn pretty(&self) -> PrettyDoc {
         match self {
