@@ -70,6 +70,14 @@ impl<'src> ExpressionRef<'src> {
         })
     }
 
+    pub fn let_binding(variable_type: Self, variable_value: Self, in_expression: Self) -> Self {
+        Self::new(Expression::Let {
+            variable_type,
+            variable_value,
+            in_expression,
+        })
+    }
+
     pub fn function_type(argument_type: Self, result_type: Self) -> Self {
         Self::new(Expression::FunctionType(VariableBinding {
             variable_type: argument_type,
@@ -153,6 +161,22 @@ impl<'src> ExpressionRef<'src> {
                 Self::unify(argument, argument1)?;
                 Self::unify(typ, typ1)?;
             }
+            (
+                Expression::Let {
+                    variable_type,
+                    variable_value,
+                    in_expression,
+                },
+                Expression::Let {
+                    variable_type: variable_type1,
+                    variable_value: variable_value1,
+                    in_expression: in_expression1,
+                },
+            ) => {
+                Self::unify(variable_type, variable_type1)?;
+                Self::unify(variable_value, variable_value1)?;
+                Self::unify(in_expression, in_expression1)?;
+            }
             (Expression::FunctionType(binding0), Expression::FunctionType(binding1)) => {
                 VariableBinding::unify(binding0, binding1)?
             }
@@ -214,6 +238,11 @@ enum Expression<'src, A: Annotation<'src>> {
         argument: A::Expression,
         typ: A::Expression,
     },
+    Let {
+        variable_type: A::Expression,
+        variable_value: A::Expression,
+        in_expression: A::Expression,
+    },
     FunctionType(VariableBinding<'src, A>),
     Lambda(VariableBinding<'src, A>),
     // TODO: Use debruijn index
@@ -257,6 +286,22 @@ impl<'src, A: Annotation<'src>> Expression<'src, A> {
                 PrettyDoc::text(")"),
                 PrettyDoc::text(":"),
                 typ.pretty(),
+                PrettyDoc::text(")"),
+            ]),
+            Self::Let {
+                variable_type,
+                variable_value,
+                in_expression,
+            } => PrettyDoc::concat([
+                PrettyDoc::text("("),
+                PrettyDoc::text("let"),
+                PrettyDoc::text("_"),
+                PrettyDoc::text(":"),
+                variable_type.pretty(),
+                PrettyDoc::text(" = "),
+                variable_value.pretty(),
+                PrettyDoc::text(" in "),
+                in_expression.pretty(),
                 PrettyDoc::text(")"),
             ]),
             Self::FunctionType(binding) => PrettyDoc::concat([
@@ -303,6 +348,15 @@ impl<'src> Expression<'src, Inference> {
                 argument.infer_types(context)?;
                 typ.infer_types(context)?;
             }
+            Self::Let {
+                variable_type,
+                variable_value,
+                in_expression,
+            } => {
+                variable_type.infer_types(context)?;
+                variable_value.infer_types(context)?;
+                in_expression.infer_types(context)?;
+            }
             Self::FunctionType(binding) => binding.infer_types(context)?,
             Self::Lambda(binding) => binding.infer_types(context)?,
         }
@@ -320,6 +374,7 @@ impl<'src> Expression<'src, Inference> {
             Self::Type => ExpressionRef::type_of_type(),
             Self::Variable(typ) => typ.clone(),
             Self::Apply { typ, .. } => typ.clone(),
+            Self::Let { in_expression, .. } => in_expression.typ(),
             Self::FunctionType(_binding) => ExpressionRef::type_of_type(),
             Self::Lambda(binding) => binding.in_expression.typ(),
         }
