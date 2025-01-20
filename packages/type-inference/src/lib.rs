@@ -143,8 +143,6 @@ impl<'src> ExpressionRef<'src> {
         y_ref.normalize()?;
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
-        // TODO: Can we make this safer by matching on `x_ref` and then matching on
-        // `y_ref`?
         match (&mut *x_ref, &mut *y_ref) {
             (Expression::Type, Expression::Type) => (),
             (
@@ -196,6 +194,7 @@ impl<'src> ExpressionRef<'src> {
                 Self::unify(ctx, typ, &mut ctx_type)?;
                 Self::unify(ctx, typ1, &mut ctx_type)?
             }
+            // It's safer to explicitly ignore each variant
             (Expression::Type, _rhs)
             | (Expression::Apply { .. }, _rhs)
             | (Expression::Let { .. }, _rhs)
@@ -278,8 +277,9 @@ struct VariableBinding<'src, A: Annotation<'src>> {
 impl<'src> VariableBinding<'src, Inference> {
     fn infer_types(&mut self, ctx: &mut Context<'src>) -> Result<()> {
         self.variable_type.infer_types(ctx)?;
-        // TODO: push type to context, then remove.
-        self.in_expression.infer_types(ctx)
+        ctx.with_type(self.variable_type.clone(), |ctx| {
+            self.in_expression.infer_types(ctx)
+        })
     }
 
     fn unify(
@@ -381,7 +381,8 @@ impl<'src> Expression<'src, Inference> {
             } => {
                 variable_type.infer_types(ctx)?;
                 variable_value.infer_types(ctx)?;
-                in_expression.infer_types(ctx)?;
+
+                ctx.with_type(variable_type.clone(), |ctx| in_expression.infer_types(ctx))?;
             }
             Self::FunctionType(binding) => binding.infer_types(ctx)?,
             Self::Lambda(binding) => binding.infer_types(ctx)?,

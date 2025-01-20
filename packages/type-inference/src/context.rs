@@ -20,14 +20,15 @@ pub struct Context<'a> {
 }
 
 impl<'a> Context<'a> {
-    pub fn push_type(&mut self, expr: ExpressionRef<'a>) -> DeBruijnLevel {
-        let level = DeBruijnLevel(self.local_variables.len());
-        self.local_variables.push(expr);
-        level
-    }
-
-    pub fn pop(&mut self) {
+    pub fn with_type<Output>(
+        &mut self,
+        expr: ExpressionRef<'a>,
+        f: impl FnOnce(&mut Self) -> Output,
+    ) -> Output {
+        self.push_type(expr);
+        let output = f(self);
         self.local_variables.pop();
+        output
     }
 
     pub fn get_type(&self, index: DeBruijnIndex) -> ExpressionRef<'a> {
@@ -40,5 +41,12 @@ impl<'a> Context<'a> {
         let len = self.local_variables.len();
         assert!(level.0 < len);
         DeBruijnIndex(len - level.0)
+    }
+
+    // TODO: Make private
+    pub fn push_type(&mut self, expr: ExpressionRef<'a>) -> DeBruijnLevel {
+        let level = DeBruijnLevel(self.local_variables.len());
+        self.local_variables.push(expr);
+        level
     }
 }
