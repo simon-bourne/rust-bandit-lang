@@ -14,20 +14,32 @@ impl fmt::Display for DeBruijnIndex {
     }
 }
 
+pub struct Variable<'a> {
+    level: DeBruijnLevel,
+    typ: ExpressionRef<'a>,
+}
+
+impl<'a> Variable<'a> {
+    pub fn to_expression(&self, ctx: &Context<'a>) -> ExpressionRef<'a> {
+        ExpressionRef::variable(ctx.de_bruijn_index(self.level), self.typ.clone())
+    }
+}
+
 #[derive(Default)]
 pub struct Context<'a> {
     local_variables: Vec<ExpressionRef<'a>>,
 }
 
 impl<'a> Context<'a> {
-    pub fn with_type<Output>(
+    pub fn with_variable<Output>(
         &mut self,
-        expr: ExpressionRef<'a>,
-        f: impl FnOnce(&mut Self) -> Output,
+        typ: ExpressionRef<'a>,
+        f: impl FnOnce(&mut Self, Variable<'a>) -> Output,
     ) -> Output {
-        self.push_type(expr);
-        let output = f(self);
-        self.local_variables.pop();
+        let level = self.push(typ.clone());
+        let var = Variable { level, typ };
+        let output = f(self, var);
+        self.pop();
         output
     }
 
@@ -37,16 +49,20 @@ impl<'a> Context<'a> {
         self.local_variables[len - index.0].clone()
     }
 
-    pub fn de_bruijn_index(&self, level: DeBruijnLevel) -> DeBruijnIndex {
+    fn de_bruijn_index(&self, level: DeBruijnLevel) -> DeBruijnIndex {
         let len = self.local_variables.len();
         assert!(level.0 < len);
         DeBruijnIndex(len - level.0)
     }
 
     // TODO: Make private
-    pub fn push_type(&mut self, expr: ExpressionRef<'a>) -> DeBruijnLevel {
+    fn push(&mut self, expr: ExpressionRef<'a>) -> DeBruijnLevel {
         let level = DeBruijnLevel(self.local_variables.len());
         self.local_variables.push(expr);
         level
+    }
+
+    fn pop(&mut self) {
+        self.local_variables.pop();
     }
 }
