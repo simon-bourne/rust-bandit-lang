@@ -55,7 +55,6 @@ impl<'a> Context<'a> {
         DeBruijnIndex(len - level.0)
     }
 
-    // TODO: Make private
     fn push(&mut self, expr: ExpressionRef<'a>) -> DeBruijnLevel {
         let level = DeBruijnLevel(self.local_variables.len());
         self.local_variables.push(expr);
