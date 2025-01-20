@@ -355,7 +355,7 @@ impl<'src, A: Annotation<'src>> Expression<'src, A> {
             ]),
             Self::Variable { index, typ } => PrettyDoc::concat([
                 PrettyDoc::text("("),
-                PrettyDoc::text(index.to_string()),
+                PrettyDoc::as_string(index),
                 PrettyDoc::text(":"),
                 typ.pretty(),
                 PrettyDoc::text(")"),
