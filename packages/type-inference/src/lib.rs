@@ -183,6 +183,7 @@ impl<'src> ExpressionRef<'src> {
             (Expression::Lambda(binding0), Expression::Lambda(binding1)) => {
                 VariableBinding::unify(ctx, binding0, binding1)?
             }
+            // TODO: This only works if the variable is bound in the expression.
             (
                 Expression::Variable { index, typ },
                 Expression::Variable {
