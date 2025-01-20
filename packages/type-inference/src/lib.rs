@@ -4,7 +4,7 @@ use std::{
     result,
 };
 
-use context::Context;
+use context::{Context, DeBruijnIndex};
 use pretty::RcDoc;
 
 pub mod context;
@@ -92,19 +92,19 @@ impl<'src> ExpressionRef<'src> {
         }))
     }
 
-    pub fn variable(typ: Self) -> Self {
-        Self::new(Expression::Variable(typ))
+    pub fn variable(index: DeBruijnIndex, typ: Self) -> Self {
+        Self::new(Expression::Variable { index, typ })
     }
 
     fn new(typ: Expression<'src, Inference>) -> Self {
         Self(Rc::new(RefCell::new(ExprRefVariants::Known(typ))))
     }
 
-    pub fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
+    pub fn infer_types(&mut self, ctx: &mut Context<'src>) -> Result<()> {
         match &mut *self.0.borrow_mut() {
-            ExprRefVariants::Known(typ) => typ.infer_types(context),
+            ExprRefVariants::Known(typ) => typ.infer_types(ctx),
             ExprRefVariants::Unknown => Ok(()),
-            ExprRefVariants::Link(target) => target.infer_types(context),
+            ExprRefVariants::Link(target) => target.infer_types(ctx),
         }
     }
 
@@ -121,7 +121,7 @@ impl<'src> ExpressionRef<'src> {
         }
     }
 
-    fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
+    fn unify(ctx: &Context<'src>, x: &mut Self, y: &mut Self) -> Result<()> {
         x.follow_links();
         y.follow_links();
 
@@ -143,6 +143,8 @@ impl<'src> ExpressionRef<'src> {
         y_ref.normalize()?;
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
+        // TODO: Can we make this safer by matching on `x_ref` and then matching on
+        // `y_ref`?
         match (&mut *x_ref, &mut *y_ref) {
             (Expression::Type, Expression::Type) => (),
             (
@@ -157,9 +159,9 @@ impl<'src> ExpressionRef<'src> {
                     typ: typ1,
                 },
             ) => {
-                Self::unify(function, function1)?;
-                Self::unify(argument, argument1)?;
-                Self::unify(typ, typ1)?;
+                Self::unify(ctx, function, function1)?;
+                Self::unify(ctx, argument, argument1)?;
+                Self::unify(ctx, typ, typ1)?;
             }
             (
                 Expression::Let {
@@ -173,17 +175,33 @@ impl<'src> ExpressionRef<'src> {
                     in_expression: in_expression1,
                 },
             ) => {
-                Self::unify(variable_type, variable_type1)?;
-                Self::unify(variable_value, variable_value1)?;
-                Self::unify(in_expression, in_expression1)?;
+                Self::unify(ctx, variable_type, variable_type1)?;
+                Self::unify(ctx, variable_value, variable_value1)?;
+                Self::unify(ctx, in_expression, in_expression1)?;
             }
             (Expression::FunctionType(binding0), Expression::FunctionType(binding1)) => {
-                VariableBinding::unify(binding0, binding1)?
+                VariableBinding::unify(ctx, binding0, binding1)?
             }
             (Expression::Lambda(binding0), Expression::Lambda(binding1)) => {
-                VariableBinding::unify(binding0, binding1)?
+                VariableBinding::unify(ctx, binding0, binding1)?
             }
-            _ => Err(InferenceError)?,
+            (
+                Expression::Variable { index, typ },
+                Expression::Variable {
+                    index: index1,
+                    typ: typ1,
+                },
+            ) if index == index1 => {
+                let mut ctx_type = ctx.get_type(*index);
+                Self::unify(ctx, typ, &mut ctx_type)?;
+                Self::unify(ctx, typ1, &mut ctx_type)?
+            }
+            (Expression::Type, _rhs)
+            | (Expression::Apply { .. }, _rhs)
+            | (Expression::Let { .. }, _rhs)
+            | (Expression::FunctionType(_), _rhs)
+            | (Expression::Lambda(_), _rhs)
+            | (Expression::Variable { .. }, _rhs) => Err(InferenceError)?,
         }
 
         drop(x_ref);
@@ -245,8 +263,10 @@ enum Expression<'src, A: Annotation<'src>> {
     },
     FunctionType(VariableBinding<'src, A>),
     Lambda(VariableBinding<'src, A>),
-    // TODO: Use debruijn index
-    Variable(A::Expression),
+    Variable {
+        index: DeBruijnIndex,
+        typ: A::Expression,
+    },
 }
 
 #[derive(Debug)]
@@ -256,16 +276,22 @@ struct VariableBinding<'src, A: Annotation<'src>> {
 }
 
 impl<'src> VariableBinding<'src, Inference> {
-    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
-        self.variable_type.infer_types(context)?;
-        self.in_expression.infer_types(context)
+    fn infer_types(&mut self, ctx: &mut Context<'src>) -> Result<()> {
+        self.variable_type.infer_types(ctx)?;
+        // TODO: push type to context, then remove.
+        self.in_expression.infer_types(ctx)
     }
 
     fn unify(
+        ctx: &Context<'src>,
         binding0: &mut VariableBinding<'src, Inference>,
         binding1: &mut VariableBinding<'src, Inference>,
     ) -> Result<()> {
-        ExpressionRef::unify(&mut binding0.variable_type, &mut binding1.variable_type)
+        ExpressionRef::unify(
+            ctx,
+            &mut binding0.variable_type,
+            &mut binding1.variable_type,
+        )
     }
 }
 
@@ -320,9 +346,9 @@ impl<'src, A: Annotation<'src>> Expression<'src, A> {
                 binding.in_expression.pretty(),
                 PrettyDoc::text(")"),
             ]),
-            Self::Variable(typ) => PrettyDoc::concat([
+            Self::Variable { index, typ } => PrettyDoc::concat([
                 PrettyDoc::text("("),
-                PrettyDoc::text("variable"),
+                PrettyDoc::text(index.to_string()),
                 PrettyDoc::text(":"),
                 typ.pretty(),
                 PrettyDoc::text(")"),
@@ -332,33 +358,33 @@ impl<'src, A: Annotation<'src>> Expression<'src, A> {
 }
 
 impl<'src> Expression<'src, Inference> {
-    fn infer_types(&mut self, context: &mut Context<'src>) -> Result<()> {
+    fn infer_types(&mut self, ctx: &mut Context<'src>) -> Result<()> {
         match self {
             Self::Type => (),
-            Self::Variable(typ) => typ.infer_types(context)?,
+            Self::Variable { typ, .. } => typ.infer_types(ctx)?,
             Self::Apply {
                 function,
                 argument,
                 typ,
             } => {
                 let function_type = &mut ExpressionRef::function_type(argument.typ(), typ.clone());
-                ExpressionRef::unify(function_type, &mut function.typ())?;
+                ExpressionRef::unify(ctx, function_type, &mut function.typ())?;
 
-                function.infer_types(context)?;
-                argument.infer_types(context)?;
-                typ.infer_types(context)?;
+                function.infer_types(ctx)?;
+                argument.infer_types(ctx)?;
+                typ.infer_types(ctx)?;
             }
             Self::Let {
                 variable_type,
                 variable_value,
                 in_expression,
             } => {
-                variable_type.infer_types(context)?;
-                variable_value.infer_types(context)?;
-                in_expression.infer_types(context)?;
+                variable_type.infer_types(ctx)?;
+                variable_value.infer_types(ctx)?;
+                in_expression.infer_types(ctx)?;
             }
-            Self::FunctionType(binding) => binding.infer_types(context)?,
-            Self::Lambda(binding) => binding.infer_types(context)?,
+            Self::FunctionType(binding) => binding.infer_types(ctx)?,
+            Self::Lambda(binding) => binding.infer_types(ctx)?,
         }
 
         Ok(())
@@ -372,7 +398,7 @@ impl<'src> Expression<'src, Inference> {
     fn typ(&self) -> ExpressionRef<'src> {
         match self {
             Self::Type => ExpressionRef::type_of_type(),
-            Self::Variable(typ) => typ.clone(),
+            Self::Variable { typ, .. } => typ.clone(),
             Self::Apply { typ, .. } => typ.clone(),
             Self::Let { in_expression, .. } => in_expression.typ(),
             Self::FunctionType(_binding) => ExpressionRef::type_of_type(),
@@ -390,14 +416,17 @@ mod tests {
     #[test]
     fn infer_kinds() {
         // data X m a = C : (m a) -> X
-        let m = ExpressionRef::variable(ExpressionRef::unknown());
-        let a = ExpressionRef::variable(ExpressionRef::unknown());
+        // TODO: We shouldn't be creating free variables
+        let ctx = &mut Context::default();
+        let m_index = ctx.push_type(ExpressionRef::unknown());
+        let a_index = ctx.push_type(ExpressionRef::unknown());
+        let m = ExpressionRef::variable(ctx.de_bruijn_index(m_index), ExpressionRef::unknown());
+        let a = ExpressionRef::variable(ctx.de_bruijn_index(a_index), ExpressionRef::unknown());
 
         // TODO: `C : (m a) -> X`, not `C : (m a)`
         let mut constructor_type = ExpressionRef::apply(m, a, ExpressionRef::unknown());
-        let context = &mut Context::default();
 
-        constructor_type.infer_types(context).unwrap();
+        constructor_type.infer_types(ctx).unwrap();
 
         let mut mint = Mint::new("tests/goldenfiles");
         let mut output = mint.new_goldenfile("infer-kinds.txt").unwrap();

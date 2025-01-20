@@ -1,10 +1,18 @@
+use std::fmt;
+
 use crate::ExpressionRef;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct DeBruijnLevel(usize);
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct DeBruijnIndex(usize);
+
+impl fmt::Display for DeBruijnIndex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 #[derive(Default)]
 pub struct Context<'a> {
@@ -12,7 +20,7 @@ pub struct Context<'a> {
 }
 
 impl<'a> Context<'a> {
-    pub fn push(&mut self, expr: ExpressionRef<'a>) -> DeBruijnLevel {
+    pub fn push_type(&mut self, expr: ExpressionRef<'a>) -> DeBruijnLevel {
         let level = DeBruijnLevel(self.local_variables.len());
         self.local_variables.push(expr);
         level
@@ -22,7 +30,7 @@ impl<'a> Context<'a> {
         self.local_variables.pop();
     }
 
-    pub fn get(&self, index: DeBruijnIndex) -> ExpressionRef<'a> {
+    pub fn get_type(&self, index: DeBruijnIndex) -> ExpressionRef<'a> {
         let len = self.local_variables.len();
         assert!(index.0 <= len);
         self.local_variables[len - index.0].clone()
