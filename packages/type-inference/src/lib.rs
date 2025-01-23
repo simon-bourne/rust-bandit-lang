@@ -23,15 +23,21 @@ pub trait Annotation<'src> {
     type Expression: Pretty;
 }
 
-pub trait Pretty {
-    fn pretty(&self) -> PrettyDoc;
-}
-
 #[derive(Debug)]
 pub struct Inference;
 
 impl<'src> Annotation<'src> for Inference {
     type Expression = ExpressionRef<'src>;
+}
+
+struct Inferred;
+
+impl<'src> Annotation<'src> for Inferred {
+    type Expression = Rc<Expression<'src, Self>>;
+}
+
+pub trait Pretty {
+    fn pretty(&self) -> PrettyDoc;
 }
 
 #[derive(Clone, Debug)]
@@ -225,12 +231,6 @@ impl<'src> ExpressionRef<'src> {
             ExprRefVariants::Link(target) => target.typ(),
         }
     }
-}
-
-struct Inferred;
-
-impl<'src> Annotation<'src> for Inferred {
-    type Expression = Rc<Expression<'src, Self>>;
 }
 
 #[derive(Debug)]
