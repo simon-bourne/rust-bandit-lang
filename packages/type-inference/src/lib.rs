@@ -343,7 +343,7 @@ impl<'src> Expression<'src, Inference> {
 mod tests {
     use goldenfile::Mint;
 
-    use super::*;
+    use crate::{context::Context, ExpressionRef as Expr, Pretty};
 
     #[test]
     fn infer_kinds() {
@@ -351,14 +351,11 @@ mod tests {
         // TODO: We shouldn't be creating free variables
         let ctx = &mut Context::default();
 
-        ctx.with_variable(ExpressionRef::unknown(), |ctx, m| {
-            ctx.with_variable(ExpressionRef::unknown(), |ctx, a| {
+        ctx.with_variable(Expr::unknown(), |ctx, m| {
+            ctx.with_variable(Expr::unknown(), |ctx, a| {
                 // TODO: `C : (m a) -> X`, not `C : (m a)`
-                let mut constructor_type = ExpressionRef::apply(
-                    m.to_expression(ctx),
-                    a.to_expression(ctx),
-                    ExpressionRef::unknown(),
-                );
+                let mut constructor_type =
+                    Expr::apply(m.to_expression(ctx), a.to_expression(ctx), Expr::unknown());
 
                 constructor_type.infer_types(ctx).unwrap();
 
