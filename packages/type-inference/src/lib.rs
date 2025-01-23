@@ -4,8 +4,8 @@ use std::{
     result,
 };
 
-use context::{Context, DeBruijnIndex};
 use ::pretty::RcDoc;
+use context::{Context, DeBruijnIndex};
 
 pub mod context;
 mod pretty;
