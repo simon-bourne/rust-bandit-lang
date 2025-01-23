@@ -1,16 +1,6 @@
 use std::rc::Rc;
 
-use super::{Annotation, ExprRefVariants, Expression, ExpressionRef, Inferred, Pretty, PrettyDoc};
-use crate::SourceExpression;
-
-impl Pretty for SourceExpression<'_> {
-    fn pretty(&self) -> PrettyDoc {
-        match self.0.as_ref() {
-            Some(expr) => expr.pretty(),
-            None => PrettyDoc::text("{unknown}"),
-        }
-    }
-}
+use crate::{Annotation, ExprRefVariants, Expression, ExpressionRef, Inferred, Pretty, PrettyDoc};
 
 impl Pretty for Rc<Expression<'_, Inferred>> {
     fn pretty(&self) -> PrettyDoc {
@@ -28,7 +18,7 @@ impl Pretty for ExpressionRef<'_> {
     }
 }
 
-impl<'src, A: Annotation<'src>> Expression<'src, A> {
+impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
     fn pretty(&self) -> PrettyDoc {
         match self {
             Self::Type => PrettyDoc::text("Type"),
