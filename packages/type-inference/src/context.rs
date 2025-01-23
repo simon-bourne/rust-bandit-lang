@@ -1,27 +1,15 @@
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use crate::ExpressionRef;
 
-#[derive(Copy, Clone, Debug)]
 pub struct DeBruijnLevel(usize);
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub struct DeBruijnIndex(usize);
 
 impl fmt::Display for DeBruijnIndex {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
-    }
-}
-
-pub struct Variable<'a> {
-    level: DeBruijnLevel,
-    typ: ExpressionRef<'a>,
-}
-
-impl<'a> Variable<'a> {
-    pub fn to_expression(&self, ctx: &Context<'a>) -> ExpressionRef<'a> {
-        ExpressionRef::variable(ctx.de_bruijn_index(self.level), self.typ.clone())
     }
 }
 
@@ -34,12 +22,11 @@ impl<'a> Context<'a> {
     pub fn with_variable<Output>(
         &mut self,
         typ: ExpressionRef<'a>,
-        f: impl FnOnce(&mut Self, Variable<'a>) -> Output,
+        f: impl FnOnce(&mut Self) -> Output,
     ) -> Output {
-        let level = self.push(typ.clone());
-        let var = Variable { level, typ };
-        let output = f(self, var);
-        self.pop();
+        self.local_variables.push(typ.clone());
+        let output = f(self);
+        self.local_variables.pop();
         output
     }
 
@@ -48,20 +35,34 @@ impl<'a> Context<'a> {
         assert!(index.0 <= len);
         self.local_variables[len - index.0].clone()
     }
+}
 
-    fn de_bruijn_index(&self, level: DeBruijnLevel) -> DeBruijnIndex {
-        let len = self.local_variables.len();
-        assert!(level.0 < len);
-        DeBruijnIndex(len - level.0)
+#[derive(Default)]
+pub struct VariableLookup<'a> {
+    variables: HashMap<&'a str, Vec<DeBruijnLevel>>,
+    variable_count: usize,
+}
+
+impl<'a> VariableLookup<'a> {
+    pub fn with_variable<Output>(
+        &mut self,
+        name: &'a str,
+        f: impl FnOnce(&mut Self) -> Output,
+    ) -> Output {
+        let level = DeBruijnLevel(self.variable_count);
+        self.variable_count += 1;
+        self.variables.entry(name).or_default().push(level);
+        let output = f(self);
+        self.variables.entry(name).and_modify(|levels| {
+            levels.pop();
+        });
+        self.variable_count -= 1;
+        output
     }
 
-    fn push(&mut self, expr: ExpressionRef<'a>) -> DeBruijnLevel {
-        let level = DeBruijnLevel(self.local_variables.len());
-        self.local_variables.push(expr);
-        level
-    }
-
-    fn pop(&mut self) {
-        self.local_variables.pop();
+    pub fn lookup(&self, name: &str) -> Option<DeBruijnIndex> {
+        let level = self.variables.get(name)?.last()?;
+        assert!(level.0 < self.variable_count);
+        Some(DeBruijnIndex(self.variable_count - level.0))
     }
 }

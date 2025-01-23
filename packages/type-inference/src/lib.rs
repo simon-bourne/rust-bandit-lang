@@ -1,18 +1,18 @@
 use std::{
     cell::{RefCell, RefMut},
+    fmt::Display,
     rc::Rc,
     result,
 };
 
 use ::pretty::RcDoc;
-use context::{Context, DeBruijnIndex};
+use context::{Context, DeBruijnIndex, VariableLookup};
 
 pub mod context;
 mod pretty;
 
 // TODO: Use actual refs, not `Rc`
 type SharedMut<T> = Rc<RefCell<T>>;
-type PrettyDoc = RcDoc<'static>;
 
 pub type Result<T> = result::Result<T, InferenceError>;
 
@@ -21,29 +21,168 @@ pub struct InferenceError;
 
 pub trait Annotation<'src> {
     type Expression: Pretty;
+    type VariableName: 'src;
+    type VariableIndex: 'src + Display;
 }
 
-#[derive(Debug)]
+pub struct Source;
+
+impl<'src> Annotation<'src> for Source {
+    type Expression = SourceExpression<'src>;
+    type VariableIndex = &'src str;
+    type VariableName = &'src str;
+}
+
+pub struct SourceExpression<'src>(Option<Rc<Expression<'src, Source>>>);
+
+impl<'src> SourceExpression<'src> {
+    pub fn unknown() -> Self {
+        Self(None)
+    }
+
+    pub fn type_of_type() -> Self {
+        Self::new(Expression::Type)
+    }
+
+    pub fn apply(function: Self, argument: Self, typ: Self) -> Self {
+        Self::new(Expression::Apply {
+            function,
+            argument,
+            typ,
+        })
+    }
+
+    pub fn let_binding(
+        name: &'src str,
+        variable_type: Self,
+        variable_value: Self,
+        in_expression: Self,
+    ) -> Self {
+        Self::new(Expression::Let {
+            variable_value,
+            binding: VariableBinding {
+                name,
+                variable_type,
+                in_expression,
+            },
+        })
+    }
+
+    pub fn function_type(name: &'src str, argument_type: Self, result_type: Self) -> Self {
+        Self::new(Expression::FunctionType(VariableBinding {
+            name,
+            variable_type: argument_type,
+            in_expression: result_type,
+        }))
+    }
+
+    pub fn lambda(name: &'src str, argument_type: Self, in_expression: Self) -> Self {
+        Self::new(Expression::Lambda(VariableBinding {
+            name,
+            variable_type: argument_type,
+            in_expression,
+        }))
+    }
+
+    pub fn variable(index: &'src str, typ: Self) -> Self {
+        Self::new(Expression::Variable { index, typ })
+    }
+
+    pub fn to_infer(&self) -> Result<ExpressionRef<'src>> {
+        self.to_infer_with_lookup(&mut VariableLookup::default())
+    }
+
+    fn to_infer_with_lookup(
+        &self,
+        lookup: &mut VariableLookup<'src>,
+    ) -> Result<ExpressionRef<'src>> {
+        match self.0.as_ref() {
+            Some(expr) => expr.to_infer(lookup),
+            None => Ok(ExpressionRef::unknown()),
+        }
+    }
+
+    fn new(expr: Expression<'src, Source>) -> Self {
+        Self(Some(Rc::new(expr)))
+    }
+}
+
+impl<'src> Expression<'src, Source> {
+    fn to_infer(&self, lookup: &mut VariableLookup<'src>) -> Result<ExpressionRef<'src>> {
+        Ok(match self {
+            Self::Type => ExpressionRef::type_of_type(),
+            Self::Apply {
+                function,
+                argument,
+                typ,
+            } => ExpressionRef::apply(
+                function.to_infer_with_lookup(lookup)?,
+                argument.to_infer_with_lookup(lookup)?,
+                typ.to_infer_with_lookup(lookup)?,
+            ),
+            Self::Let {
+                variable_value,
+                binding,
+            } => {
+                let variable_type = binding.variable_type.to_infer_with_lookup(lookup)?;
+                let variable_value = variable_value.to_infer_with_lookup(lookup)?;
+                lookup.with_variable(binding.name, |lookup| {
+                    Ok(ExpressionRef::let_binding(
+                        variable_type,
+                        variable_value,
+                        binding.in_expression.to_infer_with_lookup(lookup)?,
+                    ))
+                })?
+            }
+            Self::FunctionType(binding) => {
+                let variable_type = binding.variable_type.to_infer_with_lookup(lookup)?;
+                lookup.with_variable(binding.name, |lookup| {
+                    Ok(ExpressionRef::function_type(
+                        variable_type,
+                        binding.in_expression.to_infer_with_lookup(lookup)?,
+                    ))
+                })?
+            }
+            Self::Lambda(binding) => lookup.with_variable(binding.name, |lookup| {
+                let variable_type = binding.variable_type.to_infer_with_lookup(lookup)?;
+                Ok(ExpressionRef::lambda(
+                    variable_type,
+                    binding.in_expression.to_infer_with_lookup(lookup)?,
+                ))
+            })?,
+            Self::Variable { index, typ } => ExpressionRef::variable(
+                lookup.lookup(index).ok_or(InferenceError)?,
+                typ.to_infer_with_lookup(lookup)?,
+            ),
+        })
+    }
+}
+
 pub struct Inference;
 
 impl<'src> Annotation<'src> for Inference {
     type Expression = ExpressionRef<'src>;
+    type VariableIndex = DeBruijnIndex;
+    type VariableName = ();
 }
 
 struct Inferred;
 
 impl<'src> Annotation<'src> for Inferred {
     type Expression = Rc<Expression<'src, Self>>;
+    type VariableIndex = DeBruijnIndex;
+    type VariableName = ();
 }
+
+type PrettyDoc = RcDoc<'static>;
 
 pub trait Pretty {
     fn pretty(&self) -> PrettyDoc;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ExpressionRef<'src>(SharedMut<ExprRefVariants<'src>>);
 
-#[derive(Debug)]
 enum ExprRefVariants<'src> {
     Known(Expression<'src, Inference>),
     Unknown,
@@ -71,6 +210,7 @@ impl<'src> ExpressionRef<'src> {
         Self::new(Expression::Let {
             variable_value,
             binding: VariableBinding {
+                name: (),
                 variable_type,
                 in_expression,
             },
@@ -79,6 +219,7 @@ impl<'src> ExpressionRef<'src> {
 
     pub fn function_type(argument_type: Self, result_type: Self) -> Self {
         Self::new(Expression::FunctionType(VariableBinding {
+            name: (),
             variable_type: argument_type,
             in_expression: result_type,
         }))
@@ -86,12 +227,13 @@ impl<'src> ExpressionRef<'src> {
 
     pub fn lambda(argument_type: Self, in_expression: Self) -> Self {
         Self::new(Expression::Lambda(VariableBinding {
+            name: (),
             variable_type: argument_type,
             in_expression,
         }))
     }
 
-    fn variable(index: DeBruijnIndex, typ: Self) -> Self {
+    pub fn variable(index: DeBruijnIndex, typ: Self) -> Self {
         Self::new(Expression::Variable { index, typ })
     }
 
@@ -233,7 +375,6 @@ impl<'src> ExpressionRef<'src> {
     }
 }
 
-#[derive(Debug)]
 enum Expression<'src, A: Annotation<'src>> {
     Type,
     Apply {
@@ -248,13 +389,13 @@ enum Expression<'src, A: Annotation<'src>> {
     FunctionType(VariableBinding<'src, A>),
     Lambda(VariableBinding<'src, A>),
     Variable {
-        index: DeBruijnIndex,
+        index: A::VariableIndex,
         typ: A::Expression,
     },
 }
 
-#[derive(Debug)]
 struct VariableBinding<'src, A: Annotation<'src>> {
+    name: A::VariableName,
     variable_type: A::Expression,
     in_expression: A::Expression,
 }
@@ -262,7 +403,7 @@ struct VariableBinding<'src, A: Annotation<'src>> {
 impl<'src> VariableBinding<'src, Inference> {
     fn infer_types(&mut self, ctx: &mut Context<'src>) -> Result<()> {
         self.variable_type.infer_types(ctx)?;
-        ctx.with_variable(self.variable_type.clone(), |ctx, _| {
+        ctx.with_variable(self.variable_type.clone(), |ctx| {
             self.in_expression.infer_types(ctx)
         })
     }
@@ -278,7 +419,7 @@ impl<'src> VariableBinding<'src, Inference> {
             &mut binding1.variable_type,
         )?;
 
-        ctx.with_variable(binding0.variable_type.clone(), |ctx, _| {
+        ctx.with_variable(binding0.variable_type.clone(), |ctx| {
             ExpressionRef::unify(
                 ctx,
                 &mut binding0.in_expression,
@@ -343,26 +484,28 @@ impl<'src> Expression<'src, Inference> {
 mod tests {
     use goldenfile::Mint;
 
-    use crate::{context::Context, ExpressionRef as Expr, Pretty};
+    use crate::{context::Context, Pretty, SourceExpression as Expr};
 
     #[test]
     fn infer_kinds() {
         // data X m a = C : (m a) -> X
-        // TODO: We shouldn't be creating free variables
+
+        // TODO: `C : (m a) -> X`, not `C : (m a)`
+        let m = Expr::variable("m", Expr::unknown());
+        let a = Expr::variable("a", Expr::unknown());
+        let mut constructor_type = Expr::lambda(
+            "m",
+            Expr::unknown(),
+            Expr::lambda("a", Expr::unknown(), Expr::apply(m, a, Expr::unknown())),
+        )
+        .to_infer()
+        .unwrap();
+
         let ctx = &mut Context::default();
+        constructor_type.infer_types(ctx).unwrap();
 
-        ctx.with_variable(Expr::unknown(), |ctx, m| {
-            ctx.with_variable(Expr::unknown(), |ctx, a| {
-                // TODO: `C : (m a) -> X`, not `C : (m a)`
-                let mut constructor_type =
-                    Expr::apply(m.to_expression(ctx), a.to_expression(ctx), Expr::unknown());
-
-                constructor_type.infer_types(ctx).unwrap();
-
-                let mut mint = Mint::new("tests/goldenfiles");
-                let mut output = mint.new_goldenfile("infer-kinds.txt").unwrap();
-                constructor_type.pretty().render(80, &mut output).unwrap();
-            });
-        });
+        let mut mint = Mint::new("tests/goldenfiles");
+        let mut output = mint.new_goldenfile("infer-kinds.txt").unwrap();
+        constructor_type.pretty().render(80, &mut output).unwrap();
     }
 }
