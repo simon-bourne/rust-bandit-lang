@@ -61,10 +61,11 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
             ]),
             Self::Lambda(binding) => PrettyDoc::concat([
                 PrettyDoc::text("("),
+                PrettyDoc::text("\\"),
                 PrettyDoc::text("_"),
                 PrettyDoc::text(":"),
                 binding.variable_type.pretty(),
-                PrettyDoc::text(" -> "),
+                PrettyDoc::text(" = "),
                 binding.in_expression.pretty(),
                 PrettyDoc::text(")"),
             ]),
