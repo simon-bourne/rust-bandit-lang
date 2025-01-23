@@ -58,51 +58,20 @@ enum ExprRefVariants<'src> {
 }
 
 impl<'src> ExpressionRef<'src> {
-    pub fn unknown() -> Self {
+    fn unknown() -> Self {
         Self(Rc::new(RefCell::new(ExprRefVariants::Unknown)))
     }
 
-    pub fn type_of_type() -> Self {
+    fn type_of_type() -> Self {
         Self::new(Expression::Type)
     }
 
-    pub fn apply(function: Self, argument: Self, typ: Self) -> Self {
-        Self::new(Expression::Apply {
-            function,
-            argument,
-            typ,
-        })
-    }
-
-    pub fn let_binding(variable_type: Self, variable_value: Self, in_expression: Self) -> Self {
-        Self::new(Expression::Let {
-            variable_value,
-            binding: VariableBinding {
-                name: (),
-                variable_type,
-                in_expression,
-            },
-        })
-    }
-
-    pub fn function_type(argument_type: Self, result_type: Self) -> Self {
+    fn function_type(argument_type: Self, result_type: Self) -> Self {
         Self::new(Expression::FunctionType(VariableBinding {
             name: (),
             variable_type: argument_type,
             in_expression: result_type,
         }))
-    }
-
-    pub fn lambda(argument_type: Self, in_expression: Self) -> Self {
-        Self::new(Expression::Lambda(VariableBinding {
-            name: (),
-            variable_type: argument_type,
-            in_expression,
-        }))
-    }
-
-    pub fn variable(index: DeBruijnIndex, typ: Self) -> Self {
-        Self::new(Expression::Variable { index, typ })
     }
 
     fn new(typ: Expression<'src, Inference>) -> Self {

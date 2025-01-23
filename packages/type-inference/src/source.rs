@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use crate::{
-    context::VariableLookup, Annotation, Expression, ExpressionRef, InferenceError, Pretty,
-    PrettyDoc, Result, VariableBinding,
+    context::VariableLookup, Annotation, Expression, ExpressionRef, Inference, InferenceError,
+    Pretty, PrettyDoc, Result, VariableBinding,
 };
 
 pub struct Source;
@@ -98,51 +98,53 @@ impl Pretty for SourceExpression<'_> {
 
 impl<'src> Expression<'src, Source> {
     fn to_infer(&self, lookup: &mut VariableLookup<'src>) -> Result<ExpressionRef<'src>> {
-        Ok(match self {
-            Self::Type => ExpressionRef::type_of_type(),
+        let expr = match self {
+            Self::Type => Expression::Type,
             Self::Apply {
                 function,
                 argument,
                 typ,
-            } => ExpressionRef::apply(
-                function.to_infer_with_lookup(lookup)?,
-                argument.to_infer_with_lookup(lookup)?,
-                typ.to_infer_with_lookup(lookup)?,
-            ),
+            } => Expression::Apply {
+                function: function.to_infer_with_lookup(lookup)?,
+                argument: argument.to_infer_with_lookup(lookup)?,
+                typ: typ.to_infer_with_lookup(lookup)?,
+            },
             Self::Let {
                 variable_value,
                 binding,
             } => {
-                let variable_type = binding.variable_type.to_infer_with_lookup(lookup)?;
                 let variable_value = variable_value.to_infer_with_lookup(lookup)?;
-                lookup.with_variable(binding.name, |lookup| {
-                    Ok(ExpressionRef::let_binding(
-                        variable_type,
-                        variable_value,
-                        binding.in_expression.to_infer_with_lookup(lookup)?,
-                    ))
-                })?
+                Expression::Let {
+                    variable_value,
+                    binding: binding.to_infer(lookup)?,
+                }
             }
-            Self::FunctionType(binding) => {
-                let variable_type = binding.variable_type.to_infer_with_lookup(lookup)?;
-                lookup.with_variable(binding.name, |lookup| {
-                    Ok(ExpressionRef::function_type(
-                        variable_type,
-                        binding.in_expression.to_infer_with_lookup(lookup)?,
-                    ))
-                })?
-            }
-            Self::Lambda(binding) => lookup.with_variable(binding.name, |lookup| {
-                let variable_type = binding.variable_type.to_infer_with_lookup(lookup)?;
-                Ok(ExpressionRef::lambda(
-                    variable_type,
-                    binding.in_expression.to_infer_with_lookup(lookup)?,
-                ))
-            })?,
-            Self::Variable { index, typ } => ExpressionRef::variable(
-                lookup.lookup(index).ok_or(InferenceError)?,
-                typ.to_infer_with_lookup(lookup)?,
-            ),
+            Self::FunctionType(binding) => Expression::FunctionType(binding.to_infer(lookup)?),
+            Self::Lambda(binding) => Expression::Lambda(binding.to_infer(lookup)?),
+            Self::Variable { index, typ } => Expression::Variable {
+                index: lookup.lookup(index).ok_or(InferenceError)?,
+                typ: typ.to_infer_with_lookup(lookup)?,
+            },
+        };
+
+        Ok(ExpressionRef::new(expr))
+    }
+}
+
+impl<'src> VariableBinding<'src, Source> {
+    fn to_infer(
+        &self,
+        lookup: &mut VariableLookup<'src>,
+    ) -> Result<VariableBinding<'src, Inference>> {
+        let variable_type = self.variable_type.to_infer_with_lookup(lookup)?;
+
+        lookup.with_variable(self.name, |lookup| {
+            let in_expression = self.in_expression.to_infer_with_lookup(lookup)?;
+            Ok(VariableBinding {
+                name: (),
+                variable_type,
+                in_expression,
+            })
         })
     }
 }
