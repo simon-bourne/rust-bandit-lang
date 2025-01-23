@@ -5,9 +5,10 @@ use std::{
 };
 
 use context::{Context, DeBruijnIndex};
-use pretty::RcDoc;
+use ::pretty::RcDoc;
 
 pub mod context;
+mod pretty;
 
 // TODO: Use actual refs, not `Rc`
 type SharedMut<T> = Rc<RefCell<T>>;
@@ -31,16 +32,6 @@ pub struct Inference;
 
 impl<'src> Annotation<'src> for Inference {
     type Expression = ExpressionRef<'src>;
-}
-
-impl Pretty for ExpressionRef<'_> {
-    fn pretty(&self) -> PrettyDoc {
-        match &*self.0.borrow() {
-            ExprRefVariants::Known(owned) => owned.pretty(),
-            ExprRefVariants::Unknown => PrettyDoc::text("{unknown}"),
-            ExprRefVariants::Link(linked) => linked.pretty(),
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -242,12 +233,6 @@ impl<'src> Annotation<'src> for Inferred {
     type Expression = Rc<Expression<'src, Self>>;
 }
 
-impl Pretty for Rc<Expression<'_, Inferred>> {
-    fn pretty(&self) -> PrettyDoc {
-        self.as_ref().pretty()
-    }
-}
-
 #[derive(Debug)]
 enum Expression<'src, A: Annotation<'src>> {
     Type,
@@ -300,67 +285,6 @@ impl<'src> VariableBinding<'src, Inference> {
                 &mut binding1.in_expression,
             )
         })
-    }
-}
-
-impl<'src, A: Annotation<'src>> Expression<'src, A> {
-    fn pretty(&self) -> PrettyDoc {
-        match self {
-            Self::Type => PrettyDoc::text("Type"),
-            Self::Apply {
-                function: left,
-                argument: right,
-                typ,
-            } => PrettyDoc::concat([
-                PrettyDoc::text("("),
-                PrettyDoc::text("("),
-                left.pretty(),
-                PrettyDoc::space(),
-                right.pretty(),
-                PrettyDoc::text(")"),
-                PrettyDoc::text(":"),
-                typ.pretty(),
-                PrettyDoc::text(")"),
-            ]),
-            Self::Let {
-                variable_value,
-                binding,
-            } => PrettyDoc::concat([
-                PrettyDoc::text("("),
-                PrettyDoc::text("let"),
-                PrettyDoc::text("_"),
-                PrettyDoc::text(":"),
-                binding.variable_type.pretty(),
-                PrettyDoc::text(" = "),
-                variable_value.pretty(),
-                PrettyDoc::text(" in "),
-                binding.in_expression.pretty(),
-                PrettyDoc::text(")"),
-            ]),
-            Self::FunctionType(binding) => PrettyDoc::concat([
-                PrettyDoc::text("("),
-                binding.variable_type.pretty(),
-                PrettyDoc::text(" -> "),
-                binding.in_expression.pretty(),
-                PrettyDoc::text(")"),
-            ]),
-            Self::Lambda(binding) => PrettyDoc::concat([
-                PrettyDoc::text("("),
-                PrettyDoc::text("_"),
-                PrettyDoc::text(":"),
-                binding.variable_type.pretty(),
-                PrettyDoc::text(" -> "),
-                binding.in_expression.pretty(),
-                PrettyDoc::text(")"),
-            ]),
-            Self::Variable { index, typ } => PrettyDoc::concat([
-                PrettyDoc::text("("),
-                PrettyDoc::as_string(index),
-                PrettyDoc::text(":"),
-                typ.pretty(),
-                PrettyDoc::text(")"),
-            ]),
-        }
     }
 }
 
