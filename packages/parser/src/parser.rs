@@ -15,7 +15,7 @@ pub trait Parser<'src, Out>: winnow::Parser<&'src str, Out, ContextError> {}
 impl<'src, Out, T> Parser<'src, Out> for T where T: winnow::Parser<&'src str, Out, ContextError> {}
 
 pub fn expr<'src>(input: &mut &'src str) -> PResult<Expr<'src>> {
-    ws(separated_foldl1(
+    separated_foldl1(
         alt((
             delimited('(', ws(expr), ')'),
             typ(),
@@ -25,7 +25,7 @@ pub fn expr<'src>(input: &mut &'src str) -> PResult<Expr<'src>> {
         )),
         multispace1,
         |function, _, argument| Expr::apply(function, argument, Expr::unknown()),
-    ))
+    )
     .parse_next(input)
 }
 
