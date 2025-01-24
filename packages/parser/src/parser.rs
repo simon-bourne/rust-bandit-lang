@@ -74,6 +74,9 @@ mod tests {
     #[test]
     fn expression() {
         let expr = expr.parse("(\\x => x) Type").unwrap();
-        assert_eq!(expr.render_to_string(80), "(((_:{unknown} -> (x:{unknown})) Type):{unknown})");
+        assert_eq!(
+            expr.render_to_string(80),
+            "(((_:{unknown} -> (x:{unknown})) Type):{unknown})"
+        );
     }
 }
