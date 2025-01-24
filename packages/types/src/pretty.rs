@@ -43,7 +43,7 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
             } => PrettyDoc::concat([
                 PrettyDoc::text("("),
                 PrettyDoc::text("let"),
-                PrettyDoc::text("_"),
+                PrettyDoc::as_string(&binding.name),
                 PrettyDoc::text(":"),
                 binding.variable_type.pretty(),
                 PrettyDoc::text(" = "),
@@ -63,7 +63,6 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
                 PrettyDoc::text("("),
                 PrettyDoc::text("\\"),
                 PrettyDoc::as_string(&binding.name),
-                PrettyDoc::text("_"),
                 PrettyDoc::text(":"),
                 binding.variable_type.pretty(),
                 PrettyDoc::text(" = "),

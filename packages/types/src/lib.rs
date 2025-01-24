@@ -45,8 +45,8 @@ impl<'src> Annotation<'src> for Inferred {
 pub struct EmptyName;
 
 impl Display for EmptyName {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Ok(())
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("_")
     }
 }
 
