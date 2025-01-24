@@ -1,5 +1,5 @@
 [package]
-name = "bandit-type-inference"
+name = "bandit-types"
 version.workspace = true
 edition.workspace = true
 publish = false
