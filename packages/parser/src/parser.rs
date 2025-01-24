@@ -36,7 +36,7 @@ fn typ<'src>() -> impl Parser<'src, Expr<'src>> {
 fn lambda<'src>() -> impl Parser<'src, Expr<'src>> {
     preceded(
         ('\\', multispace0),
-        separated_pair(identifier(), ws("=>"), expr),
+        separated_pair(identifier(), ws("="), expr),
     )
     .map(|(var, expr)| Expr::lambda(var, Expr::unknown(), expr))
 }
@@ -73,10 +73,10 @@ mod tests {
 
     #[test]
     fn expression() {
-        let expr = expr.parse("(\\x => x) Type").unwrap();
+        let expr = expr.parse("(\\x = x) Type").unwrap();
         assert_eq!(
             expr.render_to_string(80),
-            "(((_:{unknown} -> (x:{unknown})) Type):{unknown})"
+            "(((\\_:{unknown} = (x:{unknown})) Type):{unknown})"
         );
     }
 }
