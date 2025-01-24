@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use crate::{
-    context::VariableLookup, Annotation, Expression, ExpressionRef, Inference, InferenceError,
-    Pretty, PrettyDoc, Result, VariableBinding,
+    context::VariableLookup, Annotation, EmptyName, Expression, ExpressionRef, Inference,
+    InferenceError, Pretty, PrettyDoc, Result, VariableBinding,
 };
 
 pub struct Source;
@@ -145,7 +145,7 @@ impl<'src> VariableBinding<'src, Source> {
         lookup.with_variable(self.name, |lookup| {
             let in_expression = self.in_expression.to_infer_with_lookup(lookup)?;
             Ok(VariableBinding {
-                name: (),
+                name: EmptyName,
                 variable_type,
                 in_expression,
             })

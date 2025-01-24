@@ -22,7 +22,7 @@ pub struct InferenceError;
 
 pub trait Annotation<'src> {
     type Expression: Pretty;
-    type VariableName: 'src;
+    type VariableName: 'src + Display;
     type VariableIndex: 'src + Display;
 }
 
@@ -31,7 +31,7 @@ pub struct Inference;
 impl<'src> Annotation<'src> for Inference {
     type Expression = ExpressionRef<'src>;
     type VariableIndex = DeBruijnIndex;
-    type VariableName = ();
+    type VariableName = EmptyName;
 }
 
 struct Inferred;
@@ -39,7 +39,15 @@ struct Inferred;
 impl<'src> Annotation<'src> for Inferred {
     type Expression = Rc<Expression<'src, Self>>;
     type VariableIndex = DeBruijnIndex;
-    type VariableName = ();
+    type VariableName = EmptyName;
+}
+
+pub struct EmptyName;
+
+impl Display for EmptyName {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(())
+    }
 }
 
 type PrettyDoc = RcDoc<'static>;
@@ -68,7 +76,7 @@ impl<'src> ExpressionRef<'src> {
 
     fn function_type(argument_type: Self, result_type: Self) -> Self {
         Self::new(Expression::FunctionType(VariableBinding {
-            name: (),
+            name: EmptyName,
             variable_type: argument_type,
             in_expression: result_type,
         }))
