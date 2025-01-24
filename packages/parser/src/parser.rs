@@ -1,7 +1,7 @@
 use bandit_types::source::SourceExpression;
 use winnow::{
     ascii::{multispace0, multispace1},
-    combinator::{alt, delimited, preceded, separated_foldl1, separated_pair},
+    combinator::{alt, delimited, preceded, separated_foldl1, separated_foldr1, separated_pair},
     error::ContextError,
     stream::AsChar,
     token::{literal, one_of, take_while},
@@ -15,18 +15,23 @@ pub trait Parser<'src, Out>: winnow::Parser<&'src str, Out, ContextError> {}
 impl<'src, Out, T> Parser<'src, Out> for T where T: winnow::Parser<&'src str, Out, ContextError> {}
 
 pub fn expr<'src>(input: &mut &'src str) -> PResult<Expr<'src>> {
-    separated_foldl1(
-        alt((
-            delimited('(', ws(expr), ')'),
-            typ(),
-            variable(),
-            lambda(),
-            function_type(),
-        )),
-        multispace1,
-        |function, _, argument| Expr::apply(function, argument, Expr::unknown()),
-    )
-    .parse_next(input)
+    function_types().parse_next(input)
+}
+
+fn function_types<'src>() -> impl Parser<'src, Expr<'src>> {
+    separated_foldr1(application(), multispace1, |input_type, _, output_type| {
+        Expr::function_type("_", input_type, output_type)
+    })
+}
+
+fn application<'src>() -> impl Parser<'src, Expr<'src>> {
+    separated_foldl1(primary(), multispace1, |function, _, argument| {
+        Expr::apply(function, argument, Expr::unknown())
+    })
+}
+
+fn primary<'src>() -> impl Parser<'src, Expr<'src>> {
+    alt((typ(), variable(), lambda(), delimited('(', ws(expr), ')')))
 }
 
 fn typ<'src>() -> impl Parser<'src, Expr<'src>> {
@@ -39,11 +44,6 @@ fn lambda<'src>() -> impl Parser<'src, Expr<'src>> {
         separated_pair(identifier(), ws("="), expr),
     )
     .map(|(var, expr)| Expr::lambda(var, Expr::unknown(), expr))
-}
-
-fn function_type<'src>() -> impl Parser<'src, Expr<'src>> {
-    separated_pair(expr, ws("->"), expr)
-        .map(|(input_type, output_type)| Expr::function_type("_", input_type, output_type))
 }
 
 fn variable<'src>() -> impl Parser<'src, Expr<'src>> {

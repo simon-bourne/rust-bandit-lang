@@ -213,6 +213,7 @@ impl<'src> ExpressionRef<'src> {
 }
 
 enum Expression<'src, A: Annotation<'src>> {
+    // TODO: Replace this with `Name`.
     Type,
     Apply {
         function: A::Expression,
