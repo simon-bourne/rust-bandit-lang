@@ -13,6 +13,7 @@ debug = 0
 
 [workspace.dependencies]
 bandit-parser = { path = "packages/parser" }
+bandit-types = { path = "packages/types" }
 
 criterion = "0.5.1"
 goldenfile = "1.7.1"
@@ -21,3 +22,4 @@ itertools = "0.12.1"
 logos = "0.15.0"
 xtask-base = { git = "https://github.com/simon-bourne/rust-xtask-base" }
 pretty = "0.12.3"
+winnow = "0.6.24"

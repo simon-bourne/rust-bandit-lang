@@ -97,14 +97,16 @@ checksum = "0c4b4d0bd25bd0b74681c0ad21497610ce1b7c91b1022cd21c80c6fbdd9476b0"
 name = "bandit-parser"
 version = "0.1.0"
 dependencies = [
+ "bandit-types",
  "criterion",
  "indoc",
  "itertools 0.12.1",
  "logos",
+ "winnow",
 ]
 
 [[package]]
-name = "bandit-type-inference"
+name = "bandit-types"
 version = "0.1.0"
 dependencies = [
  "goldenfile",
@@ -1325,6 +1327,15 @@ name = "windows_x86_64_msvc"
 version = "0.52.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bec47e5bfd1bff0eeaf6d8b485cc1074891a197ab4225d504cb7a1ab88b02bf0"
+
+[[package]]
+name = "winnow"
+version = "0.6.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8d71a593cc5c42ad7876e2c1fda56f314f3754c084128833e64f1345ff8a03a"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "xshell-macros"

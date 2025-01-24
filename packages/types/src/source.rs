@@ -68,6 +68,10 @@ impl<'src> SourceExpression<'src> {
         Self::new(Expression::Variable { index, typ })
     }
 
+    pub fn render_to_string(&self, width: usize) -> String {
+        self.pretty().pretty(width).to_string()
+    }
+
     pub fn to_infer(&self) -> Result<ExpressionRef<'src>> {
         self.to_infer_with_lookup(&mut VariableLookup::default())
     }

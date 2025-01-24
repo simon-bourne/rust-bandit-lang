@@ -5,8 +5,10 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+bandit-types.workspace = true
 logos.workspace = true
 itertools.workspace = true
+winnow.workspace= true
 
 [dev-dependencies]
 criterion.workspace = true
