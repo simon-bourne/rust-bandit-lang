@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::{
     context::VariableLookup, Annotation, Document, EmptyName, Expression, ExpressionRef, Inference,
-    Pretty, Result, VariableBinding,
+    Pretty, Result, VariableBinding, VariableIndex,
 };
 
 pub struct Source;
@@ -11,6 +11,12 @@ impl<'src> Annotation<'src> for Source {
     type Expression = SourceExpression<'src>;
     type VariableIndex = &'src str;
     type VariableName = &'src str;
+}
+
+impl VariableIndex for &'_ str {
+    fn is_infix(&self) -> bool {
+        *self == ":"
+    }
 }
 
 #[derive(Clone)]
@@ -30,16 +36,6 @@ impl<'src> SourceExpression<'src> {
             function,
             argument,
             typ: Self::unknown(),
-            infix: false,
-        })
-    }
-
-    pub fn apply_operator(function: Self, argument: Self) -> Self {
-        Self::new(Expression::Apply {
-            function,
-            argument,
-            typ: Self::unknown(),
-            infix: true,
         })
     }
 
@@ -109,6 +105,10 @@ impl Pretty for SourceExpression<'_> {
         }
     }
 
+    fn is_infix(&self) -> bool {
+        self.0.as_ref().is_some_and(|expr| expr.is_infix())
+    }
+
     fn type_annotatation(&self, term: Document, parenthesized: bool) -> Document {
         match self.0.as_ref() {
             Some(expr) => expr.type_annotatation(term, parenthesized),
@@ -125,12 +125,10 @@ impl<'src> Expression<'src, Source> {
                 function,
                 argument,
                 typ,
-                infix,
             } => Expression::Apply {
                 function: function.to_infer_with_lookup(lookup)?,
                 argument: argument.to_infer_with_lookup(lookup)?,
                 typ: typ.to_infer_with_lookup(lookup)?,
-                infix: *infix,
             },
             Self::Let {
                 variable_value,

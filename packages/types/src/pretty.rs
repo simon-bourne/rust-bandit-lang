@@ -1,10 +1,17 @@
 use std::rc::Rc;
 
-use crate::{Annotation, Document, ExprRefVariants, Expression, ExpressionRef, Inferred, Pretty};
+use crate::{
+    Annotation, Document, ExprRefVariants, Expression, ExpressionRef, Inferred, Pretty,
+    VariableIndex,
+};
 
 impl Pretty for Rc<Expression<'_, Inferred>> {
     fn to_document(&self) -> Document {
         self.as_ref().to_document()
+    }
+
+    fn is_infix(&self) -> bool {
+        self.as_ref().is_infix()
     }
 
     fn type_annotatation(&self, term: Document, parenthesized: bool) -> Document {
@@ -18,6 +25,14 @@ impl Pretty for ExpressionRef<'_> {
             ExprRefVariants::Known(owned) => owned.to_document(),
             ExprRefVariants::Unknown => Document::text("_"),
             ExprRefVariants::Link(linked) => linked.to_document(),
+        }
+    }
+
+    fn is_infix(&self) -> bool {
+        match &*self.0.borrow() {
+            ExprRefVariants::Known(owned) => owned.is_infix(),
+            ExprRefVariants::Unknown => false,
+            ExprRefVariants::Link(linked) => linked.is_infix(),
         }
     }
 
@@ -40,9 +55,8 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
                 function,
                 argument,
                 typ,
-                infix,
             } => {
-                let (left, right) = if *infix {
+                let (left, right) = if function.is_infix() {
                     (argument, function)
                 } else {
                     (function, argument)
@@ -82,6 +96,13 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
             Self::Variable { index, typ } => {
                 typ.type_annotatation(Document::as_string(index), true)
             }
+        }
+    }
+
+    fn is_infix(&self) -> bool {
+        match self {
+            Expression::Variable { index, .. } => index.is_infix(),
+            _ => false,
         }
     }
 

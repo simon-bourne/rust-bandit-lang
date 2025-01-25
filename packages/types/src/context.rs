@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt};
 
-use crate::{ExpressionRef, InferenceError, Result};
+use crate::{ExpressionRef, InferenceError, Result, VariableIndex};
 
 pub struct DeBruijnLevel(usize);
 
@@ -39,10 +39,10 @@ impl<'a> Context<'a> {
         output
     }
 
-    pub fn lookup_type(&self, index: VariableIndex<'a>) -> Result<ExpressionRef<'a>> {
+    pub fn lookup_type(&self, index: VariableReference<'a>) -> Result<ExpressionRef<'a>> {
         match index {
-            VariableIndex::Local(index) => Ok(self.local_type(index)),
-            VariableIndex::Global(name) => self.global_type(name),
+            VariableReference::Local(index) => Ok(self.local_type(index)),
+            VariableReference::Global(name) => self.global_type(name),
         }
     }
 
@@ -80,11 +80,11 @@ impl<'a> VariableLookup<'a> {
         output
     }
 
-    pub fn lookup(&self, name: &'a str) -> VariableIndex<'a> {
+    pub fn lookup(&self, name: &'a str) -> VariableReference<'a> {
         if let Some(local_index) = self.lookup_local(name) {
-            VariableIndex::Local(local_index)
+            VariableReference::Local(local_index)
         } else {
-            VariableIndex::Global(name)
+            VariableReference::Global(name)
         }
     }
 
@@ -96,16 +96,22 @@ impl<'a> VariableLookup<'a> {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub enum VariableIndex<'src> {
+pub enum VariableReference<'src> {
     Local(DeBruijnIndex),
     Global(&'src str),
 }
 
-impl fmt::Display for VariableIndex<'_> {
+impl fmt::Display for VariableReference<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            VariableIndex::Local(de_bruijn_index) => de_bruijn_index.fmt(f),
-            VariableIndex::Global(name) => name.fmt(f),
+            VariableReference::Local(de_bruijn_index) => de_bruijn_index.fmt(f),
+            VariableReference::Global(name) => name.fmt(f),
         }
+    }
+}
+
+impl VariableIndex for VariableReference<'_> {
+    fn is_infix(&self) -> bool {
+        matches!(self, Self::Global(":"))
     }
 }

@@ -110,10 +110,7 @@ fn token(token: Token<'_>) -> impl Parser<'_, ()> {
 }
 
 fn operator_expression<'src>(value: Expr<'src>, op: NamedOperator, typ: Expr<'src>) -> Expr<'src> {
-    Expr::apply(
-        Expr::apply_operator(Expr::variable(op.as_str()), value),
-        typ,
-    )
+    Expr::apply(Expr::apply(Expr::variable(op.as_str()), value), typ)
 }
 
 #[cfg(test)]

@@ -6,7 +6,7 @@ use std::{
 };
 
 use ::pretty::RcDoc;
-use context::{Context, VariableIndex};
+use context::{Context, VariableReference};
 
 pub mod context;
 mod pretty;
@@ -23,14 +23,18 @@ pub struct InferenceError;
 pub trait Annotation<'src> {
     type Expression: Pretty;
     type VariableName: 'src + Display;
-    type VariableIndex: 'src + Display;
+    type VariableIndex: 'src + VariableIndex;
+}
+
+pub trait VariableIndex: Display {
+    fn is_infix(&self) -> bool;
 }
 
 pub struct Inference;
 
 impl<'src> Annotation<'src> for Inference {
     type Expression = ExpressionRef<'src>;
-    type VariableIndex = VariableIndex<'src>;
+    type VariableIndex = VariableReference<'src>;
     type VariableName = EmptyName;
 }
 
@@ -38,7 +42,7 @@ struct Inferred;
 
 impl<'src> Annotation<'src> for Inferred {
     type Expression = Rc<Expression<'src, Self>>;
-    type VariableIndex = VariableIndex<'src>;
+    type VariableIndex = VariableReference<'src>;
     type VariableName = EmptyName;
 }
 
@@ -56,6 +60,8 @@ pub trait Pretty {
     fn to_document(&self) -> Document;
 
     fn type_annotatation(&self, term: Document, parenthesized: bool) -> Document;
+
+    fn is_infix(&self) -> bool;
 
     fn to_pretty_string(&self, width: usize) -> String {
         self.to_document().pretty(width).to_string()
@@ -139,13 +145,11 @@ impl<'src> ExpressionRef<'src> {
                     function,
                     argument,
                     typ,
-                    infix: _,
                 },
                 Expression::Apply {
                     function: function1,
                     argument: argument1,
                     typ: typ1,
-                    infix: _,
                 },
             ) => {
                 Self::unify(ctx, function, function1)?;
@@ -231,7 +235,6 @@ enum Expression<'src, A: Annotation<'src>> {
         function: A::Expression,
         argument: A::Expression,
         typ: A::Expression,
-        infix: bool,
     },
     Let {
         variable_value: A::Expression,
@@ -292,7 +295,6 @@ impl<'src> Expression<'src, Inference> {
                 function,
                 argument,
                 typ,
-                infix: _,
             } => {
                 let function_type =
                     &mut ExpressionRef::function_type(argument.typ(ctx)?, typ.clone());
