@@ -13,6 +13,7 @@ impl<'src> Annotation<'src> for Source {
     type VariableName = &'src str;
 }
 
+#[derive(Clone)]
 pub struct SourceExpression<'src>(Option<Rc<Expression<'src, Source>>>);
 
 impl<'src> SourceExpression<'src> {

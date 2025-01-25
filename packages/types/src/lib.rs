@@ -284,7 +284,10 @@ impl<'src> Expression<'src, Inference> {
     fn infer_types(&mut self, ctx: &mut Context<'src>) -> Result<()> {
         match self {
             Self::Type => (),
-            Self::Variable { typ, .. } => typ.infer_types(ctx)?,
+            Self::Variable { index, typ } => {
+                ExpressionRef::unify(ctx, typ, &mut ctx.lookup_type(*index)?)?;
+                typ.infer_types(ctx)?
+            }
             Self::Apply {
                 function,
                 argument,
@@ -357,7 +360,19 @@ mod tests {
         constructor_type.infer_types(ctx).unwrap();
         assert_eq!(
             constructor_type.to_pretty_string(80),
-            "(\\_ = (\\_ = ((2:({unknown} -> {unknown})) 1)))"
+            "(\\_:({unknown} -> {unknown}) = (\\_ = ((2:({unknown} -> {unknown})) 1)))"
         );
+    }
+
+    #[test]
+    fn let_error() {
+        // let x : Int = x : Float
+        let int_type = Expr::variable("Int", Expr::type_of_type());
+        let float_type = Expr::variable("Float", Expr::type_of_type());
+        let one = Expr::variable("one", int_type.clone());
+        let let_binding = Expr::let_binding("x", int_type, one, Expr::variable("x", float_type));
+
+        let ctx = &mut Context::new(HashMap::new());
+        assert!(let_binding.to_infer().unwrap().infer_types(ctx).is_err());
     }
 }
