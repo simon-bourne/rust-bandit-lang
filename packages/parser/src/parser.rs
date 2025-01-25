@@ -89,6 +89,7 @@ fn token(token: Token<'_>) -> impl Parser<'_, ()> {
 
 #[cfg(test)]
 mod tests {
+    use bandit_types::Pretty;
     use winnow::Parser;
 
     use crate::{lex::Token, parser::expr};

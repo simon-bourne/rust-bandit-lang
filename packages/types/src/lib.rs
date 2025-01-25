@@ -56,6 +56,10 @@ pub trait Pretty {
     fn to_document(&self) -> Document;
 
     fn type_annotatation(&self, term: Document, parenthesized: bool) -> Document;
+
+    fn to_pretty_string(&self, width: usize) -> String {
+        self.to_document().pretty(width).to_string()
+    }
 }
 
 #[derive(Clone)]
@@ -330,8 +334,6 @@ impl<'src> Expression<'src, Inference> {
 
 #[cfg(test)]
 mod tests {
-    use goldenfile::Mint;
-
     use crate::{context::Context, source::SourceExpression as Expr, Pretty};
 
     #[test]
@@ -351,12 +353,9 @@ mod tests {
 
         let ctx = &mut Context::default();
         constructor_type.infer_types(ctx).unwrap();
-
-        let mut mint = Mint::new("tests/goldenfiles");
-        let mut output = mint.new_goldenfile("infer-kinds.txt").unwrap();
-        constructor_type
-            .to_document()
-            .render(80, &mut output)
-            .unwrap();
+        assert_eq!(
+            constructor_type.to_pretty_string(80),
+            "(\\_ = (\\_ = ((2:({unknown} -> {unknown})) 1)))"
+        );
     }
 }

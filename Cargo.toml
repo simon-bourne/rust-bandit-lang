@@ -16,7 +16,6 @@ bandit-parser = { path = "packages/parser" }
 bandit-types = { path = "packages/types" }
 
 criterion = "0.5.1"
-goldenfile = "1.7.1"
 indoc = "2.0.4"
 itertools = "0.12.1"
 logos = "0.15.0"

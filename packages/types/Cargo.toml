@@ -6,6 +6,3 @@ publish = false
 
 [dependencies]
 pretty.workspace = true
-
-[dev-dependencies]
-goldenfile.workspace = true
