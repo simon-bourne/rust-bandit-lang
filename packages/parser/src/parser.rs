@@ -102,8 +102,8 @@ mod tests {
             .collect::<Vec<_>>();
         let expr = expr.parse(&tokens).unwrap();
         assert_eq!(
-            expr.render_to_string(80),
-            "(((\\x:{unknown} = (x:{unknown})) Type):{unknown})"
+            expr.to_pretty_string(80),
+            "((\\x = x) Type)"
         );
     }
 }

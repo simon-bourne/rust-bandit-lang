@@ -50,10 +50,12 @@ impl Display for EmptyName {
     }
 }
 
-type PrettyDoc = RcDoc<'static>;
+type Document = RcDoc<'static>;
 
 pub trait Pretty {
-    fn pretty(&self) -> PrettyDoc;
+    fn to_document(&self) -> Document;
+
+    fn type_annotatation(&self, term: Document, parenthesized: bool) -> Document;
 }
 
 #[derive(Clone)]
@@ -352,6 +354,9 @@ mod tests {
 
         let mut mint = Mint::new("tests/goldenfiles");
         let mut output = mint.new_goldenfile("infer-kinds.txt").unwrap();
-        constructor_type.pretty().render(80, &mut output).unwrap();
+        constructor_type
+            .to_document()
+            .render(80, &mut output)
+            .unwrap();
     }
 }

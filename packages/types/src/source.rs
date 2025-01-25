@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use crate::{
-    context::VariableLookup, Annotation, EmptyName, Expression, ExpressionRef, Inference,
-    InferenceError, Pretty, PrettyDoc, Result, VariableBinding,
+    context::VariableLookup, Annotation, Document, EmptyName, Expression, ExpressionRef, Inference,
+    InferenceError, Pretty, Result, VariableBinding,
 };
 
 pub struct Source;
@@ -68,8 +68,8 @@ impl<'src> SourceExpression<'src> {
         Self::new(Expression::Variable { index, typ })
     }
 
-    pub fn render_to_string(&self, width: usize) -> String {
-        self.pretty().pretty(width).to_string()
+    pub fn to_pretty_string(&self, width: usize) -> String {
+        self.to_document().pretty(width).to_string()
     }
 
     pub fn to_infer(&self) -> Result<ExpressionRef<'src>> {
@@ -92,10 +92,17 @@ impl<'src> SourceExpression<'src> {
 }
 
 impl Pretty for SourceExpression<'_> {
-    fn pretty(&self) -> PrettyDoc {
+    fn to_document(&self) -> Document {
         match self.0.as_ref() {
-            Some(expr) => expr.pretty(),
-            None => PrettyDoc::text("{unknown}"),
+            Some(expr) => expr.to_document(),
+            None => Document::text("{unknown}"),
+        }
+    }
+
+    fn type_annotatation(&self, term: Document, parenthesized: bool) -> Document {
+        match self.0.as_ref() {
+            Some(expr) => expr.type_annotatation(term, parenthesized),
+            None => term,
         }
     }
 }
