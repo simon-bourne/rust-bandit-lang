@@ -77,7 +77,7 @@ impl<'src> ExpressionRef<'src> {
     }
 
     fn type_of_type() -> Self {
-        Self::new(Expression::Type)
+        Self::new(Expression::GlobalVariable("Type"))
     }
 
     fn function_type(argument_type: Self, result_type: Self) -> Self {
@@ -136,7 +136,8 @@ impl<'src> ExpressionRef<'src> {
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
-            (Expression::Type, Expression::Type) => (),
+            (Expression::GlobalVariable(name0), Expression::GlobalVariable(name1))
+                if name0 == name1 => {}
             (
                 Expression::Apply {
                     function,
@@ -181,12 +182,12 @@ impl<'src> ExpressionRef<'src> {
                     typ: typ1,
                 },
             ) if index == index1 => {
-                let mut ctx_type = ctx.get_type(*index);
+                let mut ctx_type = ctx.local_type(*index);
                 Self::unify(ctx, typ, &mut ctx_type)?;
                 Self::unify(ctx, typ1, &mut ctx_type)?
             }
             // It's safer to explicitly ignore each variant
-            (Expression::Type, _rhs)
+            (Expression::GlobalVariable(_), _rhs)
             | (Expression::Apply { .. }, _rhs)
             | (Expression::Let { .. }, _rhs)
             | (Expression::FunctionType(_), _rhs)
@@ -217,18 +218,16 @@ impl<'src> ExpressionRef<'src> {
         .ok()
     }
 
-    fn typ(&self) -> Self {
+    fn typ(&self, ctx: &Context<'src>) -> Result<Self> {
         match &*self.0.borrow() {
-            ExprRefVariants::Known(owned) => owned.typ(),
-            ExprRefVariants::Unknown => Self::type_of_type(),
-            ExprRefVariants::Link(target) => target.typ(),
+            ExprRefVariants::Known(owned) => owned.typ(ctx),
+            ExprRefVariants::Unknown => Ok(Self::type_of_type()),
+            ExprRefVariants::Link(target) => target.typ(ctx),
         }
     }
 }
 
 enum Expression<'src, A: Annotation<'src>> {
-    // TODO: Replace this with `Name`.
-    Type,
     Apply {
         function: A::Expression,
         argument: A::Expression,
@@ -240,6 +239,9 @@ enum Expression<'src, A: Annotation<'src>> {
     },
     FunctionType(VariableBinding<'src, A>),
     Lambda(VariableBinding<'src, A>),
+    // TODO: VariableIndex should be a LocalName|GlobalName where we're using debruijn indices,
+    // and just a string for sourceexpr
+    GlobalVariable(&'src str),
     Variable {
         index: A::VariableIndex,
         typ: A::Expression,
@@ -284,15 +286,16 @@ impl<'src> VariableBinding<'src, Inference> {
 impl<'src> Expression<'src, Inference> {
     fn infer_types(&mut self, ctx: &mut Context<'src>) -> Result<()> {
         match self {
-            Self::Type => (),
+            Self::GlobalVariable(_) => (),
             Self::Variable { typ, .. } => typ.infer_types(ctx)?,
             Self::Apply {
                 function,
                 argument,
                 typ,
             } => {
-                let function_type = &mut ExpressionRef::function_type(argument.typ(), typ.clone());
-                ExpressionRef::unify(ctx, function_type, &mut function.typ())?;
+                let function_type =
+                    &mut ExpressionRef::function_type(argument.typ(ctx)?, typ.clone());
+                ExpressionRef::unify(ctx, function_type, &mut function.typ(ctx)?)?;
 
                 function.infer_types(ctx)?;
                 argument.infer_types(ctx)?;
@@ -317,18 +320,18 @@ impl<'src> Expression<'src, Inference> {
         Ok(())
     }
 
-    fn typ(&self) -> ExpressionRef<'src> {
-        match self {
-            Self::Type => ExpressionRef::type_of_type(),
+    fn typ(&self, ctx: &Context<'src>) -> Result<ExpressionRef<'src>> {
+        Ok(match self {
+            Self::GlobalVariable(name) => ctx.global_type(name)?,
             Self::Variable { typ, .. } => typ.clone(),
             Self::Apply { typ, .. } => typ.clone(),
-            Self::Let { binding, .. } => binding.in_expression.typ(),
+            Self::Let { binding, .. } => binding.in_expression.typ(ctx)?,
             Self::FunctionType(_binding) => ExpressionRef::type_of_type(),
             Self::Lambda(binding) => ExpressionRef::function_type(
                 binding.variable_type.clone(),
-                binding.in_expression.typ(),
+                binding.in_expression.typ(ctx)?,
             ),
-        }
+        })
     }
 }
 

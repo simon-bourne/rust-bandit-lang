@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt};
 
-use crate::ExpressionRef;
+use crate::{ExpressionRef, InferenceError, Result};
 
 pub struct DeBruijnLevel(usize);
 
@@ -30,10 +30,17 @@ impl<'a> Context<'a> {
         output
     }
 
-    pub fn get_type(&self, index: DeBruijnIndex) -> ExpressionRef<'a> {
+    pub fn local_type(&self, index: DeBruijnIndex) -> ExpressionRef<'a> {
         let len = self.local_variables.len();
         assert!(index.0 <= len);
         self.local_variables[len - index.0].clone()
+    }
+
+    pub fn global_type(&self, name: &str) -> Result<ExpressionRef<'a>> {
+        match name {
+            "Type" => Ok(ExpressionRef::type_of_type()),
+            _ => Err(InferenceError),
+        }
     }
 }
 

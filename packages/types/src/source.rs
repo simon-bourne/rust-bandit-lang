@@ -21,7 +21,7 @@ impl<'src> SourceExpression<'src> {
     }
 
     pub fn type_of_type() -> Self {
-        Self::new(Expression::Type)
+        Self::new(Expression::GlobalVariable("Type"))
     }
 
     pub fn apply(function: Self, argument: Self, typ: Self) -> Self {
@@ -106,7 +106,7 @@ impl Pretty for SourceExpression<'_> {
 impl<'src> Expression<'src, Source> {
     fn to_infer(&self, lookup: &mut VariableLookup<'src>) -> Result<ExpressionRef<'src>> {
         let expr = match self {
-            Self::Type => Expression::Type,
+            Self::GlobalVariable(name) => Expression::GlobalVariable(name),
             Self::Apply {
                 function,
                 argument,
