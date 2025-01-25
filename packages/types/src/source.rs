@@ -25,20 +25,20 @@ impl<'src> SourceExpression<'src> {
         Self::new(Expression::Type)
     }
 
-    pub fn apply(function: Self, argument: Self, typ: Self) -> Self {
+    pub fn apply(function: Self, argument: Self) -> Self {
         Self::new(Expression::Apply {
             function,
             argument,
-            typ,
+            typ: Self::unknown(),
             infix: false,
         })
     }
 
-    pub fn apply_operator(function: Self, argument: Self, typ: Self) -> Self {
+    pub fn apply_operator(function: Self, argument: Self) -> Self {
         Self::new(Expression::Apply {
             function,
             argument,
-            typ,
+            typ: Self::unknown(),
             infix: true,
         })
     }
@@ -75,8 +75,11 @@ impl<'src> SourceExpression<'src> {
         }))
     }
 
-    pub fn variable(index: &'src str, typ: Self) -> Self {
-        Self::new(Expression::Variable { index, typ })
+    pub fn variable(index: &'src str) -> Self {
+        Self::new(Expression::Variable {
+            index,
+            typ: Self::unknown(),
+        })
     }
 
     pub fn to_infer(&self) -> Result<ExpressionRef<'src>> {

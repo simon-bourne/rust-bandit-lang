@@ -30,16 +30,13 @@ fn function_types<'src>() -> impl Parser<'src, Expr<'src>> {
     separated_foldr1(
         function_applications(),
         operator(NamedOperator::Implies),
+        // TODO: Optionally parse binding name
         |input_type, _, output_type| Expr::function_type("_", input_type, output_type),
     )
 }
 
 fn function_applications<'src>() -> impl Parser<'src, Expr<'src>> {
-    repeat(1.., primary()).map(|es: Vec<_>| {
-        es.into_iter()
-            .reduce(|function, argument| Expr::apply(function, argument, Expr::unknown()))
-            .unwrap()
-    })
+    repeat(1.., primary()).map(|es: Vec<_>| es.into_iter().reduce(Expr::apply).unwrap())
 }
 
 fn primary<'src>() -> impl Parser<'src, Expr<'src>> {
@@ -50,16 +47,19 @@ fn typ<'src>() -> impl Parser<'src, Expr<'src>> {
     identifier().verify_map(|name| (name == "Type").then(Expr::type_of_type))
 }
 
+// TODO: Parse let bindings
+
 fn lambda<'src>() -> impl Parser<'src, Expr<'src>> {
     preceded(
         token(Token::Lambda),
         separated_pair(identifier(), operator(NamedOperator::Assign), expr),
     )
+    // TODO: Optionally parse binding type
     .map(|(var, expr)| Expr::lambda(var, Expr::unknown(), expr))
 }
 
 fn variable<'src>() -> impl Parser<'src, Expr<'src>> {
-    identifier().map(|name| Expr::variable(name, Expr::unknown()))
+    identifier().map(Expr::variable)
 }
 
 fn identifier<'src>() -> impl Parser<'src, &'src str> {
@@ -95,18 +95,6 @@ fn right_operators<'src, const N: usize>(
     )
 }
 
-fn operator_expression<'src>(value: Expr<'src>, op: NamedOperator, typ: Expr<'src>) -> Expr<'src> {
-    Expr::apply(
-        Expr::apply_operator(
-            Expr::variable(op.as_str(), Expr::unknown()),
-            value,
-            Expr::unknown(),
-        ),
-        typ,
-        Expr::unknown(),
-    )
-}
-
 fn matches_operators<'src, const N: usize>(
     ops: [NamedOperator; N],
 ) -> impl Parser<'src, NamedOperator> {
@@ -119,6 +107,13 @@ fn operator<'src>(name: NamedOperator) -> impl Parser<'src, ()> {
 
 fn token(token: Token<'_>) -> impl Parser<'_, ()> {
     one_of(move |t: SrcToken| t.0 == token).void()
+}
+
+fn operator_expression<'src>(value: Expr<'src>, op: NamedOperator, typ: Expr<'src>) -> Expr<'src> {
+    Expr::apply(
+        Expr::apply_operator(Expr::variable(op.as_str()), value),
+        typ,
+    )
 }
 
 #[cfg(test)]
