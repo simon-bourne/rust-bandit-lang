@@ -1,47 +1,54 @@
 use bandit_types::source::SourceExpression;
 use winnow::{
-    ascii::{multispace0, multispace1},
-    combinator::{alt, delimited, preceded, separated_foldl1, separated_foldr1, separated_pair},
+    combinator::{alt, delimited, preceded, repeat, separated_foldr1, separated_pair},
     error::ContextError,
-    stream::AsChar,
-    token::{literal, one_of, take_while},
+    token::{any, one_of},
     PResult, Parser as _,
 };
 
+use crate::lex::{Grouping, NamedOperator, Token};
+
 pub type Expr<'a> = SourceExpression<'a>;
 
-pub trait Parser<'src, Out>: winnow::Parser<&'src str, Out, ContextError> {}
+pub trait Parser<'src, Out>: winnow::Parser<&'src [Token<'src>], Out, ContextError> {}
 
-impl<'src, Out, T> Parser<'src, Out> for T where T: winnow::Parser<&'src str, Out, ContextError> {}
+impl<'src, Out, T> Parser<'src, Out> for T where
+    T: winnow::Parser<&'src [Token<'src>], Out, ContextError>
+{
+}
 
-pub fn expr<'src>(input: &mut &'src str) -> PResult<Expr<'src>> {
+pub fn expr<'src>(input: &mut &'src [Token<'src>]) -> PResult<Expr<'src>> {
     function_types().parse_next(input)
 }
 
 fn function_types<'src>() -> impl Parser<'src, Expr<'src>> {
-    separated_foldr1(application(), multispace1, |input_type, _, output_type| {
-        Expr::function_type("_", input_type, output_type)
-    })
+    separated_foldr1(
+        application(),
+        operator(NamedOperator::Implies),
+        |input_type, _, output_type| Expr::function_type("_", input_type, output_type),
+    )
 }
 
 fn application<'src>() -> impl Parser<'src, Expr<'src>> {
-    separated_foldl1(primary(), multispace1, |function, _, argument| {
-        Expr::apply(function, argument, Expr::unknown())
+    repeat(1.., primary()).map(|es: Vec<_>| {
+        es.into_iter()
+            .reduce(|function, argument| Expr::apply(function, argument, Expr::unknown()))
+            .unwrap()
     })
 }
 
 fn primary<'src>() -> impl Parser<'src, Expr<'src>> {
-    alt((typ(), variable(), lambda(), delimited('(', ws(expr), ')')))
+    alt((typ(), variable(), lambda(), parenthesized(expr)))
 }
 
 fn typ<'src>() -> impl Parser<'src, Expr<'src>> {
-    literal("Type").map(|_| Expr::type_of_type())
+    identifier().verify_map(|name| (name == "Type").then(Expr::type_of_type))
 }
 
 fn lambda<'src>() -> impl Parser<'src, Expr<'src>> {
     preceded(
-        ('\\', multispace0),
-        separated_pair(identifier(), ws("="), expr),
+        token(Token::Lambda),
+        separated_pair(identifier(), operator(NamedOperator::Assign), expr),
     )
     .map(|(var, expr)| Expr::lambda(var, Expr::unknown(), expr))
 }
@@ -51,29 +58,49 @@ fn variable<'src>() -> impl Parser<'src, Expr<'src>> {
 }
 
 fn identifier<'src>() -> impl Parser<'src, &'src str> {
-    (
-        one_of(|c: char| c.is_alpha() || c == '_'),
-        take_while(0.., |c: char| c.is_alphanum() || c == '_'),
-    )
-        .take()
+    any.verify_map(|t| {
+        if let Token::Identifier(name) = t {
+            Some(name)
+        } else {
+            None
+        }
+    })
 }
 
-fn ws<'src, F, O>(inner: F) -> impl Parser<'src, O>
-where
-    F: Parser<'src, O>,
-{
-    delimited(multispace0, inner, multispace0)
+fn parenthesized<'src, T>(parser: impl Parser<'src, T>) -> impl Parser<'src, T> {
+    grouped(Grouping::Parentheses, parser)
+}
+
+fn grouped<'src, T>(grouping: Grouping, parser: impl Parser<'src, T>) -> impl Parser<'src, T> {
+    delimited(
+        token(Token::Open(grouping)),
+        parser,
+        token(Token::Close(grouping)),
+    )
+}
+
+fn operator<'src>(name: NamedOperator) -> impl Parser<'src, ()> {
+    token(Token::Operator(name))
+}
+
+fn token(token: Token<'_>) -> impl Parser<'_, ()> {
+    one_of(move |t| t == token).void()
 }
 
 #[cfg(test)]
 mod tests {
     use winnow::Parser;
 
-    use crate::parser::expr;
+    use crate::{lex::Token, parser::expr};
 
     #[test]
     fn expression() {
-        let expr = expr.parse("(\\x = x) Type").unwrap();
+        // TODO: Can we avoid collecting the tokens?
+        // TODO: Keep the span information
+        let tokens = Token::layout("(\\x = x) Type")
+            .map(|(t, _span)| t)
+            .collect::<Vec<_>>();
+        let expr = expr.parse(&tokens).unwrap();
         assert_eq!(
             expr.render_to_string(80),
             "(((\\x:{unknown} = (x:{unknown})) Type):{unknown})"
