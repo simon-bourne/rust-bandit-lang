@@ -6,18 +6,19 @@ use winnow::{
     PResult, Parser as _,
 };
 
-use crate::lex::{Grouping, NamedOperator, Token};
+use crate::lex::{Grouping, NamedOperator, SrcToken, Token};
 
 pub type Expr<'a> = SourceExpression<'a>;
+pub type TokenList<'src> = &'src [SrcToken<'src>];
 
-pub trait Parser<'src, Out>: winnow::Parser<&'src [Token<'src>], Out, ContextError> {}
+pub trait Parser<'src, Out>: winnow::Parser<TokenList<'src>, Out, ContextError> {}
 
 impl<'src, Out, T> Parser<'src, Out> for T where
-    T: winnow::Parser<&'src [Token<'src>], Out, ContextError>
+    T: winnow::Parser<TokenList<'src>, Out, ContextError>
 {
 }
 
-pub fn expr<'src>(input: &mut &'src [Token<'src>]) -> PResult<Expr<'src>> {
+pub fn expr<'src>(input: &mut TokenList<'src>) -> PResult<Expr<'src>> {
     function_types().parse_next(input)
 }
 
@@ -58,8 +59,8 @@ fn variable<'src>() -> impl Parser<'src, Expr<'src>> {
 }
 
 fn identifier<'src>() -> impl Parser<'src, &'src str> {
-    any.verify_map(|t| {
-        if let Token::Identifier(name) = t {
+    any.verify_map(|t: SrcToken| {
+        if let Token::Identifier(name) = t.0 {
             Some(name)
         } else {
             None
@@ -84,7 +85,7 @@ fn operator<'src>(name: NamedOperator) -> impl Parser<'src, ()> {
 }
 
 fn token(token: Token<'_>) -> impl Parser<'_, ()> {
-    one_of(move |t| t == token).void()
+    one_of(move |t: SrcToken| t.0 == token).void()
 }
 
 #[cfg(test)]
@@ -92,15 +93,14 @@ mod tests {
     use bandit_types::Pretty;
     use winnow::Parser;
 
-    use crate::{lex::Token, parser::expr};
+    use crate::{
+        lex::{SrcToken, Token},
+        parser::expr,
+    };
 
     #[test]
     fn expression() {
-        // TODO: Can we avoid collecting the tokens?
-        // TODO: Keep the span information
-        let tokens = Token::layout("(\\x = x) Type")
-            .map(|(t, _span)| t)
-            .collect::<Vec<_>>();
+        let tokens: Vec<SrcToken> = Token::layout("(\\x = x) Type").collect();
         let expr = expr.parse(&tokens).unwrap();
         assert_eq!(expr.to_pretty_string(80), "((\\x = x) Type)");
     }
