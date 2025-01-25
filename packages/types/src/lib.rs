@@ -370,9 +370,15 @@ mod tests {
         let int_type = Expr::variable("Int", Expr::type_of_type());
         let float_type = Expr::variable("Float", Expr::type_of_type());
         let one = Expr::variable("one", int_type.clone());
-        let let_binding = Expr::let_binding("x", int_type, one, Expr::variable("x", float_type));
+        let let_binding =
+            Expr::let_binding("x", int_type.clone(), one, Expr::variable("x", float_type));
 
-        let ctx = &mut Context::new(HashMap::new());
+        let mut global_types = HashMap::new();
+        global_types.insert("one", int_type.to_infer().unwrap());
+        global_types.insert("Int", Expr::type_of_type().to_infer().unwrap());
+        global_types.insert("Float", Expr::type_of_type().to_infer().unwrap());
+        let ctx = &mut Context::new(global_types);
+
         assert!(let_binding.to_infer().unwrap().infer_types(ctx).is_err());
     }
 }
