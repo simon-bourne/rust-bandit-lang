@@ -16,7 +16,7 @@ impl Pretty for ExpressionRef<'_> {
     fn to_document(&self) -> Document {
         match &*self.0.borrow() {
             ExprRefVariants::Known(owned) => owned.to_document(),
-            ExprRefVariants::Unknown => Document::text("{unknown}"),
+            ExprRefVariants::Unknown => Document::text("_"),
             ExprRefVariants::Link(linked) => linked.to_document(),
         }
     }

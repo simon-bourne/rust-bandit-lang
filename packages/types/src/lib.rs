@@ -356,7 +356,7 @@ mod tests {
         constructor_type.infer_types(ctx).unwrap();
         assert_eq!(
             constructor_type.to_pretty_string(80),
-            "(\\_:({unknown} -> {unknown}) = (\\_ = ((2:({unknown} -> {unknown})) 1)))"
+            "(\\_:(_ -> _) = (\\_ = ((2:(_ -> _)) 1)))"
         );
     }
 

@@ -105,7 +105,7 @@ impl Pretty for SourceExpression<'_> {
     fn to_document(&self) -> Document {
         match self.0.as_ref() {
             Some(expr) => expr.to_document(),
-            None => Document::text("{unknown}"),
+            None => Document::text("_"),
         }
     }
 
