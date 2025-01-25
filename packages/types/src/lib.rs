@@ -131,9 +131,6 @@ impl<'src> ExpressionRef<'src> {
             return Ok(());
         };
 
-        x_ref.normalize()?;
-        y_ref.normalize()?;
-
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
             (Expression::Type, Expression::Type) => {}
@@ -316,11 +313,6 @@ impl<'src> Expression<'src, Inference> {
             Self::Lambda(binding) => binding.infer_types(ctx)?,
         }
 
-        Ok(())
-    }
-
-    fn normalize(&mut self) -> Result<()> {
-        // TODO: Normalize by evaluation
         Ok(())
     }
 
