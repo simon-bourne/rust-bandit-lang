@@ -35,7 +35,7 @@ impl Pretty for ExpressionRef<'_> {
 impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
     fn to_document(&self) -> Document {
         match self {
-            Self::GlobalVariable(name) => Document::as_string(name),
+            Self::Type => Document::text("Type"),
             Self::Apply {
                 function: left,
                 argument: right,

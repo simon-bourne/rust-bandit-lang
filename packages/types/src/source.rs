@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::{
     context::VariableLookup, Annotation, Document, EmptyName, Expression, ExpressionRef, Inference,
-    InferenceError, Pretty, Result, VariableBinding,
+    Pretty, Result, VariableBinding,
 };
 
 pub struct Source;
@@ -21,7 +21,7 @@ impl<'src> SourceExpression<'src> {
     }
 
     pub fn type_of_type() -> Self {
-        Self::new(Expression::GlobalVariable("Type"))
+        Self::new(Expression::Type)
     }
 
     pub fn apply(function: Self, argument: Self, typ: Self) -> Self {
@@ -106,7 +106,7 @@ impl Pretty for SourceExpression<'_> {
 impl<'src> Expression<'src, Source> {
     fn to_infer(&self, lookup: &mut VariableLookup<'src>) -> Result<ExpressionRef<'src>> {
         let expr = match self {
-            Self::GlobalVariable(name) => Expression::GlobalVariable(name),
+            Self::Type => Expression::Type,
             Self::Apply {
                 function,
                 argument,
@@ -129,7 +129,7 @@ impl<'src> Expression<'src, Source> {
             Self::FunctionType(binding) => Expression::FunctionType(binding.to_infer(lookup)?),
             Self::Lambda(binding) => Expression::Lambda(binding.to_infer(lookup)?),
             Self::Variable { index, typ } => Expression::Variable {
-                index: lookup.lookup(index).ok_or(InferenceError)?,
+                index: lookup.lookup(index),
                 typ: typ.to_infer_with_lookup(lookup)?,
             },
         };

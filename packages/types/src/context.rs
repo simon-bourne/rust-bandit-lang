@@ -30,17 +30,21 @@ impl<'a> Context<'a> {
         output
     }
 
-    pub fn local_type(&self, index: DeBruijnIndex) -> ExpressionRef<'a> {
+    pub fn lookup_type(&self, index: VariableIndex<'a>) -> Result<ExpressionRef<'a>> {
+        match index {
+            VariableIndex::Local(index) => Ok(self.local_type(index)),
+            VariableIndex::Global(name) => self.global_type(name),
+        }
+    }
+
+    fn local_type(&self, index: DeBruijnIndex) -> ExpressionRef<'a> {
         let len = self.local_variables.len();
         assert!(index.0 <= len);
         self.local_variables[len - index.0].clone()
     }
 
-    pub fn global_type(&self, name: &str) -> Result<ExpressionRef<'a>> {
-        match name {
-            "Type" => Ok(ExpressionRef::type_of_type()),
-            _ => Err(InferenceError),
-        }
+    fn global_type(&self, _name: &str) -> Result<ExpressionRef<'a>> {
+        Err(InferenceError)
     }
 }
 
@@ -67,9 +71,32 @@ impl<'a> VariableLookup<'a> {
         output
     }
 
-    pub fn lookup(&self, name: &str) -> Option<DeBruijnIndex> {
+    pub fn lookup(&self, name: &'a str) -> VariableIndex<'a> {
+        if let Some(local_index) = self.lookup_local(name) {
+            VariableIndex::Local(local_index)
+        } else {
+            VariableIndex::Global(name)
+        }
+    }
+
+    fn lookup_local(&self, name: &str) -> Option<DeBruijnIndex> {
         let level = self.variables.get(name)?.last()?;
         assert!(level.0 < self.variable_count);
         Some(DeBruijnIndex(self.variable_count - level.0))
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum VariableIndex<'src> {
+    Local(DeBruijnIndex),
+    Global(&'src str),
+}
+
+impl fmt::Display for VariableIndex<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            VariableIndex::Local(de_bruijn_index) => de_bruijn_index.fmt(f),
+            VariableIndex::Global(name) => name.fmt(f),
+        }
     }
 }
