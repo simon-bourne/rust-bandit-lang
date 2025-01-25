@@ -13,12 +13,21 @@ impl fmt::Display for DeBruijnIndex {
     }
 }
 
-#[derive(Default)]
+pub type GlobalTypes<'a> = HashMap<&'a str, ExpressionRef<'a>>;
+
 pub struct Context<'a> {
     local_variables: Vec<ExpressionRef<'a>>,
+    global_types: GlobalTypes<'a>,
 }
 
 impl<'a> Context<'a> {
+    pub fn new(global_types: GlobalTypes<'a>) -> Self {
+        Self {
+            local_variables: Vec::new(),
+            global_types,
+        }
+    }
+
     pub fn with_variable<Output>(
         &mut self,
         typ: ExpressionRef<'a>,
@@ -43,8 +52,8 @@ impl<'a> Context<'a> {
         self.local_variables[len - index.0].clone()
     }
 
-    fn global_type(&self, _name: &str) -> Result<ExpressionRef<'a>> {
-        Err(InferenceError)
+    fn global_type(&self, name: &str) -> Result<ExpressionRef<'a>> {
+        self.global_types.get(name).cloned().ok_or(InferenceError)
     }
 }
 

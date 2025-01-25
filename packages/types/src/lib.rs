@@ -334,6 +334,8 @@ impl<'src> Expression<'src, Inference> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::{context::Context, source::SourceExpression as Expr, Pretty};
 
     #[test]
@@ -351,7 +353,7 @@ mod tests {
         .to_infer()
         .unwrap();
 
-        let ctx = &mut Context::default();
+        let ctx = &mut Context::new(HashMap::new());
         constructor_type.infer_types(ctx).unwrap();
         assert_eq!(
             constructor_type.to_pretty_string(80),
