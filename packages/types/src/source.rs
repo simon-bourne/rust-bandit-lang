@@ -30,6 +30,16 @@ impl<'src> SourceExpression<'src> {
             function,
             argument,
             typ,
+            infix: false,
+        })
+    }
+
+    pub fn apply_operator(function: Self, argument: Self, typ: Self) -> Self {
+        Self::new(Expression::Apply {
+            function,
+            argument,
+            typ,
+            infix: true,
         })
     }
 
@@ -112,10 +122,12 @@ impl<'src> Expression<'src, Source> {
                 function,
                 argument,
                 typ,
+                infix,
             } => Expression::Apply {
                 function: function.to_infer_with_lookup(lookup)?,
                 argument: argument.to_infer_with_lookup(lookup)?,
                 typ: typ.to_infer_with_lookup(lookup)?,
+                infix: *infix,
             },
             Self::Let {
                 variable_value,

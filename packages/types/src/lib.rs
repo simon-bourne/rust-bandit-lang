@@ -142,11 +142,13 @@ impl<'src> ExpressionRef<'src> {
                     function,
                     argument,
                     typ,
+                    infix: _,
                 },
                 Expression::Apply {
                     function: function1,
                     argument: argument1,
                     typ: typ1,
+                    infix: _,
                 },
             ) => {
                 Self::unify(ctx, function, function1)?;
@@ -232,6 +234,7 @@ enum Expression<'src, A: Annotation<'src>> {
         function: A::Expression,
         argument: A::Expression,
         typ: A::Expression,
+        infix: bool,
     },
     Let {
         variable_value: A::Expression,
@@ -292,6 +295,7 @@ impl<'src> Expression<'src, Inference> {
                 function,
                 argument,
                 typ,
+                infix: _,
             } => {
                 let function_type =
                     &mut ExpressionRef::function_type(argument.typ(ctx)?, typ.clone());

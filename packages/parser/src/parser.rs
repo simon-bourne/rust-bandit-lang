@@ -19,18 +19,22 @@ impl<'src, Out, T> Parser<'src, Out> for T where
 }
 
 pub fn expr<'src>(input: &mut TokenList<'src>) -> PResult<Expr<'src>> {
-    function_types().parse_next(input)
+    type_annotations().parse_next(input)
+}
+
+fn type_annotations<'src>() -> impl Parser<'src, Expr<'src>> {
+    right_operators([NamedOperator::HasType], function_types())
 }
 
 fn function_types<'src>() -> impl Parser<'src, Expr<'src>> {
     separated_foldr1(
-        application(),
+        function_applications(),
         operator(NamedOperator::Implies),
         |input_type, _, output_type| Expr::function_type("_", input_type, output_type),
     )
 }
 
-fn application<'src>() -> impl Parser<'src, Expr<'src>> {
+fn function_applications<'src>() -> impl Parser<'src, Expr<'src>> {
     repeat(1.., primary()).map(|es: Vec<_>| {
         es.into_iter()
             .reduce(|function, argument| Expr::apply(function, argument, Expr::unknown()))
@@ -80,6 +84,35 @@ fn grouped<'src, T>(grouping: Grouping, parser: impl Parser<'src, T>) -> impl Pa
     )
 }
 
+fn right_operators<'src, const N: usize>(
+    ops: [NamedOperator; N],
+    tighter_binding_operators: impl Parser<'src, Expr<'src>>,
+) -> impl Parser<'src, Expr<'src>> {
+    separated_foldr1(
+        tighter_binding_operators,
+        matches_operators(ops),
+        operator_expression,
+    )
+}
+
+fn operator_expression<'src>(value: Expr<'src>, op: NamedOperator, typ: Expr<'src>) -> Expr<'src> {
+    Expr::apply(
+        Expr::apply_operator(
+            Expr::variable(op.as_str(), Expr::unknown()),
+            value,
+            Expr::unknown(),
+        ),
+        typ,
+        Expr::unknown(),
+    )
+}
+
+fn matches_operators<'src, const N: usize>(
+    ops: [NamedOperator; N],
+) -> impl Parser<'src, NamedOperator> {
+    any.verify_map(move |t: SrcToken| ops.iter().copied().find(|op| Token::Operator(*op) == t.0))
+}
+
 fn operator<'src>(name: NamedOperator) -> impl Parser<'src, ()> {
     token(Token::Operator(name))
 }
@@ -103,5 +136,12 @@ mod tests {
         let tokens: Vec<SrcToken> = Token::layout("(\\x = x) Type").collect();
         let expr = expr.parse(&tokens).unwrap();
         assert_eq!(expr.to_pretty_string(80), "((\\x = x) Type)");
+    }
+
+    #[test]
+    fn type_annotation() {
+        let tokens: Vec<SrcToken> = Token::layout("x : Int").collect();
+        let expr = expr.parse(&tokens).unwrap();
+        assert_eq!(expr.to_pretty_string(80), "((x :) Int)");
     }
 }

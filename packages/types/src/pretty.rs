@@ -37,13 +37,22 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
         match self {
             Self::Type => Document::text("Type"),
             Self::Apply {
-                function: left,
-                argument: right,
+                function,
+                argument,
                 typ,
-            } => typ.type_annotatation(
-                parenthesize([left.to_document(), Document::space(), right.to_document()]),
-                true,
-            ),
+                infix,
+            } => {
+                let (left, right) = if *infix {
+                    (argument, function)
+                } else {
+                    (function, argument)
+                };
+
+                typ.type_annotatation(
+                    parenthesize([left.to_document(), Document::space(), right.to_document()]),
+                    true,
+                )
+            }
             Self::Let {
                 variable_value,
                 binding,
