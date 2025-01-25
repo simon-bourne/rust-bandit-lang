@@ -101,9 +101,6 @@ mod tests {
             .map(|(t, _span)| t)
             .collect::<Vec<_>>();
         let expr = expr.parse(&tokens).unwrap();
-        assert_eq!(
-            expr.to_pretty_string(80),
-            "((\\x = x) Type)"
-        );
+        assert_eq!(expr.to_pretty_string(80), "((\\x = x) Type)");
     }
 }
