@@ -168,15 +168,17 @@ mod tests {
 
     #[test]
     fn expression() {
-        let tokens: Vec<SrcToken> = Token::layout("(\\x = x) Type").collect();
-        let expr = expr.parse(&tokens).unwrap();
-        assert_eq!(expr.to_pretty_string(80), "((\\x = x) Type)");
+        parse("(\\x = x) Type", "((\\x = x) Type)");
     }
 
     #[test]
     fn type_annotation() {
-        let tokens: Vec<SrcToken> = Token::layout("x : Int").collect();
+        parse("x : Int", "((x :) Int)");
+    }
+
+    fn parse(input: &str, expected: &str) {
+        let tokens: Vec<SrcToken> = Token::layout(input).collect();
         let expr = expr.parse(&tokens).unwrap();
-        assert_eq!(expr.to_pretty_string(80), "((x :) Int)");
+        assert_eq!(expr.to_pretty_string(80), expected);
     }
 }
