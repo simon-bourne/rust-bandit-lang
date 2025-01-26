@@ -12,6 +12,8 @@ pub mod context;
 mod pretty;
 pub mod source;
 
+pub use pretty::Pretty;
+
 // TODO: Use actual refs, not `Rc`
 type SharedMut<T> = Rc<RefCell<T>>;
 
@@ -66,25 +68,6 @@ pub enum TypeAnnotations {
 pub enum Parentheses {
     On,
     Off,
-}
-
-pub trait Pretty {
-    fn to_document(&self, type_annotations: TypeAnnotations) -> Document;
-
-    fn type_annotatation(
-        &self,
-        term: Document,
-        parentheses: Parentheses,
-        type_annotations: TypeAnnotations,
-    ) -> Document;
-
-    fn is_infix(&self) -> bool;
-
-    fn to_pretty_string(&self, width: usize) -> String {
-        self.to_document(TypeAnnotations::On)
-            .pretty(width)
-            .to_string()
-    }
 }
 
 #[derive(Clone)]

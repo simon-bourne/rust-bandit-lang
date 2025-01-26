@@ -2,8 +2,27 @@ use std::rc::Rc;
 
 use crate::{
     Annotation, Document, ExprRefVariants, Expression, ExpressionRef, Inferred, Parentheses,
-    Pretty, TypeAnnotations, VariableIndex,
+    TypeAnnotations, VariableIndex,
 };
+
+pub trait Pretty {
+    fn to_document(&self, type_annotations: TypeAnnotations) -> Document;
+
+    fn type_annotatation(
+        &self,
+        term: Document,
+        parentheses: Parentheses,
+        type_annotations: TypeAnnotations,
+    ) -> Document;
+
+    fn is_infix(&self) -> bool;
+
+    fn to_pretty_string(&self, width: usize) -> String {
+        self.to_document(TypeAnnotations::On)
+            .pretty(width)
+            .to_string()
+    }
+}
 
 impl Pretty for Rc<Expression<'_, Inferred>> {
     fn to_document(&self, type_annotations: TypeAnnotations) -> Document {
