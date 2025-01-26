@@ -72,9 +72,13 @@ pub trait Pretty {
 pub struct ExpressionRef<'src>(SharedMut<ExprRefVariants<'src>>);
 
 enum ExprRefVariants<'src> {
-    Known(Expression<'src, Inference>),
+    Known {
+        expression: Expression<'src, Inference>,
+    },
     Unknown,
-    Link(ExpressionRef<'src>),
+    Link {
+        target: ExpressionRef<'src>,
+    },
 }
 
 impl<'src> ExpressionRef<'src> {
@@ -94,26 +98,26 @@ impl<'src> ExpressionRef<'src> {
         }))
     }
 
-    fn new(typ: Expression<'src, Inference>) -> Self {
-        Self(Rc::new(RefCell::new(ExprRefVariants::Known(typ))))
+    fn new(expression: Expression<'src, Inference>) -> Self {
+        Self(Rc::new(RefCell::new(ExprRefVariants::Known { expression })))
     }
 
     pub fn infer_types(&mut self, ctx: &mut Context<'src>) -> Result<()> {
         match &mut *self.0.borrow_mut() {
-            ExprRefVariants::Known(typ) => typ.infer_types(ctx),
+            ExprRefVariants::Known { expression } => expression.infer_types(ctx),
             ExprRefVariants::Unknown => Ok(()),
-            ExprRefVariants::Link(target) => target.infer_types(ctx),
+            ExprRefVariants::Link { target } => target.infer_types(ctx),
         }
     }
 
     fn follow_links(&mut self) {
         loop {
             let borrowed = self.0.borrow();
-            let ExprRefVariants::Link(link) = &*borrowed else {
+            let ExprRefVariants::Link { target } = &*borrowed else {
                 return;
             };
 
-            let link = link.clone();
+            let link = target.clone();
             drop(borrowed);
             *self = link;
         }
@@ -208,14 +212,19 @@ impl<'src> ExpressionRef<'src> {
     }
 
     fn replace(&mut self, other: &Self) {
-        RefCell::replace(&self.0, ExprRefVariants::Link(other.clone()));
+        RefCell::replace(
+            &self.0,
+            ExprRefVariants::Link {
+                target: other.clone(),
+            },
+        );
         *self = other.clone();
     }
 
     fn known<'a>(&'a self) -> Option<RefMut<'a, Expression<'src, Inference>>> {
         RefMut::filter_map(self.0.borrow_mut(), |x| {
-            if let ExprRefVariants::Known(known) = x {
-                Some(known)
+            if let ExprRefVariants::Known { expression } = x {
+                Some(expression)
             } else {
                 None
             }
@@ -225,9 +234,9 @@ impl<'src> ExpressionRef<'src> {
 
     fn typ(&self, ctx: &Context<'src>) -> Result<Self> {
         match &*self.0.borrow() {
-            ExprRefVariants::Known(owned) => owned.typ(ctx),
+            ExprRefVariants::Known { expression } => expression.typ(ctx),
             ExprRefVariants::Unknown => Ok(Self::type_of_type()),
-            ExprRefVariants::Link(target) => target.typ(ctx),
+            ExprRefVariants::Link { target } => target.typ(ctx),
         }
     }
 }

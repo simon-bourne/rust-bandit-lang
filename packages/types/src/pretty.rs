@@ -22,27 +22,27 @@ impl Pretty for Rc<Expression<'_, Inferred>> {
 impl Pretty for ExpressionRef<'_> {
     fn to_document(&self) -> Document {
         match &*self.0.borrow() {
-            ExprRefVariants::Known(owned) => owned.to_document(),
+            ExprRefVariants::Known { expression } => expression.to_document(),
             ExprRefVariants::Unknown => Document::text("_"),
-            ExprRefVariants::Link(linked) => linked.to_document(),
+            ExprRefVariants::Link { target } => target.to_document(),
         }
     }
 
     fn is_infix(&self) -> bool {
         match &*self.0.borrow() {
-            ExprRefVariants::Known(owned) => owned.is_infix(),
+            ExprRefVariants::Known { expression } => expression.is_infix(),
             ExprRefVariants::Unknown => false,
-            ExprRefVariants::Link(linked) => linked.is_infix(),
+            ExprRefVariants::Link { target } => target.is_infix(),
         }
     }
 
     fn type_annotatation(&self, term: Document, parenthesized: bool) -> Document {
         match &*self.0.borrow() {
-            ExprRefVariants::Known(expression) => expression.type_annotatation(term, parenthesized),
-            ExprRefVariants::Unknown => term,
-            ExprRefVariants::Link(expression_ref) => {
-                expression_ref.type_annotatation(term, parenthesized)
+            ExprRefVariants::Known { expression } => {
+                expression.type_annotatation(term, parenthesized)
             }
+            ExprRefVariants::Unknown => term,
+            ExprRefVariants::Link { target } => target.type_annotatation(term, parenthesized),
         }
     }
 }
