@@ -1,6 +1,6 @@
 use bandit_types::source::SourceExpression;
 use winnow::{
-    combinator::{alt, delimited, preceded, repeat, separated_foldr1, separated_pair},
+    combinator::{alt, delimited, opt, preceded, repeat, separated_foldr1, separated_pair},
     error::ContextError,
     token::{any, one_of},
     PResult, Parser as _,
@@ -52,10 +52,17 @@ fn typ<'src>() -> impl Parser<'src, Expr<'src>> {
 fn lambda<'src>() -> impl Parser<'src, Expr<'src>> {
     preceded(
         token(Token::Lambda),
-        separated_pair(identifier(), operator(NamedOperator::Assign), expr),
+        separated_pair(variable_binding(), operator(NamedOperator::Assign), expr),
     )
-    // TODO: Optionally parse binding type
-    .map(|(var, expr)| Expr::lambda(var, Expr::unknown_type(), expr))
+    .map(|((var, typ), expr)| Expr::lambda(var, typ, expr))
+}
+
+fn variable_binding<'src>() -> impl Parser<'src, (&'src str, Expr<'src>)> {
+    (
+        identifier(),
+        opt(preceded(operator(NamedOperator::HasType), expr))
+            .map(|typ| typ.unwrap_or_else(Expr::unknown_type)),
+    )
 }
 
 fn variable<'src>() -> impl Parser<'src, Expr<'src>> {
