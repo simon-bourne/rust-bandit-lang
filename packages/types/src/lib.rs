@@ -128,11 +128,14 @@ impl<'src> ExpressionRef<'src> {
         }
 
         let Some(mut x_ref) = x.known() else {
+            Self::unify(ctx, &mut x.typ(ctx)?, &mut y.typ(ctx)?)?;
             x.replace(y);
             return Ok(());
         };
 
         let Some(mut y_ref) = y.known() else {
+            drop(x_ref);
+            Self::unify(ctx, &mut x.typ(ctx)?, &mut y.typ(ctx)?)?;
             y.replace(x);
             return Ok(());
         };
