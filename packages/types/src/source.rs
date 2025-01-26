@@ -48,9 +48,9 @@ impl<'src> SourceExpression<'src> {
         Self::new(Expression::Type)
     }
 
-    pub fn apply(function: Self, argument: Self) -> Self {
+    pub fn apply(self, argument: Self) -> Self {
         Self::new(Expression::Apply {
-            function,
+            function: self,
             argument,
             typ: Self::unknown_type(),
         })
@@ -93,6 +93,10 @@ impl<'src> SourceExpression<'src> {
             index,
             typ: Self::unknown_type(),
         })
+    }
+
+    pub fn annotate(self, typ: Self) -> Self {
+        Self::variable(":").apply(self).apply(typ)
     }
 
     pub fn to_infer(&self) -> Result<ExpressionRef<'src>> {

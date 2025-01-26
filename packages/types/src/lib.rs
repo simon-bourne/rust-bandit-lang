@@ -114,6 +114,43 @@ impl<'src> ExpressionRef<'src> {
         }
     }
 
+    // TODO: Apply annotations before `infer_types`, and make this private.
+    pub fn apply_annotations(&mut self, ctx: &mut Context<'src>) -> Result<()> {
+        let annotated_term = match &mut *self.0.borrow_mut() {
+            ExprRefVariants::Known { expression } => expression.apply_annotations(ctx)?,
+            ExprRefVariants::Unknown { typ } => {
+                typ.apply_annotations(ctx)?;
+                None
+            }
+            ExprRefVariants::Link { target } => {
+                target.apply_annotations(ctx)?;
+                None
+            }
+        };
+
+        if let Some(annotated_term) = annotated_term {
+            self.replace(&annotated_term);
+        }
+
+        Ok(())
+    }
+
+    fn get_annotation(&self) -> Option<ExpressionRef<'src>> {
+        match &*self.0.borrow() {
+            ExprRefVariants::Known { expression } => expression.get_annotation(),
+            ExprRefVariants::Unknown { .. } => None,
+            ExprRefVariants::Link { target } => target.get_annotation(),
+        }
+    }
+
+    fn is_annotation_operator(&self) -> bool {
+        match &*self.0.borrow() {
+            ExprRefVariants::Known { expression } => expression.is_annotation_operator(),
+            ExprRefVariants::Unknown { .. } => false,
+            ExprRefVariants::Link { target } => target.is_annotation_operator(),
+        }
+    }
+
     fn follow_links(&mut self) {
         loop {
             let borrowed = self.0.borrow();
@@ -271,6 +308,11 @@ struct VariableBinding<'src, A: Annotation<'src>> {
 }
 
 impl<'src> VariableBinding<'src, Inference> {
+    fn apply_annotations(&mut self, ctx: &mut Context<'src>) -> Result<()> {
+        self.variable_type.apply_annotations(ctx)?;
+        self.in_expression.apply_annotations(ctx)
+    }
+
     fn infer_types(&mut self, ctx: &mut Context<'src>) -> Result<()> {
         ExpressionRef::unify(
             ctx,
@@ -305,6 +347,59 @@ impl<'src> VariableBinding<'src, Inference> {
 }
 
 impl<'src> Expression<'src, Inference> {
+    fn apply_annotations(
+        &mut self,
+        ctx: &mut Context<'src>,
+    ) -> Result<Option<ExpressionRef<'src>>> {
+        match self {
+            Self::Type => (),
+            Self::Apply {
+                function,
+                argument,
+                typ,
+            } => {
+                typ.apply_annotations(ctx)?;
+
+                if let Some(annotated_term) = function.get_annotation() {
+                    ExpressionRef::unify(ctx, &mut annotated_term.typ(ctx)?, argument)?;
+                    return Ok(Some(annotated_term));
+                }
+            }
+            Self::Let {
+                variable_value,
+                binding,
+            } => {
+                variable_value.apply_annotations(ctx)?;
+                binding.apply_annotations(ctx)?
+            }
+            Self::FunctionType(variable_binding) => variable_binding.apply_annotations(ctx)?,
+            Self::Lambda(variable_binding) => variable_binding.apply_annotations(ctx)?,
+            Self::Variable { typ, .. } => typ.apply_annotations(ctx)?,
+        }
+
+        Ok(None)
+    }
+
+    /// If this is `apply (:) term`, return `Some(term)` else `None`
+    fn get_annotation(&self) -> Option<ExpressionRef<'src>> {
+        match self {
+            Self::Apply {
+                function, argument, ..
+            } => function.is_annotation_operator().then(|| argument.clone()),
+            _ => None,
+        }
+    }
+
+    fn is_annotation_operator(&self) -> bool {
+        matches!(
+            self,
+            Self::Variable {
+                index: VariableReference::Global(":"),
+                ..
+            }
+        )
+    }
+
     fn infer_types(&mut self, ctx: &mut Context<'src>) -> Result<()> {
         match self {
             Self::Type => (),
@@ -385,24 +480,28 @@ mod tests {
         );
     }
 
-    // TODO: Use type annotations here
-    // #[test]
-    // fn let_error() {
-    //     // let x : Int = x : Float
-    //     let int_type = Expr::variable("Int");
-    //     let float_type = Expr::variable("Float");
-    //     let one = Expr::variable("one", int_type.clone());
-    //     let let_binding =
-    //         Expr::let_binding("x", int_type.clone(), one, Expr::variable("x",
-    // float_type));
+    #[test]
+    fn let_error() {
+        // let x : Int = 1 in x : Float
+        let int_type = Expr::variable("Int");
+        let float_type = Expr::variable("Float");
+        let one = Expr::variable("one").annotate(int_type.clone());
+        let let_binding = Expr::let_binding(
+            "x",
+            int_type.clone(),
+            one,
+            Expr::variable("x").annotate(float_type),
+        );
 
-    //     let mut global_types = HashMap::new();
-    //     global_types.insert("one", int_type.to_infer().unwrap());
-    //     global_types.insert("Int", Expr::type_of_type().to_infer().unwrap());
-    //     global_types.insert("Float",
-    // Expr::type_of_type().to_infer().unwrap());     let ctx = &mut
-    // Context::new(global_types);
+        let mut global_types = HashMap::new();
+        global_types.insert("one", int_type.to_infer().unwrap());
+        global_types.insert("Int", Expr::type_of_type().to_infer().unwrap());
+        global_types.insert("Float", Expr::type_of_type().to_infer().unwrap());
+        let ctx = &mut Context::new(global_types);
 
-    //     assert!(let_binding.to_infer().unwrap().infer_types(ctx).is_err());
-    // }
+        let mut let_binding = let_binding.to_infer().unwrap();
+        let_binding.apply_annotations(ctx).unwrap();
+
+        assert!(let_binding.infer_types(ctx).is_err());
+    }
 }
