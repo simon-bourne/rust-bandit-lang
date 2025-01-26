@@ -135,19 +135,14 @@ impl<'src> ExpressionRef<'src> {
         Ok(())
     }
 
-    fn get_annotation(&self) -> Option<ExpressionRef<'src>> {
+    fn map_known<Output>(
+        &self,
+        f: impl FnOnce(&Expression<'src, Inference>) -> Output,
+    ) -> Option<Output> {
         match &*self.0.borrow() {
-            ExprRefVariants::Known { expression } => expression.get_annotation(),
+            ExprRefVariants::Known { expression } => Some(f(expression)),
             ExprRefVariants::Unknown { .. } => None,
-            ExprRefVariants::Link { target } => target.get_annotation(),
-        }
-    }
-
-    fn is_annotation_operator(&self) -> bool {
-        match &*self.0.borrow() {
-            ExprRefVariants::Known { expression } => expression.is_annotation_operator(),
-            ExprRefVariants::Unknown { .. } => false,
-            ExprRefVariants::Link { target } => target.is_annotation_operator(),
+            ExprRefVariants::Link { target } => target.map_known(f),
         }
     }
 
@@ -360,7 +355,10 @@ impl<'src> Expression<'src, Inference> {
             } => {
                 typ.apply_annotations(ctx)?;
 
-                if let Some(annotated_term) = function.get_annotation() {
+                if let Some(annotated_term) = function
+                    .map_known(Expression::get_annotation_term)
+                    .flatten()
+                {
                     ExpressionRef::unify(ctx, &mut annotated_term.typ(ctx)?, argument)?;
                     return Ok(Some(annotated_term));
                 }
@@ -381,11 +379,13 @@ impl<'src> Expression<'src, Inference> {
     }
 
     /// If this is `apply (:) term`, return `Some(term)` else `None`
-    fn get_annotation(&self) -> Option<ExpressionRef<'src>> {
+    fn get_annotation_term(&self) -> Option<ExpressionRef<'src>> {
         match self {
             Self::Apply {
                 function, argument, ..
-            } => function.is_annotation_operator().then(|| argument.clone()),
+            } => function
+                .map_known(|e| e.is_annotation_operator().then(|| argument.clone()))
+                .flatten(),
             _ => None,
         }
     }
