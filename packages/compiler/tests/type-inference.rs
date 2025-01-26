@@ -4,26 +4,43 @@ use bandit_parser::{
     lex::{SrcToken, Token},
     parser::{expr, Expr},
 };
-use bandit_types::{context::Context, Pretty};
+use bandit_types::{context::Context, ExpressionRef, Pretty};
 use winnow::Parser;
 
-fn test_with_ctx(input: &str, expected: &str) {
-    let type_of_type = Expr::type_of_type().to_infer().unwrap();
-    let int_type = Expr::variable("Int").to_infer().unwrap();
-    let bool_type = Expr::variable("Bool").to_infer().unwrap();
-    let mut global_items = HashMap::new();
-    global_items.insert("Int", type_of_type.clone());
-    global_items.insert("one", int_type);
-    global_items.insert("Bool", type_of_type.clone());
-    global_items.insert("true", bool_type);
-
-    let add_tokens: Vec<_> = Token::layout("Int -> Int -> Int").collect();
-    global_items.insert("add", expr.parse(&add_tokens).unwrap().to_infer().unwrap());
-
-    let ctx = &mut Context::new(global_items);
-
+fn parse(input: &str) -> ExpressionRef<'_> {
     let tokens: Vec<SrcToken> = Token::layout(input).collect();
-    let mut expr = expr.parse(&tokens).unwrap().to_infer().unwrap();
+    expr.parse(&tokens).unwrap().to_infer().unwrap()
+}
+
+fn context<'src>(
+    types: impl IntoIterator<Item = &'src str>,
+    items: impl IntoIterator<Item = (&'src str, &'src str)>,
+) -> Context<'src> {
+    let mut global_items = HashMap::new();
+    let type_of_type = Expr::type_of_type().to_infer().unwrap();
+
+    for typ in types {
+        global_items.insert(typ, type_of_type.clone());
+    }
+
+    for (name, typ) in items {
+        global_items.insert(name, parse(typ));
+    }
+
+    Context::new(global_items)
+}
+
+fn test_with_ctx(input: &str, expected: &str) {
+    let ctx = &mut context(
+        ["Int", "Bool"],
+        [
+            ("one", "Int"),
+            ("true", "Bool"),
+            ("add", "Int -> Int -> Int"),
+        ],
+    );
+
+    let mut expr = parse(input);
     expr.normalize(ctx).unwrap();
     assert_eq!(expr.to_pretty_string(80), expected);
 }
