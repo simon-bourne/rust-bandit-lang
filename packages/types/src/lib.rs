@@ -106,7 +106,13 @@ impl<'src> ExpressionRef<'src> {
         Self(Rc::new(RefCell::new(ExprRefVariants::Known { expression })))
     }
 
-    pub fn infer_types(&mut self, ctx: &mut Context<'src>) -> Result<()> {
+    /// Apply type annotations and infer types.
+    pub fn normalize(&mut self, ctx: &mut Context<'src>) -> Result<()> {
+        self.apply_annotations(ctx)?;
+        self.infer_types(ctx)
+    }
+
+    fn infer_types(&mut self, ctx: &mut Context<'src>) -> Result<()> {
         match &mut *self.0.borrow_mut() {
             ExprRefVariants::Known { expression } => expression.infer_types(ctx),
             ExprRefVariants::Unknown { typ } => typ.infer_types(ctx),
@@ -114,8 +120,7 @@ impl<'src> ExpressionRef<'src> {
         }
     }
 
-    // TODO: Apply annotations before `infer_types`, and make this private.
-    pub fn apply_annotations(&mut self, ctx: &mut Context<'src>) -> Result<()> {
+    fn apply_annotations(&mut self, ctx: &mut Context<'src>) -> Result<()> {
         let annotated_term = match &mut *self.0.borrow_mut() {
             ExprRefVariants::Known { expression } => expression.apply_annotations(ctx)?,
             ExprRefVariants::Unknown { typ } => {
@@ -473,7 +478,7 @@ mod tests {
         .unwrap();
 
         let ctx = &mut Context::new(HashMap::new());
-        constructor_type.infer_types(ctx).unwrap();
+        constructor_type.normalize(ctx).unwrap();
         assert_eq!(
             constructor_type.to_pretty_string(80),
             "(\\_:(_ -> _) = (\\_ = ((2:(_ -> _)) 1)))"
@@ -499,9 +504,6 @@ mod tests {
         global_types.insert("Float", Expr::type_of_type().to_infer().unwrap());
         let ctx = &mut Context::new(global_types);
 
-        let mut let_binding = let_binding.to_infer().unwrap();
-        let_binding.apply_annotations(ctx).unwrap();
-
-        assert!(let_binding.infer_types(ctx).is_err());
+        assert!(let_binding.to_infer().unwrap().normalize(ctx).is_err());
     }
 }
