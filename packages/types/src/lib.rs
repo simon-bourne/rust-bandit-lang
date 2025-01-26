@@ -463,9 +463,7 @@ mod tests {
 
     #[test]
     fn infer_kinds() {
-        // data X m a = C : (m a) -> X
-
-        // TODO: `C : (m a) -> X`, not `C : (m a)`
+        // C : (m a)
         let m = Expr::variable("m");
         let a = Expr::variable("a");
         let mut constructor_type = Expr::lambda(
