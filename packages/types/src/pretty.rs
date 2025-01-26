@@ -1,30 +1,38 @@
 use std::rc::Rc;
 
 use crate::{
-    Annotation, Document, ExprRefVariants, Expression, ExpressionRef, Inferred, Pretty,
-    VariableIndex,
+    Annotation, Document, ExprRefVariants, Expression, ExpressionRef, Inferred, Parentheses,
+    Pretty, TypeAnnotations, VariableIndex,
 };
 
 impl Pretty for Rc<Expression<'_, Inferred>> {
-    fn to_document(&self) -> Document {
-        self.as_ref().to_document()
+    fn to_document(&self, type_annotations: TypeAnnotations) -> Document {
+        self.as_ref().to_document(type_annotations)
     }
 
     fn is_infix(&self) -> bool {
         self.as_ref().is_infix()
     }
 
-    fn type_annotatation(&self, term: Document, parenthesized: bool) -> Document {
-        self.as_ref().type_annotatation(term, parenthesized)
+    fn type_annotatation(
+        &self,
+        term: Document,
+        parentheses: Parentheses,
+        type_annotations: TypeAnnotations,
+    ) -> Document {
+        self.as_ref()
+            .type_annotatation(term, parentheses, type_annotations)
     }
 }
 
 impl Pretty for ExpressionRef<'_> {
-    fn to_document(&self) -> Document {
+    fn to_document(&self, type_annotations: TypeAnnotations) -> Document {
         match &*self.0.borrow() {
-            ExprRefVariants::Known { expression } => expression.to_document(),
-            ExprRefVariants::Unknown { typ } => typ.type_annotatation(Document::text("_"), true),
-            ExprRefVariants::Link { target } => target.to_document(),
+            ExprRefVariants::Known { expression } => expression.to_document(type_annotations),
+            ExprRefVariants::Unknown { typ } => {
+                typ.type_annotatation(Document::text("_"), Parentheses::On, type_annotations)
+            }
+            ExprRefVariants::Link { target } => target.to_document(type_annotations),
         }
     }
 
@@ -36,19 +44,26 @@ impl Pretty for ExpressionRef<'_> {
         }
     }
 
-    fn type_annotatation(&self, term: Document, parenthesized: bool) -> Document {
+    fn type_annotatation(
+        &self,
+        term: Document,
+        parentheses: Parentheses,
+        type_annotations: TypeAnnotations,
+    ) -> Document {
         match &*self.0.borrow() {
             ExprRefVariants::Known { expression } => {
-                expression.type_annotatation(term, parenthesized)
+                expression.type_annotatation(term, parentheses, type_annotations)
             }
             ExprRefVariants::Unknown { .. } => term,
-            ExprRefVariants::Link { target } => target.type_annotatation(term, parenthesized),
+            ExprRefVariants::Link { target } => {
+                target.type_annotatation(term, parentheses, type_annotations)
+            }
         }
     }
 }
 
 impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
-    fn to_document(&self) -> Document {
+    fn to_document(&self, type_annotations: TypeAnnotations) -> Document {
         match self {
             Self::Type => Document::text("Type"),
             Self::Apply {
@@ -63,8 +78,13 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
                 };
 
                 typ.type_annotatation(
-                    parenthesize([left.to_document(), Document::space(), right.to_document()]),
-                    true,
+                    parenthesize([
+                        left.to_document(type_annotations),
+                        Document::space(),
+                        right.to_document(type_annotations),
+                    ]),
+                    Parentheses::On,
+                    type_annotations,
                 )
             }
             Self::Let {
@@ -72,30 +92,36 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
                 binding,
             } => parenthesize([
                 Document::text("let"),
-                binding
-                    .variable_type
-                    .type_annotatation(Document::as_string(&binding.name), false),
+                binding.variable_type.type_annotatation(
+                    Document::as_string(&binding.name),
+                    Parentheses::Off,
+                    type_annotations,
+                ),
                 Document::text(" = "),
-                variable_value.to_document(),
+                variable_value.to_document(type_annotations),
                 Document::text(" in "),
-                binding.in_expression.to_document(),
+                binding.in_expression.to_document(type_annotations),
             ]),
             Self::FunctionType(binding) => parenthesize([
-                binding.variable_type.to_document(),
+                binding.variable_type.to_document(type_annotations),
                 Document::text(" -> "),
-                binding.in_expression.to_document(),
+                binding.in_expression.to_document(type_annotations),
             ]),
             Self::Lambda(binding) => parenthesize([
                 Document::text("\\"),
-                binding
-                    .variable_type
-                    .type_annotatation(Document::as_string(&binding.name), false),
+                binding.variable_type.type_annotatation(
+                    Document::as_string(&binding.name),
+                    Parentheses::Off,
+                    type_annotations,
+                ),
                 Document::text(" = "),
-                binding.in_expression.to_document(),
+                binding.in_expression.to_document(type_annotations),
             ]),
-            Self::Variable { index, typ } => {
-                typ.type_annotatation(Document::as_string(index), true)
-            }
+            Self::Variable { index, typ } => typ.type_annotatation(
+                Document::as_string(index),
+                Parentheses::On,
+                type_annotations,
+            ),
         }
     }
 
@@ -106,13 +132,25 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
         }
     }
 
-    fn type_annotatation(&self, term: Document, parenthesized: bool) -> Document {
-        let annotated = [term, Document::text(":"), self.to_document()];
+    fn type_annotatation(
+        &self,
+        term: Document,
+        parentheses: Parentheses,
+        type_annotations: TypeAnnotations,
+    ) -> Document {
+        if matches!(type_annotations, TypeAnnotations::Off) {
+            return term;
+        }
 
-        if parenthesized {
-            parenthesize(annotated)
-        } else {
-            Document::concat(annotated)
+        let annotated = [
+            term,
+            Document::text(":"),
+            self.to_document(TypeAnnotations::Off),
+        ];
+
+        match parentheses {
+            Parentheses::On => parenthesize(annotated),
+            Parentheses::Off => Document::concat(annotated),
         }
     }
 }

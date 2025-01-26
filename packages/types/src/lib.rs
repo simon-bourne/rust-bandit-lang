@@ -56,15 +56,34 @@ impl Display for EmptyName {
 
 type Document = RcDoc<'static>;
 
-pub trait Pretty {
-    fn to_document(&self) -> Document;
+#[derive(Copy, Clone)]
+pub enum TypeAnnotations {
+    On,
+    Off,
+}
 
-    fn type_annotatation(&self, term: Document, parenthesized: bool) -> Document;
+#[derive(Copy, Clone)]
+pub enum Parentheses {
+    On,
+    Off,
+}
+
+pub trait Pretty {
+    fn to_document(&self, type_annotations: TypeAnnotations) -> Document;
+
+    fn type_annotatation(
+        &self,
+        term: Document,
+        parentheses: Parentheses,
+        type_annotations: TypeAnnotations,
+    ) -> Document;
 
     fn is_infix(&self) -> bool;
 
     fn to_pretty_string(&self, width: usize) -> String {
-        self.to_document().pretty(width).to_string()
+        self.to_document(TypeAnnotations::On)
+            .pretty(width)
+            .to_string()
     }
 }
 

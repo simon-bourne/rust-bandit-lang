@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::{
     context::VariableLookup, Annotation, Document, EmptyName, Expression, ExpressionRef, Inference,
-    Pretty, Result, VariableBinding, VariableIndex,
+    Parentheses, Pretty, Result, TypeAnnotations, VariableBinding, VariableIndex,
 };
 
 pub struct Source;
@@ -19,6 +19,7 @@ impl VariableIndex for &'_ str {
     }
 }
 
+// TODO: Use our own enum to have unknown(typ)
 #[derive(Clone)]
 pub struct SourceExpression<'src>(Option<Rc<Expression<'src, Source>>>);
 
@@ -103,9 +104,9 @@ impl<'src> SourceExpression<'src> {
 }
 
 impl Pretty for SourceExpression<'_> {
-    fn to_document(&self) -> Document {
+    fn to_document(&self, type_annotations: TypeAnnotations) -> Document {
         match self.0.as_ref() {
-            Some(expr) => expr.to_document(),
+            Some(expr) => expr.to_document(type_annotations),
             None => Document::text("_"),
         }
     }
@@ -114,9 +115,14 @@ impl Pretty for SourceExpression<'_> {
         self.0.as_ref().is_some_and(|expr| expr.is_infix())
     }
 
-    fn type_annotatation(&self, term: Document, parenthesized: bool) -> Document {
+    fn type_annotatation(
+        &self,
+        term: Document,
+        parentheses: Parentheses,
+        type_annotations: TypeAnnotations,
+    ) -> Document {
         match self.0.as_ref() {
-            Some(expr) => expr.type_annotatation(term, parenthesized),
+            Some(expr) => expr.type_annotatation(term, parentheses, type_annotations),
             None => term,
         }
     }
