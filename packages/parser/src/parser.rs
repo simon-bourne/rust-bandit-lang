@@ -6,7 +6,7 @@ use winnow::{
     PResult, Parser as _,
 };
 
-use crate::lex::{Grouping, NamedOperator, SrcToken, Token};
+use crate::lex::{Grouping, Keyword, NamedOperator, SrcToken, Token};
 
 pub type Expr<'a> = SourceExpression<'a>;
 pub type TokenList<'src> = &'src [SrcToken<'src>];
@@ -40,14 +40,36 @@ fn function_applications<'src>() -> impl Parser<'src, Expr<'src>> {
 }
 
 fn primary<'src>() -> impl Parser<'src, Expr<'src>> {
-    alt((typ(), variable(), lambda(), parenthesized(expr)))
+    alt((
+        typ(),
+        variable(),
+        lambda(),
+        let_binding(),
+        parenthesized(expr),
+    ))
 }
 
 fn typ<'src>() -> impl Parser<'src, Expr<'src>> {
     identifier().verify_map(|name| (name == "Type").then(Expr::type_of_type))
 }
 
-// TODO: Parse let bindings
+fn let_binding<'src>() -> impl Parser<'src, Expr<'src>> {
+    preceded(
+        token(Token::Keyword(Keyword::Let)),
+        (
+            variable_binding(),
+            operator(NamedOperator::Assign),
+            expr,
+            token(Token::LineEnd),
+            expr,
+        ),
+    )
+    .map(
+        |((var, typ), _assign, variable_value, _line, in_expression)| {
+            Expr::let_binding(var, typ, variable_value, in_expression)
+        },
+    )
+}
 
 fn lambda<'src>() -> impl Parser<'src, Expr<'src>> {
     preceded(
