@@ -14,7 +14,6 @@ pub mod source;
 
 pub use pretty::Pretty;
 
-// TODO: Use actual refs, not `Rc`
 type SharedMut<T> = Rc<RefCell<T>>;
 
 pub type Result<T> = result::Result<T, InferenceError>;

@@ -30,7 +30,11 @@ fn function_types<'src>() -> impl Parser<'src, Expr<'src>> {
     separated_foldr1(
         function_applications(),
         operator(NamedOperator::Implies),
-        // TODO: Optionally parse binding name
+        // TODO: Optionally parse binding name. Use:
+        // - `∀name . `
+        // - `∀name : Type . `
+        // - `∀x y z . `
+        // - `∀x (y : Type) (z : Type) . `
         |input_type, _, output_type| Expr::function_type("_", input_type, output_type),
     )
 }
