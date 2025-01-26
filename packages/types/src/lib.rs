@@ -278,6 +278,11 @@ struct VariableBinding<'src, A: Annotation<'src>> {
 
 impl<'src> VariableBinding<'src, Inference> {
     fn infer_types(&mut self, ctx: &mut Context<'src>) -> Result<()> {
+        ExpressionRef::unify(
+            ctx,
+            &mut self.variable_type.typ(ctx)?,
+            &mut ExpressionRef::type_of_type(),
+        )?;
         self.variable_type.infer_types(ctx)?;
         ctx.with_variable(self.variable_type.clone(), |ctx| {
             self.in_expression.infer_types(ctx)
@@ -310,6 +315,7 @@ impl<'src> Expression<'src, Inference> {
         match self {
             Self::Type => (),
             Self::Variable { index, typ } => {
+                ExpressionRef::unify(ctx, &mut typ.typ(ctx)?, &mut ExpressionRef::type_of_type())?;
                 ExpressionRef::unify(ctx, typ, &mut ctx.lookup_type(*index)?)?;
                 typ.infer_types(ctx)?
             }
@@ -318,6 +324,7 @@ impl<'src> Expression<'src, Inference> {
                 argument,
                 typ,
             } => {
+                ExpressionRef::unify(ctx, &mut typ.typ(ctx)?, &mut ExpressionRef::type_of_type())?;
                 let function_type =
                     &mut ExpressionRef::function_type(argument.typ(ctx)?, typ.clone());
                 ExpressionRef::unify(ctx, function_type, &mut function.typ(ctx)?)?;
