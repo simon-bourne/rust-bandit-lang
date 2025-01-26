@@ -35,5 +35,8 @@ fn one() {
 
 #[test]
 fn partial_add() {
-    test_with_ctx("add one", "(((add : (Int -> (Int -> Int))) (one : Int)) : (Int -> Int))");
+    test_with_ctx(
+        "add one",
+        "(((add : (Int -> (Int -> Int))) (one : Int)) : (Int -> Int))",
+    );
 }
