@@ -29,7 +29,7 @@ fn type_annotations<'src>() -> impl Parser<'src, Expr<'src>> {
 fn function_types<'src>() -> impl Parser<'src, Expr<'src>> {
     separated_foldr1(
         function_applications(),
-        operator(NamedOperator::Implies),
+        operator(NamedOperator::To),
         // TODO: Optionally parse binding name. Use:
         // - `∀name . `
         // - `∀name : Type . `
