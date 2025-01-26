@@ -163,7 +163,7 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
 
         let annotated = [
             term,
-            Document::text(":"),
+            Document::text(" : "),
             self.to_document(TypeAnnotations::Off),
         ];
 
