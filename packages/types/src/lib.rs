@@ -103,16 +103,8 @@ enum ExprRefVariants<'src> {
 }
 
 impl<'src> ExpressionRef<'src> {
-    fn unknown_term() -> Self {
-        Self(Rc::new(RefCell::new(ExprRefVariants::Unknown {
-            typ: Self::unknown_type(),
-        })))
-    }
-
-    fn unknown_type() -> Self {
-        Self(Rc::new(RefCell::new(ExprRefVariants::Unknown {
-            typ: Self::type_of_type(),
-        })))
+    fn unknown(typ: Self) -> Self {
+        Self(Rc::new(RefCell::new(ExprRefVariants::Unknown { typ })))
     }
 
     fn type_of_type() -> Self {

@@ -19,17 +19,29 @@ impl VariableIndex for &'_ str {
     }
 }
 
-// TODO: Use our own enum to have unknown(typ)
 #[derive(Clone)]
-pub struct SourceExpression<'src>(Option<Rc<Expression<'src, Source>>>);
+pub struct SourceExpression<'src>(Rc<SrcExprVariants<'src>>);
+
+enum SrcExprVariants<'src> {
+    Known {
+        expression: Expression<'src, Source>,
+    },
+    Unknown {
+        typ: SourceExpression<'src>,
+    },
+}
 
 impl<'src> SourceExpression<'src> {
     pub fn unknown_term() -> Self {
-        Self(None)
+        Self(Rc::new(SrcExprVariants::Unknown {
+            typ: Self::unknown_type(),
+        }))
     }
 
     pub fn unknown_type() -> Self {
-        Self(None)
+        Self(Rc::new(SrcExprVariants::Unknown {
+            typ: Self::type_of_type(),
+        }))
     }
 
     pub fn type_of_type() -> Self {
@@ -91,28 +103,34 @@ impl<'src> SourceExpression<'src> {
         &self,
         lookup: &mut VariableLookup<'src>,
     ) -> Result<ExpressionRef<'src>> {
-        match self.0.as_ref() {
-            Some(expr) => expr.to_infer(lookup),
-            // TODO: Unknown term or type
-            None => Ok(ExpressionRef::unknown_term()),
-        }
+        Ok(match self.0.as_ref() {
+            SrcExprVariants::Known { expression } => expression.to_infer(lookup)?,
+            SrcExprVariants::Unknown { typ } => {
+                ExpressionRef::unknown(typ.to_infer_with_lookup(lookup)?)
+            }
+        })
     }
 
-    fn new(expr: Expression<'src, Source>) -> Self {
-        Self(Some(Rc::new(expr)))
+    fn new(expression: Expression<'src, Source>) -> Self {
+        Self(Rc::new(SrcExprVariants::Known { expression }))
     }
 }
 
 impl Pretty for SourceExpression<'_> {
     fn to_document(&self, type_annotations: TypeAnnotations) -> Document {
         match self.0.as_ref() {
-            Some(expr) => expr.to_document(type_annotations),
-            None => Document::text("_"),
+            SrcExprVariants::Known { expression } => expression.to_document(type_annotations),
+            SrcExprVariants::Unknown { typ } => {
+                typ.type_annotatation(Document::text("_"), Parentheses::On, type_annotations)
+            }
         }
     }
 
     fn is_infix(&self) -> bool {
-        self.0.as_ref().is_some_and(|expr| expr.is_infix())
+        match self.0.as_ref() {
+            SrcExprVariants::Known { expression } => expression.is_infix(),
+            SrcExprVariants::Unknown { .. } => false,
+        }
     }
 
     fn type_annotatation(
@@ -122,8 +140,10 @@ impl Pretty for SourceExpression<'_> {
         type_annotations: TypeAnnotations,
     ) -> Document {
         match self.0.as_ref() {
-            Some(expr) => expr.type_annotatation(term, parentheses, type_annotations),
-            None => term,
+            SrcExprVariants::Known { expression } => {
+                expression.type_annotatation(term, parentheses, type_annotations)
+            }
+            SrcExprVariants::Unknown { .. } => term,
         }
     }
 }
