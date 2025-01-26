@@ -35,6 +35,8 @@ fn function_types<'src>() -> impl Parser<'src, Expr<'src>> {
         // - `∀name : Type . `
         // - `∀x y z . `
         // - `∀x (y : Type) (z : Type) . `
+        //
+        // This can be used for multi argument lambdas as well.
         |input_type, _, output_type| Expr::function_type("_", input_type, output_type),
     )
 }
