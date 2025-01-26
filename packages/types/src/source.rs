@@ -23,7 +23,11 @@ impl VariableIndex for &'_ str {
 pub struct SourceExpression<'src>(Option<Rc<Expression<'src, Source>>>);
 
 impl<'src> SourceExpression<'src> {
-    pub fn unknown() -> Self {
+    pub fn unknown_term() -> Self {
+        Self(None)
+    }
+
+    pub fn unknown_type() -> Self {
         Self(None)
     }
 
@@ -35,7 +39,7 @@ impl<'src> SourceExpression<'src> {
         Self::new(Expression::Apply {
             function,
             argument,
-            typ: Self::unknown(),
+            typ: Self::unknown_type(),
         })
     }
 
@@ -74,7 +78,7 @@ impl<'src> SourceExpression<'src> {
     pub fn variable(index: &'src str) -> Self {
         Self::new(Expression::Variable {
             index,
-            typ: Self::unknown(),
+            typ: Self::unknown_type(),
         })
     }
 
@@ -88,7 +92,8 @@ impl<'src> SourceExpression<'src> {
     ) -> Result<ExpressionRef<'src>> {
         match self.0.as_ref() {
             Some(expr) => expr.to_infer(lookup),
-            None => Ok(ExpressionRef::unknown()),
+            // TODO: Unknown term or type
+            None => Ok(ExpressionRef::unknown_term()),
         }
     }
 

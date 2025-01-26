@@ -55,7 +55,7 @@ fn lambda<'src>() -> impl Parser<'src, Expr<'src>> {
         separated_pair(identifier(), operator(NamedOperator::Assign), expr),
     )
     // TODO: Optionally parse binding type
-    .map(|(var, expr)| Expr::lambda(var, Expr::unknown(), expr))
+    .map(|(var, expr)| Expr::lambda(var, Expr::unknown_type(), expr))
 }
 
 fn variable<'src>() -> impl Parser<'src, Expr<'src>> {

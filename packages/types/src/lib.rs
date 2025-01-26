@@ -75,15 +75,25 @@ enum ExprRefVariants<'src> {
     Known {
         expression: Expression<'src, Inference>,
     },
-    Unknown,
+    Unknown {
+        typ: ExpressionRef<'src>,
+    },
     Link {
         target: ExpressionRef<'src>,
     },
 }
 
 impl<'src> ExpressionRef<'src> {
-    fn unknown() -> Self {
-        Self(Rc::new(RefCell::new(ExprRefVariants::Unknown)))
+    fn unknown_term() -> Self {
+        Self(Rc::new(RefCell::new(ExprRefVariants::Unknown {
+            typ: Self::unknown_type(),
+        })))
+    }
+
+    fn unknown_type() -> Self {
+        Self(Rc::new(RefCell::new(ExprRefVariants::Unknown {
+            typ: Self::type_of_type(),
+        })))
     }
 
     fn type_of_type() -> Self {
@@ -105,7 +115,7 @@ impl<'src> ExpressionRef<'src> {
     pub fn infer_types(&mut self, ctx: &mut Context<'src>) -> Result<()> {
         match &mut *self.0.borrow_mut() {
             ExprRefVariants::Known { expression } => expression.infer_types(ctx),
-            ExprRefVariants::Unknown => Ok(()),
+            ExprRefVariants::Unknown { typ } => typ.infer_types(ctx),
             ExprRefVariants::Link { target } => target.infer_types(ctx),
         }
     }
@@ -235,7 +245,7 @@ impl<'src> ExpressionRef<'src> {
     fn typ(&self, ctx: &Context<'src>) -> Result<Self> {
         match &*self.0.borrow() {
             ExprRefVariants::Known { expression } => expression.typ(ctx),
-            ExprRefVariants::Unknown => Ok(Self::type_of_type()),
+            ExprRefVariants::Unknown { typ } => Ok(typ.clone()),
             ExprRefVariants::Link { target } => target.typ(ctx),
         }
     }
@@ -360,8 +370,8 @@ mod tests {
         let a = Expr::variable("a");
         let mut constructor_type = Expr::lambda(
             "m",
-            Expr::unknown(),
-            Expr::lambda("a", Expr::unknown(), Expr::apply(m, a)),
+            Expr::unknown_type(),
+            Expr::lambda("a", Expr::unknown_type(), Expr::apply(m, a)),
         )
         .to_infer()
         .unwrap();

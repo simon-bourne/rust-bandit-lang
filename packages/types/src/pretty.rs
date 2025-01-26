@@ -23,7 +23,7 @@ impl Pretty for ExpressionRef<'_> {
     fn to_document(&self) -> Document {
         match &*self.0.borrow() {
             ExprRefVariants::Known { expression } => expression.to_document(),
-            ExprRefVariants::Unknown => Document::text("_"),
+            ExprRefVariants::Unknown { typ } => typ.type_annotatation(Document::text("_"), true),
             ExprRefVariants::Link { target } => target.to_document(),
         }
     }
@@ -31,7 +31,7 @@ impl Pretty for ExpressionRef<'_> {
     fn is_infix(&self) -> bool {
         match &*self.0.borrow() {
             ExprRefVariants::Known { expression } => expression.is_infix(),
-            ExprRefVariants::Unknown => false,
+            ExprRefVariants::Unknown { .. } => false,
             ExprRefVariants::Link { target } => target.is_infix(),
         }
     }
@@ -41,7 +41,7 @@ impl Pretty for ExpressionRef<'_> {
             ExprRefVariants::Known { expression } => {
                 expression.type_annotatation(term, parenthesized)
             }
-            ExprRefVariants::Unknown => term,
+            ExprRefVariants::Unknown { .. } => term,
             ExprRefVariants::Link { target } => target.type_annotatation(term, parenthesized),
         }
     }
