@@ -50,8 +50,9 @@ pub enum Token<'src> {
     #[token("\\")]
     Lambda,
 
-    #[token("\\Pi")]
-    Pi,
+    #[token("=>")]
+    #[token("⇒")]
+    SuchThat,
 
     #[regex(r"(?&ident)")]
     Identifier(&'src str),
@@ -74,7 +75,6 @@ pub enum Token<'src> {
     #[token("<=", |_| NamedOperator::LessOrEqual)]
     #[token(">=", |_| NamedOperator::GreaterOrEqual)]
     #[token("=", |_| NamedOperator::Assign)]
-    #[token("=>", |_| NamedOperator::Implies)]
     #[token(":", |_| NamedOperator::HasType)]
     #[token("->", |_| NamedOperator::To)]
     // Unicode operators
@@ -82,7 +82,6 @@ pub enum Token<'src> {
     #[token("≤", |_| NamedOperator::LessOrEqual)]
     #[token("≥", |_| NamedOperator::GreaterOrEqual)]
     #[token("→", |_| NamedOperator::To)]
-    #[token("⇒", |_| NamedOperator::Implies)]
     Operator(NamedOperator),
 
     #[regex(r"\.(?&ident)")]
@@ -215,7 +214,6 @@ pub enum NamedOperator {
     Apply,
     Assign,
     HasType,
-    Implies,
     To,
 }
 
@@ -238,7 +236,6 @@ impl NamedOperator {
             NamedOperator::LessOrEqual => "<=",
             NamedOperator::GreaterOrEqual => ">=",
 
-            NamedOperator::Implies => "=>",
             NamedOperator::HasType => ":",
             NamedOperator::Assign => "=",
             NamedOperator::Apply => "<-",

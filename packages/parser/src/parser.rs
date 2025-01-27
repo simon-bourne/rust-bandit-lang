@@ -45,7 +45,7 @@ fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     alt((
         typ(),
         variable(),
-        pi(),
+        forall(),
         lambda(),
         let_binding(),
         parenthesized(expr),
@@ -56,17 +56,17 @@ fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     identifier().verify_map(|name| (name == "Type").then(Expr::type_of_type))
 }
 
-fn pi<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
+fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     preceded(
-        token(Token::Pi),
-        separated_pair(variable_binding(), operator(NamedOperator::To), expr),
+        keyword(Keyword::Forall),
+        separated_pair(variable_binding(), token(Token::SuchThat), expr),
     )
     .map(|((var, typ), expr)| Expr::function_type(var, typ, expr))
 }
 
 fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     preceded(
-        token(Token::Keyword(Keyword::Let)),
+        keyword(Keyword::Let),
         (
             variable_binding(),
             operator(NamedOperator::Assign),
@@ -85,7 +85,7 @@ fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
 fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     preceded(
         token(Token::Lambda),
-        separated_pair(variable_binding(), operator(NamedOperator::Assign), expr),
+        separated_pair(variable_binding(), token(Token::SuchThat), expr),
     )
     .map(|((var, typ), expr)| Expr::lambda(var, typ, expr))
 }
@@ -151,6 +151,10 @@ fn operator<'tok, 'src: 'tok>(name: NamedOperator) -> impl Parser<'tok, 'src, ()
     token(Token::Operator(name))
 }
 
+fn keyword<'tok, 'src: 'tok>(keyword: Keyword) -> impl Parser<'tok, 'src, ()> {
+    token(Token::Keyword(keyword))
+}
+
 fn token<'tok, 'src: 'tok>(token: Token<'src>) -> impl Parser<'tok, 'src, ()> {
     one_of(move |t: SrcToken| t.0 == token).void()
 }
@@ -171,12 +175,12 @@ mod tests {
 
     #[test]
     fn pi() {
-        parse("(\\Pi x → x) Type", "(((_ : Type) → x) Type)");
+        parse("∀x ⇒ x", "((_ : Type) → x)");
     }
 
     #[test]
     fn lambda() {
-        parse("(\\x = x) Type", "((\\x = x) Type)");
+        parse("(\\x ⇒ x) Type", "((\\x ⇒ x) Type)");
     }
 
     #[test]

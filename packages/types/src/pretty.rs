@@ -133,7 +133,7 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
                     Parentheses::Off,
                     type_annotations,
                 ),
-                Document::text(" = "),
+                Document::text(" ⇒ "),
                 binding.in_expression.to_document(type_annotations),
             ]),
             Self::Variable { index, typ } => typ.type_annotatation(
