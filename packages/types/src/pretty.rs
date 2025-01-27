@@ -121,11 +121,29 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
                 Document::text(" in "),
                 binding.in_expression.to_document(type_annotations),
             ]),
-            Self::FunctionType(binding) => parenthesize([
-                binding.variable_type.to_document(type_annotations),
-                Document::text(" → "),
-                binding.in_expression.to_document(type_annotations),
-            ]),
+            Self::FunctionType(binding) => {
+                let in_expression = binding.in_expression.to_document(type_annotations);
+                let variable_name = binding.name.to_string();
+
+                if variable_name == "_" {
+                    parenthesize([
+                        binding.variable_type.to_document(type_annotations),
+                        Document::text(" → "),
+                        in_expression,
+                    ])
+                } else {
+                    parenthesize([
+                        Document::text("∀"),
+                        binding.variable_type.type_annotatation(
+                            Document::text(variable_name),
+                            Parentheses::Off,
+                            type_annotations,
+                        ),
+                        Document::text(" ⇒ "),
+                        in_expression,
+                    ])
+                }
+            }
             Self::Lambda(binding) => parenthesize([
                 Document::text("\\"),
                 binding.variable_type.type_annotatation(

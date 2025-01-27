@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn pi() {
-        parse("∀x ⇒ x", "((_ : Type) → x)");
+        parse("∀x ⇒ x", "(∀x ⇒ x)");
     }
 
     #[test]
