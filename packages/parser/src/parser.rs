@@ -50,7 +50,11 @@ pub fn expr<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> PResult<Expr
 }
 
 fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
-    right_operators(NamedOperator::HasType, function_types())
+    separated_foldr1(
+        function_types(),
+        NamedOperator::HasType,
+        |term, _op, typ| term.has_type(typ),
+    )
 }
 
 fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
@@ -150,17 +154,6 @@ fn grouped<'tok, 'src: 'tok, T>(
     delimited(Token::Open(grouping), parser, Token::Close(grouping))
 }
 
-fn right_operators<'tok, 'src: 'tok>(
-    ops: impl Parser<'tok, 'src, NamedOperator>,
-    tighter_binding_operators: impl Parser<'tok, 'src, Expr<'src>>,
-) -> impl Parser<'tok, 'src, Expr<'src>> {
-    separated_foldr1(tighter_binding_operators, ops, operator_expression)
-}
-
-fn operator_expression<'src>(lhs: Expr<'src>, op: NamedOperator, rhs: Expr<'src>) -> Expr<'src> {
-    Expr::apply(Expr::apply(Expr::variable(op.as_str()), lhs), rhs)
-}
-
 #[cfg(test)]
 mod tests {
     use bandit_types::Pretty;
@@ -183,8 +176,7 @@ mod tests {
 
     #[test]
     fn type_annotation() {
-        // TODO: Fix this. Result should be `x : Int`
-        parse("x : Int", ": x Int");
+        parse("x : Int", "x : Int");
     }
 
     fn parse(input: &str, expected: &str) {

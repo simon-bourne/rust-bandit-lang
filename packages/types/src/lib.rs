@@ -116,14 +116,14 @@ impl<'src> ExpressionRef<'src> {
         }
 
         let Some(mut x_ref) = x.known() else {
-            Self::unify(ctx, &mut x.typ(ctx)?, &mut y.typ(ctx)?)?;
+            Self::unify(ctx, &mut x.typ(), &mut y.typ())?;
             x.replace(y);
             return Ok(());
         };
 
         let Some(mut y_ref) = y.known() else {
             drop(x_ref);
-            Self::unify(ctx, &mut x.typ(ctx)?, &mut y.typ(ctx)?)?;
+            Self::unify(ctx, &mut x.typ(), &mut y.typ())?;
             y.replace(x);
             return Ok(());
         };
@@ -216,11 +216,11 @@ impl<'src> ExpressionRef<'src> {
         .ok()
     }
 
-    fn typ(&self, ctx: &Context<'src>) -> Result<Self> {
+    fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            ExprRefVariants::Known { expression } => expression.typ(ctx),
-            ExprRefVariants::Unknown { typ } => Ok(typ.clone()),
-            ExprRefVariants::Link { target } => target.typ(ctx),
+            ExprRefVariants::Known { expression } => expression.typ(),
+            ExprRefVariants::Unknown { typ } => typ.clone(),
+            ExprRefVariants::Link { target } => target.typ(),
         }
     }
 }
@@ -255,7 +255,7 @@ impl<'src> VariableBinding<'src, Inference> {
     fn infer_types(&mut self, ctx: &mut Context<'src>) -> Result<()> {
         ExpressionRef::unify(
             ctx,
-            &mut self.variable_type.typ(ctx)?,
+            &mut self.variable_type.typ(),
             &mut ExpressionRef::type_of_type(),
         )?;
         self.variable_type.infer_types(ctx)?;
@@ -290,7 +290,7 @@ impl<'src> Expression<'src, Inference> {
         match self {
             Self::Type => (),
             Self::Variable { index, typ } => {
-                ExpressionRef::unify(ctx, &mut typ.typ(ctx)?, &mut ExpressionRef::type_of_type())?;
+                ExpressionRef::unify(ctx, &mut typ.typ(), &mut ExpressionRef::type_of_type())?;
                 ExpressionRef::unify(ctx, typ, &mut ctx.lookup_type(*index)?)?;
                 typ.infer_types(ctx)?
             }
@@ -299,10 +299,9 @@ impl<'src> Expression<'src, Inference> {
                 argument,
                 typ,
             } => {
-                ExpressionRef::unify(ctx, &mut typ.typ(ctx)?, &mut ExpressionRef::type_of_type())?;
-                let function_type =
-                    &mut ExpressionRef::function_type(argument.typ(ctx)?, typ.clone());
-                ExpressionRef::unify(ctx, function_type, &mut function.typ(ctx)?)?;
+                ExpressionRef::unify(ctx, &mut typ.typ(), &mut ExpressionRef::type_of_type())?;
+                let function_type = &mut ExpressionRef::function_type(argument.typ(), typ.clone());
+                ExpressionRef::unify(ctx, function_type, &mut function.typ())?;
 
                 function.infer_types(ctx)?;
                 argument.infer_types(ctx)?;
@@ -322,18 +321,18 @@ impl<'src> Expression<'src, Inference> {
         Ok(())
     }
 
-    fn typ(&self, ctx: &Context<'src>) -> Result<ExpressionRef<'src>> {
-        Ok(match self {
+    fn typ(&self) -> ExpressionRef<'src> {
+        match self {
             Self::Type => ExpressionRef::type_of_type(),
             Self::Variable { typ, .. } => typ.clone(),
             Self::Apply { typ, .. } => typ.clone(),
-            Self::Let { binding, .. } => binding.in_expression.typ(ctx)?,
+            Self::Let { binding, .. } => binding.in_expression.typ(),
             Self::FunctionType(_binding) => ExpressionRef::type_of_type(),
             Self::Lambda(binding) => ExpressionRef::function_type(
                 binding.variable_type.clone(),
-                binding.in_expression.typ(ctx)?,
+                binding.in_expression.typ(),
             ),
-        })
+        }
     }
 }
 
@@ -369,12 +368,12 @@ mod tests {
         // let x : Int = 1 in x : Float
         let int_type = Expr::variable("Int");
         let float_type = Expr::variable("Float");
-        let one = Expr::variable("one").annotate(int_type.clone());
+        let one = Expr::variable("one").has_type(int_type.clone());
         let let_binding = Expr::let_binding(
             "x",
             int_type.clone(),
             one,
-            Expr::variable("x").annotate(float_type),
+            Expr::variable("x").has_type(float_type),
         );
 
         let mut global_types = HashMap::new();

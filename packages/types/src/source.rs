@@ -1,8 +1,8 @@
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
 use crate::{
-    context::VariableLookup,
-    pretty::{Document, Operator, Side, TypeAnnotations},
+    context::{Context, VariableLookup},
+    pretty::{disambiguate, Document, Operator, Side, TypeAnnotations},
     EmptyName, Expression, ExpressionRef, Inference, Pretty, Result, Stage, VariableBinding,
 };
 
@@ -20,6 +20,10 @@ pub struct SourceExpression<'src>(Rc<SrcExprVariants<'src>>);
 enum SrcExprVariants<'src> {
     Known {
         expression: Expression<'src, Source>,
+    },
+    TypeAnnotation {
+        expression: SourceExpression<'src>,
+        typ: SourceExpression<'src>,
     },
     Unknown {
         typ: SourceExpression<'src>,
@@ -90,8 +94,11 @@ impl<'src> SourceExpression<'src> {
         })
     }
 
-    pub fn annotate(self, typ: Self) -> Self {
-        Self::variable(":").apply(self).apply(typ)
+    pub fn has_type(self, typ: Self) -> Self {
+        Self(Rc::new(SrcExprVariants::TypeAnnotation {
+            expression: self,
+            typ,
+        }))
     }
 
     pub fn to_infer(&self) -> Result<ExpressionRef<'src>> {
@@ -104,10 +111,35 @@ impl<'src> SourceExpression<'src> {
     ) -> Result<ExpressionRef<'src>> {
         Ok(match self.0.as_ref() {
             SrcExprVariants::Known { expression } => expression.to_infer(lookup)?,
+            SrcExprVariants::TypeAnnotation { expression, typ } => {
+                let expression = expression.to_infer_with_lookup(lookup)?;
+                let mut typ = typ.to_infer_with_lookup(lookup)?;
+                // TODO: Can we add these as deferred unifications, so we don't need `ctx``?
+                let ctx = &mut Context::new(HashMap::new());
+                ExpressionRef::unify(ctx, &mut expression.typ(), &mut typ)?;
+                expression
+            }
             SrcExprVariants::Unknown { typ } => {
                 ExpressionRef::unknown(typ.to_infer_with_lookup(lookup)?)
             }
         })
+    }
+
+    fn operator(&self) -> Option<Operator> {
+        match self.0.as_ref() {
+            SrcExprVariants::Known { expression } => match expression {
+                Expression::Apply { .. } => Some(Operator::Apply),
+                Expression::FunctionType(binding) => {
+                    (binding.name == "_").then_some(Operator::Arrow)
+                }
+                Expression::Type
+                | Expression::Let { .. }
+                | Expression::Lambda(_)
+                | Expression::Variable { .. } => None,
+            },
+            SrcExprVariants::TypeAnnotation { .. } => Some(Operator::HasType),
+            SrcExprVariants::Unknown { .. } => None,
+        }
     }
 
     fn new(expression: Expression<'src, Source>) -> Self {
@@ -125,6 +157,11 @@ impl Pretty for SourceExpression<'_> {
             SrcExprVariants::Known { expression } => {
                 expression.to_document(parent, type_annotations)
             }
+            SrcExprVariants::TypeAnnotation { expression, typ } => {
+                let op = Operator::HasType;
+                let term = expression.to_document(Some((op, Side::Left)), type_annotations);
+                typ.type_annotatation(term, expression.operator(), parent, type_annotations)
+            }
             SrcExprVariants::Unknown { typ } => {
                 typ.type_annotatation(Document::text("_"), None, parent, type_annotations)
             }
@@ -141,6 +178,19 @@ impl Pretty for SourceExpression<'_> {
         match self.0.as_ref() {
             SrcExprVariants::Known { expression } => {
                 expression.type_annotatation(term, term_operator, parent, type_annotations)
+            }
+            SrcExprVariants::TypeAnnotation { .. } => {
+                let op = Operator::HasType;
+                let typ = self.to_document(Some((op, Side::Left)), type_annotations);
+                disambiguate(
+                    Some(op),
+                    parent,
+                    [
+                        disambiguate(term_operator, Some((op, Side::Right)), [term]),
+                        Document::text(":"),
+                        typ,
+                    ],
+                )
             }
             SrcExprVariants::Unknown { .. } => term,
         }

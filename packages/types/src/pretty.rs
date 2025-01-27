@@ -208,7 +208,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
     }
 }
 
-fn disambiguate(
+pub fn disambiguate(
     operator: Option<Operator>,
     parent: Option<(Operator, Side)>,
     docs: impl IntoIterator<Item = Document>,
