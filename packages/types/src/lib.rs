@@ -479,7 +479,7 @@ mod tests {
         constructor_type.normalize(ctx).unwrap();
         assert_eq!(
             constructor_type.to_pretty_string(80),
-            "(\\_ : (_ → _) ⇒ (\\_ ⇒ ((2 : (_ → _)) 1)))"
+            r"(\_ : (_ → _) ⇒ (\_ ⇒ ((2 : (_ → _)) 1)))"
         );
     }
 
