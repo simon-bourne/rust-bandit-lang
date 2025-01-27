@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use pretty::RcDoc;
 
-use crate::{ExprRefVariants, Expression, ExpressionRef, Inferred, Stage, VariableIndex};
+use crate::{ExprRefVariants, Expression, ExpressionRef, Inferred, Stage};
 
 pub trait Pretty {
     fn to_document(
@@ -19,8 +19,6 @@ pub trait Pretty {
         type_annotations: TypeAnnotations,
     ) -> Document;
 
-    fn is_infix(&self) -> bool;
-
     fn to_pretty_string(&self, width: usize) -> String {
         self.to_document(None, TypeAnnotations::On)
             .pretty(width)
@@ -35,10 +33,6 @@ impl Pretty for Rc<Expression<'_, Inferred>> {
         type_annotations: TypeAnnotations,
     ) -> Document {
         self.as_ref().to_document(parent, type_annotations)
-    }
-
-    fn is_infix(&self) -> bool {
-        self.as_ref().is_infix()
     }
 
     fn type_annotatation(
@@ -67,14 +61,6 @@ impl Pretty for ExpressionRef<'_> {
                 typ.type_annotatation(Document::text("_"), None, parent, type_annotations)
             }
             ExprRefVariants::Link { target } => target.to_document(parent, type_annotations),
-        }
-    }
-
-    fn is_infix(&self) -> bool {
-        match &*self.0.borrow() {
-            ExprRefVariants::Known { expression } => expression.is_infix(),
-            ExprRefVariants::Unknown { .. } => false,
-            ExprRefVariants::Link { target } => target.is_infix(),
         }
     }
 
@@ -110,19 +96,13 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                 argument,
                 typ,
             } => {
-                // TODO: Fix parenthesizing this.
-                let (left, right) = if function.is_infix() {
-                    (argument, function)
-                } else {
-                    (function, argument)
-                };
                 let op = Operator::Apply;
 
                 typ.type_annotatation(
                     Document::concat([
-                        left.to_document(Some((op, Side::Left)), type_annotations),
+                        function.to_document(Some((op, Side::Left)), type_annotations),
                         Document::space(),
-                        right.to_document(Some((op, Side::Right)), type_annotations),
+                        argument.to_document(Some((op, Side::Right)), type_annotations),
                     ]),
                     Some(op),
                     parent,
@@ -200,13 +180,6 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
             Self::Variable { index, typ } => {
                 typ.type_annotatation(Document::as_string(index), None, parent, type_annotations)
             }
-        }
-    }
-
-    fn is_infix(&self) -> bool {
-        match self {
-            Expression::Variable { index, .. } => index.is_infix(),
-            _ => false,
         }
     }
 

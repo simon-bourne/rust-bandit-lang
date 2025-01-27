@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt};
 
-use crate::{ExpressionRef, InferenceError, Result, VariableIndex};
+use crate::{ExpressionRef, InferenceError, Result};
 
 pub struct DeBruijnLevel(usize);
 
@@ -108,11 +108,5 @@ impl fmt::Display for VariableReference<'_> {
             VariableReference::Local(de_bruijn_index) => de_bruijn_index.fmt(f),
             VariableReference::Global(name) => name.fmt(f),
         }
-    }
-}
-
-impl VariableIndex for VariableReference<'_> {
-    fn is_infix(&self) -> bool {
-        matches!(self, Self::Global(":"))
     }
 }

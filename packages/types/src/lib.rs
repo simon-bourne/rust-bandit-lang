@@ -23,11 +23,7 @@ pub struct InferenceError;
 pub trait Stage<'src> {
     type Expression: Pretty;
     type VariableName: 'src + Display;
-    type VariableIndex: 'src + VariableIndex;
-}
-
-pub trait VariableIndex: Display {
-    fn is_infix(&self) -> bool;
+    type VariableIndex: 'src + Display;
 }
 
 pub struct Inference;

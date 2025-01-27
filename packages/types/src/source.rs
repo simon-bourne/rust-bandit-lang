@@ -4,7 +4,6 @@ use crate::{
     context::VariableLookup,
     pretty::{Document, Operator, Side, TypeAnnotations},
     EmptyName, Expression, ExpressionRef, Inference, Pretty, Result, Stage, VariableBinding,
-    VariableIndex,
 };
 
 pub struct Source;
@@ -13,12 +12,6 @@ impl<'src> Stage<'src> for Source {
     type Expression = SourceExpression<'src>;
     type VariableIndex = &'src str;
     type VariableName = &'src str;
-}
-
-impl VariableIndex for &'_ str {
-    fn is_infix(&self) -> bool {
-        *self == ":"
-    }
 }
 
 #[derive(Clone)]
@@ -135,13 +128,6 @@ impl Pretty for SourceExpression<'_> {
             SrcExprVariants::Unknown { typ } => {
                 typ.type_annotatation(Document::text("_"), None, parent, type_annotations)
             }
-        }
-    }
-
-    fn is_infix(&self) -> bool {
-        match self.0.as_ref() {
-            SrcExprVariants::Known { expression } => expression.is_infix(),
-            SrcExprVariants::Unknown { .. } => false,
         }
     }
 
