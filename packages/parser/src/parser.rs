@@ -21,6 +21,30 @@ impl<'tok, 'src: 'tok, Out, T> Parser<'tok, 'src, Out> for T where
 {
 }
 
+impl<'tok, 'src: 'tok> winnow::Parser<TokenList<'tok, 'src>, Token<'src>, ContextError>
+    for Token<'src>
+{
+    fn parse_next(&mut self, input: &mut TokenList<'tok, 'src>) -> PResult<Self> {
+        one_of(|t: SrcToken| t.0 == *self)
+            .value(*self)
+            .parse_next(input)
+    }
+}
+
+impl<'tok, 'src: 'tok> winnow::Parser<TokenList<'tok, 'src>, NamedOperator, ContextError>
+    for NamedOperator
+{
+    fn parse_next(&mut self, input: &mut TokenList<'tok, 'src>) -> PResult<NamedOperator> {
+        Token::Operator(*self).value(*self).parse_next(input)
+    }
+}
+
+impl<'tok, 'src: 'tok> winnow::Parser<TokenList<'tok, 'src>, Keyword, ContextError> for Keyword {
+    fn parse_next(&mut self, input: &mut TokenList<'tok, 'src>) -> PResult<Keyword> {
+        Token::Keyword(*self).value(*self).parse_next(input)
+    }
+}
+
 pub fn expr<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> PResult<Expr<'src>> {
     type_annotations().parse_next(input)
 }
@@ -32,7 +56,7 @@ fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
 fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     separated_foldr1(
         function_applications(),
-        operator(NamedOperator::To),
+        NamedOperator::To,
         |input_type, _, output_type| Expr::function_type("_", input_type, output_type),
     )
 }
@@ -58,20 +82,20 @@ fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
 
 fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     preceded(
-        keyword(Keyword::Forall),
-        separated_pair(variable_binding(), token(Token::SuchThat), expr),
+        Keyword::Forall,
+        separated_pair(variable_binding(), Token::SuchThat, expr),
     )
     .map(|((var, typ), expr)| Expr::function_type(var, typ, expr))
 }
 
 fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     preceded(
-        keyword(Keyword::Let),
+        Keyword::Let,
         (
             variable_binding(),
-            operator(NamedOperator::Assign),
+            NamedOperator::Assign,
             expr,
-            token(Token::LineEnd),
+            Token::LineEnd,
             expr,
         ),
     )
@@ -84,8 +108,8 @@ fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
 
 fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     preceded(
-        token(Token::Lambda),
-        separated_pair(variable_binding(), token(Token::SuchThat), expr),
+        Token::Lambda,
+        separated_pair(variable_binding(), Token::SuchThat, expr),
     )
     .map(|((var, typ), expr)| Expr::lambda(var, typ, expr))
 }
@@ -94,7 +118,7 @@ fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
 fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, Expr<'src>)> {
     (
         identifier(),
-        opt(preceded(operator(NamedOperator::HasType), expr))
+        opt(preceded(NamedOperator::HasType, expr))
             .map(|typ| typ.unwrap_or_else(Expr::unknown_type)),
     )
 }
@@ -123,11 +147,7 @@ fn grouped<'tok, 'src: 'tok, T>(
     grouping: Grouping,
     parser: impl Parser<'tok, 'src, T>,
 ) -> impl Parser<'tok, 'src, T> {
-    delimited(
-        token(Token::Open(grouping)),
-        parser,
-        token(Token::Close(grouping)),
-    )
+    delimited(Token::Open(grouping), parser, Token::Close(grouping))
 }
 
 fn right_operators<'tok, 'src: 'tok, const N: usize>(
@@ -145,18 +165,6 @@ fn matches_operators<'tok, 'src: 'tok, const N: usize>(
     ops: [NamedOperator; N],
 ) -> impl Parser<'tok, 'src, NamedOperator> {
     any.verify_map(move |t: SrcToken| ops.iter().copied().find(|op| Token::Operator(*op) == t.0))
-}
-
-fn operator<'tok, 'src: 'tok>(name: NamedOperator) -> impl Parser<'tok, 'src, ()> {
-    token(Token::Operator(name))
-}
-
-fn keyword<'tok, 'src: 'tok>(keyword: Keyword) -> impl Parser<'tok, 'src, ()> {
-    token(Token::Keyword(keyword))
-}
-
-fn token<'tok, 'src: 'tok>(token: Token<'src>) -> impl Parser<'tok, 'src, ()> {
-    one_of(move |t: SrcToken| t.0 == token).void()
 }
 
 fn operator_expression<'src>(value: Expr<'src>, op: NamedOperator, typ: Expr<'src>) -> Expr<'src> {
