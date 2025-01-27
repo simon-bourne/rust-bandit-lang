@@ -2,7 +2,6 @@ use bandit_types::source::SourceExpression;
 use winnow::{
     combinator::{alt, delimited, opt, preceded, repeat, separated_foldr1, separated_pair},
     error::ContextError,
-    seq,
     token::{any, one_of},
     PResult, Parser as _,
 };
@@ -51,7 +50,7 @@ pub fn expr<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> PResult<Expr
 }
 
 fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
-    right_operators([NamedOperator::HasType], function_types())
+    right_operators(NamedOperator::HasType, function_types())
 }
 
 fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
@@ -92,17 +91,19 @@ fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
 fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     preceded(
         Keyword::Let,
-        seq!(
+        (
             variable_binding(),
-            _: NamedOperator::Assign,
+            NamedOperator::Assign,
             expr,
-            _: Token::LineEnd,
+            Token::LineEnd,
             expr,
         ),
     )
-    .map(|((var, typ), variable_value, in_expression)| {
-        Expr::let_binding(var, typ, variable_value, in_expression)
-    })
+    .map(
+        |((var, typ), _assign, variable_value, _linend, in_expression)| {
+            Expr::let_binding(var, typ, variable_value, in_expression)
+        },
+    )
 }
 
 fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
@@ -149,25 +150,15 @@ fn grouped<'tok, 'src: 'tok, T>(
     delimited(Token::Open(grouping), parser, Token::Close(grouping))
 }
 
-fn right_operators<'tok, 'src: 'tok, const N: usize>(
-    ops: [NamedOperator; N],
+fn right_operators<'tok, 'src: 'tok>(
+    ops: impl Parser<'tok, 'src, NamedOperator>,
     tighter_binding_operators: impl Parser<'tok, 'src, Expr<'src>>,
 ) -> impl Parser<'tok, 'src, Expr<'src>> {
-    separated_foldr1(
-        tighter_binding_operators,
-        matches_operators(ops),
-        operator_expression,
-    )
+    separated_foldr1(tighter_binding_operators, ops, operator_expression)
 }
 
-fn matches_operators<'tok, 'src: 'tok, const N: usize>(
-    ops: [NamedOperator; N],
-) -> impl Parser<'tok, 'src, NamedOperator> {
-    any.verify_map(move |t: SrcToken| ops.iter().copied().find(|op| Token::Operator(*op) == t.0))
-}
-
-fn operator_expression<'src>(value: Expr<'src>, op: NamedOperator, typ: Expr<'src>) -> Expr<'src> {
-    Expr::apply(Expr::apply(Expr::variable(op.as_str()), value), typ)
+fn operator_expression<'src>(lhs: Expr<'src>, op: NamedOperator, rhs: Expr<'src>) -> Expr<'src> {
+    Expr::apply(Expr::apply(Expr::variable(op.as_str()), lhs), rhs)
 }
 
 #[cfg(test)]
