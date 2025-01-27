@@ -37,7 +37,7 @@ fn test_with_ctx(input: &str, expected: &str) {
     );
 
     let mut expr = parse(input);
-    expr.normalize(ctx).unwrap();
+    expr.infer_types(ctx).unwrap();
     assert_eq!(expr.to_pretty_string(80), expected);
 }
 
