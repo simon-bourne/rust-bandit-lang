@@ -3,13 +3,13 @@ use std::rc::Rc;
 use crate::{
     context::VariableLookup,
     pretty::{Document, Operator, Side, TypeAnnotations},
-    Annotation, EmptyName, Expression, ExpressionRef, Inference, Pretty, Result, VariableBinding,
+    EmptyName, Expression, ExpressionRef, Inference, Pretty, Result, Stage, VariableBinding,
     VariableIndex,
 };
 
 pub struct Source;
 
-impl<'src> Annotation<'src> for Source {
+impl<'src> Stage<'src> for Source {
     type Expression = SourceExpression<'src>;
     type VariableIndex = &'src str;
     type VariableName = &'src str;

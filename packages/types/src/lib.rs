@@ -20,7 +20,7 @@ pub type Result<T> = result::Result<T, InferenceError>;
 #[derive(Debug)]
 pub struct InferenceError;
 
-pub trait Annotation<'src> {
+pub trait Stage<'src> {
     type Expression: Pretty;
     type VariableName: 'src + Display;
     type VariableIndex: 'src + VariableIndex;
@@ -32,7 +32,7 @@ pub trait VariableIndex: Display {
 
 pub struct Inference;
 
-impl<'src> Annotation<'src> for Inference {
+impl<'src> Stage<'src> for Inference {
     type Expression = ExpressionRef<'src>;
     type VariableIndex = VariableReference<'src>;
     type VariableName = EmptyName;
@@ -40,7 +40,7 @@ impl<'src> Annotation<'src> for Inference {
 
 struct Inferred;
 
-impl<'src> Annotation<'src> for Inferred {
+impl<'src> Stage<'src> for Inferred {
     type Expression = Rc<Expression<'src, Self>>;
     type VariableIndex = VariableReference<'src>;
     type VariableName = EmptyName;
@@ -266,30 +266,30 @@ impl<'src> ExpressionRef<'src> {
     }
 }
 
-enum Expression<'src, A: Annotation<'src>> {
+enum Expression<'src, S: Stage<'src>> {
     Type,
     Apply {
-        function: A::Expression,
-        argument: A::Expression,
-        typ: A::Expression,
+        function: S::Expression,
+        argument: S::Expression,
+        typ: S::Expression,
     },
     Let {
-        variable_value: A::Expression,
-        binding: VariableBinding<'src, A>,
+        variable_value: S::Expression,
+        binding: VariableBinding<'src, S>,
     },
     // TODO: Do we need to store a constraint on the binding, like `a ~ expression`?
-    FunctionType(VariableBinding<'src, A>),
-    Lambda(VariableBinding<'src, A>),
+    FunctionType(VariableBinding<'src, S>),
+    Lambda(VariableBinding<'src, S>),
     Variable {
-        index: A::VariableIndex,
-        typ: A::Expression,
+        index: S::VariableIndex,
+        typ: S::Expression,
     },
 }
 
-struct VariableBinding<'src, A: Annotation<'src>> {
-    name: A::VariableName,
-    variable_type: A::Expression,
-    in_expression: A::Expression,
+struct VariableBinding<'src, S: Stage<'src>> {
+    name: S::VariableName,
+    variable_type: S::Expression,
+    in_expression: S::Expression,
 }
 
 impl<'src> VariableBinding<'src, Inference> {

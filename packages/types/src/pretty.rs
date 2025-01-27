@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use pretty::RcDoc;
 
-use crate::{Annotation, ExprRefVariants, Expression, ExpressionRef, Inferred, VariableIndex};
+use crate::{ExprRefVariants, Expression, ExpressionRef, Inferred, Stage, VariableIndex};
 
 pub trait Pretty {
     fn to_document(
@@ -97,7 +97,7 @@ impl Pretty for ExpressionRef<'_> {
     }
 }
 
-impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
+impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
     fn to_document(
         &self,
         parent: Option<(Operator, Side)>,
