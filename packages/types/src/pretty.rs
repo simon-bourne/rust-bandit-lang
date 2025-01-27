@@ -116,7 +116,7 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
                 } else {
                     (function, argument)
                 };
-                let op = Operator::Application;
+                let op = Operator::Apply;
 
                 typ.type_annotatation(
                     Document::concat([
@@ -221,13 +221,15 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
             return disambiguate(term_operator, parent, [term]);
         }
 
+        let op = Operator::HasType;
+
         disambiguate(
             Some(Operator::HasType),
             parent,
             [
-                disambiguate(term_operator, Some((Operator::HasType, Side::Left)), [term]),
+                disambiguate(term_operator, Some((op, Side::Left)), [term]),
                 Document::text(" : "),
-                self.to_document(Some((Operator::HasType, Side::Right)), TypeAnnotations::Off),
+                self.to_document(Some((op, Side::Right)), TypeAnnotations::Off),
             ],
         )
     }
@@ -261,7 +263,7 @@ fn parenthesize(docs: impl IntoIterator<Item = Document>) -> Document {
 pub enum Operator {
     HasType,
     Arrow,
-    Application,
+    Apply,
 }
 
 impl Operator {
@@ -297,7 +299,7 @@ impl Operator {
         match self {
             Self::HasType => 0,
             Self::Arrow => 1,
-            Self::Application => 2,
+            Self::Apply => 2,
         }
     }
 
@@ -305,7 +307,7 @@ impl Operator {
         match self {
             Self::HasType => Side::Right,
             Self::Arrow => Side::Right,
-            Self::Application => Side::Left,
+            Self::Apply => Side::Left,
         }
     }
 }
