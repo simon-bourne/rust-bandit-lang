@@ -43,13 +43,10 @@ fn test_with_ctx(input: &str, expected: &str) {
 
 #[test]
 fn one() {
-    test_with_ctx("one", "(one : Int)");
+    test_with_ctx("one", "one : Int");
 }
 
 #[test]
 fn partial_add() {
-    test_with_ctx(
-        "add one",
-        "(((add : (Int → (Int → Int))) (one : Int)) : (Int → Int))",
-    );
+    test_with_ctx("add one", "(add : Int → Int → Int) (one : Int) : Int → Int");
 }

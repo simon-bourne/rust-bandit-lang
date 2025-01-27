@@ -1,32 +1,40 @@
 use std::rc::Rc;
 
-use crate::{
-    Annotation, Document, ExprRefVariants, Expression, ExpressionRef, Inferred, Parentheses,
-    TypeAnnotations, VariableIndex,
-};
+use pretty::RcDoc;
+
+use crate::{Annotation, ExprRefVariants, Expression, ExpressionRef, Inferred, VariableIndex};
 
 pub trait Pretty {
-    fn to_document(&self, type_annotations: TypeAnnotations) -> Document;
+    fn to_document(
+        &self,
+        parent: Option<(Operator, Side)>,
+        type_annotations: TypeAnnotations,
+    ) -> Document;
 
     fn type_annotatation(
         &self,
         term: Document,
-        parentheses: Parentheses,
+        term_operator: Option<Operator>,
+        parent: Option<(Operator, Side)>,
         type_annotations: TypeAnnotations,
     ) -> Document;
 
     fn is_infix(&self) -> bool;
 
     fn to_pretty_string(&self, width: usize) -> String {
-        self.to_document(TypeAnnotations::On)
+        self.to_document(None, TypeAnnotations::On)
             .pretty(width)
             .to_string()
     }
 }
 
 impl Pretty for Rc<Expression<'_, Inferred>> {
-    fn to_document(&self, type_annotations: TypeAnnotations) -> Document {
-        self.as_ref().to_document(type_annotations)
+    fn to_document(
+        &self,
+        parent: Option<(Operator, Side)>,
+        type_annotations: TypeAnnotations,
+    ) -> Document {
+        self.as_ref().to_document(parent, type_annotations)
     }
 
     fn is_infix(&self) -> bool {
@@ -36,22 +44,29 @@ impl Pretty for Rc<Expression<'_, Inferred>> {
     fn type_annotatation(
         &self,
         term: Document,
-        parentheses: Parentheses,
+        term_operator: Option<Operator>,
+        parent: Option<(Operator, Side)>,
         type_annotations: TypeAnnotations,
     ) -> Document {
         self.as_ref()
-            .type_annotatation(term, parentheses, type_annotations)
+            .type_annotatation(term, term_operator, parent, type_annotations)
     }
 }
 
 impl Pretty for ExpressionRef<'_> {
-    fn to_document(&self, type_annotations: TypeAnnotations) -> Document {
+    fn to_document(
+        &self,
+        parent: Option<(Operator, Side)>,
+        type_annotations: TypeAnnotations,
+    ) -> Document {
         match &*self.0.borrow() {
-            ExprRefVariants::Known { expression } => expression.to_document(type_annotations),
-            ExprRefVariants::Unknown { typ } => {
-                typ.type_annotatation(Document::text("_"), Parentheses::On, type_annotations)
+            ExprRefVariants::Known { expression } => {
+                expression.to_document(parent, type_annotations)
             }
-            ExprRefVariants::Link { target } => target.to_document(type_annotations),
+            ExprRefVariants::Unknown { typ } => {
+                typ.type_annotatation(Document::text("_"), None, parent, type_annotations)
+            }
+            ExprRefVariants::Link { target } => target.to_document(parent, type_annotations),
         }
     }
 
@@ -66,23 +81,28 @@ impl Pretty for ExpressionRef<'_> {
     fn type_annotatation(
         &self,
         term: Document,
-        parentheses: Parentheses,
+        term_operator: Option<Operator>,
+        parent: Option<(Operator, Side)>,
         type_annotations: TypeAnnotations,
     ) -> Document {
         match &*self.0.borrow() {
             ExprRefVariants::Known { expression } => {
-                expression.type_annotatation(term, parentheses, type_annotations)
+                expression.type_annotatation(term, term_operator, parent, type_annotations)
             }
             ExprRefVariants::Unknown { .. } => term,
             ExprRefVariants::Link { target } => {
-                target.type_annotatation(term, parentheses, type_annotations)
+                target.type_annotatation(term, term_operator, parent, type_annotations)
             }
         }
     }
 }
 
 impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
-    fn to_document(&self, type_annotations: TypeAnnotations) -> Document {
+    fn to_document(
+        &self,
+        parent: Option<(Operator, Side)>,
+        type_annotations: TypeAnnotations,
+    ) -> Document {
         match self {
             Self::Type => Document::text("Type"),
             Self::Apply {
@@ -90,75 +110,96 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
                 argument,
                 typ,
             } => {
+                // TODO: Fix parenthesizing this.
                 let (left, right) = if function.is_infix() {
                     (argument, function)
                 } else {
                     (function, argument)
                 };
+                let op = Operator::Application;
 
                 typ.type_annotatation(
-                    parenthesize([
-                        left.to_document(type_annotations),
+                    Document::concat([
+                        left.to_document(Some((op, Side::Left)), type_annotations),
                         Document::space(),
-                        right.to_document(type_annotations),
+                        right.to_document(Some((op, Side::Right)), type_annotations),
                     ]),
-                    Parentheses::On,
+                    Some(op),
+                    parent,
                     type_annotations,
                 )
             }
             Self::Let {
                 variable_value,
                 binding,
-            } => parenthesize([
-                Document::text("let"),
-                binding.variable_type.type_annotatation(
-                    Document::as_string(&binding.name),
-                    Parentheses::Off,
-                    type_annotations,
-                ),
-                Document::text(" = "),
-                variable_value.to_document(type_annotations),
-                Document::text(" in "),
-                binding.in_expression.to_document(type_annotations),
-            ]),
+            } => parenthesize_if(
+                parent.is_some(),
+                [
+                    Document::text("let"),
+                    binding.variable_type.type_annotatation(
+                        Document::as_string(&binding.name),
+                        None,
+                        None,
+                        type_annotations,
+                    ),
+                    Document::text(" = "),
+                    variable_value.to_document(None, type_annotations),
+                    Document::text(" in "),
+                    binding.in_expression.to_document(None, type_annotations),
+                ],
+            ),
             Self::FunctionType(binding) => {
-                let in_expression = binding.in_expression.to_document(type_annotations);
                 let variable_name = binding.name.to_string();
 
                 if variable_name == "_" {
-                    parenthesize([
-                        binding.variable_type.to_document(type_annotations),
-                        Document::text(" → "),
-                        in_expression,
-                    ])
+                    let op = Operator::Arrow;
+                    disambiguate(
+                        Some(op),
+                        parent,
+                        [
+                            binding
+                                .variable_type
+                                .to_document(Some((op, Side::Left)), type_annotations),
+                            Document::text(" → "),
+                            binding
+                                .in_expression
+                                .to_document(Some((op, Side::Right)), type_annotations),
+                        ],
+                    )
                 } else {
-                    parenthesize([
-                        Document::text("∀"),
-                        binding.variable_type.type_annotatation(
-                            Document::text(variable_name),
-                            Parentheses::Off,
-                            type_annotations,
-                        ),
-                        Document::text(" ⇒ "),
-                        in_expression,
-                    ])
+                    parenthesize_if(
+                        parent.is_some(),
+                        [
+                            Document::text("∀"),
+                            binding.variable_type.type_annotatation(
+                                Document::text(variable_name),
+                                None,
+                                None,
+                                type_annotations,
+                            ),
+                            Document::text(" ⇒ "),
+                            binding.in_expression.to_document(None, type_annotations),
+                        ],
+                    )
                 }
             }
-            Self::Lambda(binding) => parenthesize([
-                Document::text("\\"),
-                binding.variable_type.type_annotatation(
-                    Document::as_string(&binding.name),
-                    Parentheses::Off,
-                    type_annotations,
-                ),
-                Document::text(" ⇒ "),
-                binding.in_expression.to_document(type_annotations),
-            ]),
-            Self::Variable { index, typ } => typ.type_annotatation(
-                Document::as_string(index),
-                Parentheses::On,
-                type_annotations,
+            Self::Lambda(binding) => parenthesize_if(
+                parent.is_some(),
+                [
+                    Document::text("\\"),
+                    binding.variable_type.type_annotatation(
+                        Document::as_string(&binding.name),
+                        None,
+                        None,
+                        type_annotations,
+                    ),
+                    Document::text(" ⇒ "),
+                    binding.in_expression.to_document(None, type_annotations),
+                ],
             ),
+            Self::Variable { index, typ } => {
+                typ.type_annotatation(Document::as_string(index), None, parent, type_annotations)
+            }
         }
     }
 
@@ -172,23 +213,39 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
     fn type_annotatation(
         &self,
         term: Document,
-        parentheses: Parentheses,
+        term_operator: Option<Operator>,
+        parent: Option<(Operator, Side)>,
         type_annotations: TypeAnnotations,
     ) -> Document {
         if matches!(type_annotations, TypeAnnotations::Off) {
-            return term;
+            return disambiguate(term_operator, parent, [term]);
         }
 
-        let annotated = [
-            term,
-            Document::text(" : "),
-            self.to_document(TypeAnnotations::Off),
-        ];
+        disambiguate(
+            Some(Operator::HasType),
+            parent,
+            [
+                disambiguate(term_operator, Some((Operator::HasType, Side::Left)), [term]),
+                Document::text(" : "),
+                self.to_document(Some((Operator::HasType, Side::Right)), TypeAnnotations::Off),
+            ],
+        )
+    }
+}
 
-        match parentheses {
-            Parentheses::On => parenthesize(annotated),
-            Parentheses::Off => Document::concat(annotated),
-        }
+fn disambiguate(
+    operator: Option<Operator>,
+    parent: Option<(Operator, Side)>,
+    docs: impl IntoIterator<Item = Document>,
+) -> Document {
+    parenthesize_if(operator.is_some_and(|op| op.parenthesize(parent)), docs)
+}
+
+fn parenthesize_if(condition: bool, docs: impl IntoIterator<Item = Document>) -> Document {
+    if condition {
+        parenthesize(docs)
+    } else {
+        Document::concat(docs)
     }
 }
 
@@ -198,4 +255,71 @@ fn parenthesize(docs: impl IntoIterator<Item = Document>) -> Document {
         Document::concat(docs),
         Document::text(")"),
     ])
+}
+
+#[derive(Copy, Clone)]
+pub enum Operator {
+    HasType,
+    Arrow,
+    Application,
+}
+
+impl Operator {
+    fn parenthesize(self, parent: Option<(Operator, Side)>) -> bool {
+        let Some((parent, side)) = parent else {
+            return false;
+        };
+
+        if self.precedence() > parent.precedence() {
+            return false;
+        }
+
+        if self.precedence() < parent.precedence() {
+            return true;
+        }
+
+        assert!(self.precedence() == parent.precedence());
+
+        // We shouldn't have operators of the same precedence but different
+        // associativity. Just in case:
+        if self.associativity() != parent.associativity() {
+            return true;
+        }
+
+        if self.associativity() == side {
+            return false;
+        }
+
+        true
+    }
+
+    fn precedence(self) -> usize {
+        match self {
+            Self::HasType => 0,
+            Self::Arrow => 1,
+            Self::Application => 2,
+        }
+    }
+
+    fn associativity(self) -> Side {
+        match self {
+            Self::HasType => Side::Right,
+            Self::Arrow => Side::Right,
+            Self::Application => Side::Left,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum Side {
+    Left,
+    Right,
+}
+
+pub type Document = RcDoc<'static>;
+
+#[derive(Copy, Clone)]
+pub enum TypeAnnotations {
+    On,
+    Off,
 }

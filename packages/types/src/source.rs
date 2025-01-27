@@ -1,8 +1,10 @@
 use std::rc::Rc;
 
 use crate::{
-    context::VariableLookup, Annotation, Document, EmptyName, Expression, ExpressionRef, Inference,
-    Parentheses, Pretty, Result, TypeAnnotations, VariableBinding, VariableIndex,
+    context::VariableLookup,
+    pretty::{Document, Operator, Side, TypeAnnotations},
+    Annotation, EmptyName, Expression, ExpressionRef, Inference, Pretty, Result, VariableBinding,
+    VariableIndex,
 };
 
 pub struct Source;
@@ -121,11 +123,17 @@ impl<'src> SourceExpression<'src> {
 }
 
 impl Pretty for SourceExpression<'_> {
-    fn to_document(&self, type_annotations: TypeAnnotations) -> Document {
+    fn to_document(
+        &self,
+        parent: Option<(Operator, Side)>,
+        type_annotations: TypeAnnotations,
+    ) -> Document {
         match self.0.as_ref() {
-            SrcExprVariants::Known { expression } => expression.to_document(type_annotations),
+            SrcExprVariants::Known { expression } => {
+                expression.to_document(parent, type_annotations)
+            }
             SrcExprVariants::Unknown { typ } => {
-                typ.type_annotatation(Document::text("_"), Parentheses::On, type_annotations)
+                typ.type_annotatation(Document::text("_"), None, parent, type_annotations)
             }
         }
     }
@@ -140,12 +148,13 @@ impl Pretty for SourceExpression<'_> {
     fn type_annotatation(
         &self,
         term: Document,
-        parentheses: Parentheses,
+        term_operator: Option<Operator>,
+        parent: Option<(Operator, Side)>,
         type_annotations: TypeAnnotations,
     ) -> Document {
         match self.0.as_ref() {
             SrcExprVariants::Known { expression } => {
-                expression.type_annotatation(term, parentheses, type_annotations)
+                expression.type_annotatation(term, term_operator, parent, type_annotations)
             }
             SrcExprVariants::Unknown { .. } => term,
         }

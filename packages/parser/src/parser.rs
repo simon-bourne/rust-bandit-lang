@@ -173,17 +173,17 @@ mod tests {
 
     #[test]
     fn pi() {
-        parse("∀x ⇒ x", "(∀x ⇒ x)");
+        parse("∀x ⇒ x", "∀x ⇒ x");
     }
 
     #[test]
     fn lambda() {
-        parse(r"(\x ⇒ x) Type", r"((\x ⇒ x) Type)");
+        parse(r"(\x ⇒ x) Type", r"(\x ⇒ x) Type");
     }
 
     #[test]
     fn type_annotation() {
-        parse("x : Int", "((x :) Int)");
+        parse("x : Int", "x : Int");
     }
 
     fn parse(input: &str, expected: &str) {

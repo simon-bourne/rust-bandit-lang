@@ -5,7 +5,6 @@ use std::{
     result,
 };
 
-use ::pretty::RcDoc;
 use context::{Context, VariableReference};
 
 pub mod context;
@@ -53,20 +52,6 @@ impl Display for EmptyName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("_")
     }
-}
-
-type Document = RcDoc<'static>;
-
-#[derive(Copy, Clone)]
-pub enum TypeAnnotations {
-    On,
-    Off,
-}
-
-#[derive(Copy, Clone)]
-pub enum Parentheses {
-    On,
-    Off,
 }
 
 #[derive(Clone)]
@@ -479,7 +464,7 @@ mod tests {
         constructor_type.normalize(ctx).unwrap();
         assert_eq!(
             constructor_type.to_pretty_string(80),
-            r"(\_ : (_ → _) ⇒ (\_ ⇒ ((2 : (_ → _)) 1)))"
+            r"\_ : _ → _ ⇒ \_ ⇒ (2 : _ → _) 1"
         );
     }
 
