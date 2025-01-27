@@ -2,6 +2,7 @@ use bandit_types::source::SourceExpression;
 use winnow::{
     combinator::{alt, delimited, opt, preceded, repeat, separated_foldr1, separated_pair},
     error::ContextError,
+    seq,
     token::{any, one_of},
     PResult, Parser as _,
 };
@@ -91,19 +92,17 @@ fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
 fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     preceded(
         Keyword::Let,
-        (
+        seq!(
             variable_binding(),
-            NamedOperator::Assign,
+            _: NamedOperator::Assign,
             expr,
-            Token::LineEnd,
+            _: Token::LineEnd,
             expr,
         ),
     )
-    .map(
-        |((var, typ), _assign, variable_value, _line, in_expression)| {
-            Expr::let_binding(var, typ, variable_value, in_expression)
-        },
-    )
+    .map(|((var, typ), variable_value, in_expression)| {
+        Expr::let_binding(var, typ, variable_value, in_expression)
+    })
 }
 
 fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
