@@ -33,11 +33,7 @@ fn context<'src>(
 fn test_with_ctx(input: &str, expected: &str) {
     let ctx = &mut context(
         ["Int", "Bool"],
-        [
-            ("one", "Int"),
-            ("true", "Bool"),
-            ("add", "Int -> Int -> Int"),
-        ],
+        [("one", "Int"), ("true", "Bool"), ("add", "Int → Int → Int")],
     );
 
     let mut expr = parse(input);
@@ -54,6 +50,6 @@ fn one() {
 fn partial_add() {
     test_with_ctx(
         "add one",
-        "(((add : (Int -> (Int -> Int))) (one : Int)) : (Int -> Int))",
+        "(((add : (Int → (Int → Int))) (one : Int)) : (Int → Int))",
     );
 }

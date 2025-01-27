@@ -33,13 +33,6 @@ fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     separated_foldr1(
         function_applications(),
         operator(NamedOperator::To),
-        // TODO: Optionally parse binding name. Use:
-        // - `∀name . `
-        // - `∀name : Type . `
-        // - `∀x y z . `
-        // - `∀x (y : Type) (z : Type) . `
-        //
-        // This can be used for multi argument lambdas as well.
         |input_type, _, output_type| Expr::function_type("_", input_type, output_type),
     )
 }
@@ -52,6 +45,7 @@ fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     alt((
         typ(),
         variable(),
+        pi(),
         lambda(),
         let_binding(),
         parenthesized(expr),
@@ -60,6 +54,14 @@ fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
 
 fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     identifier().verify_map(|name| (name == "Type").then(Expr::type_of_type))
+}
+
+fn pi<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
+    preceded(
+        token(Token::Pi),
+        separated_pair(variable_binding(), operator(NamedOperator::To), expr),
+    )
+    .map(|((var, typ), expr)| Expr::function_type(var, typ, expr))
 }
 
 fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
@@ -88,6 +90,7 @@ fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     .map(|((var, typ), expr)| Expr::lambda(var, typ, expr))
 }
 
+// TODO: Multiple variable bindings
 fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, Expr<'src>)> {
     (
         identifier(),
@@ -167,7 +170,12 @@ mod tests {
     };
 
     #[test]
-    fn expression() {
+    fn pi() {
+        parse("(\\Pi x → x) Type", "(((_ : Type) → x) Type)");
+    }
+
+    #[test]
+    fn lambda() {
         parse("(\\x = x) Type", "((\\x = x) Type)");
     }
 

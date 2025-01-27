@@ -123,7 +123,7 @@ impl<'src, A: Annotation<'src>> Pretty for Expression<'src, A> {
             ]),
             Self::FunctionType(binding) => parenthesize([
                 binding.variable_type.to_document(type_annotations),
-                Document::text(" -> "),
+                Document::text(" → "),
                 binding.in_expression.to_document(type_annotations),
             ]),
             Self::Lambda(binding) => parenthesize([

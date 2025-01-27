@@ -47,11 +47,9 @@ pub enum Token<'src> {
     #[token("while", |_| Keyword::While)]
     Keyword(Keyword),
 
-    #[token("λ")]
     #[token("\\")]
     Lambda,
 
-    #[token("Π")]
     #[token("\\Pi")]
     Pi,
 
