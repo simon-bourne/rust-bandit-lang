@@ -51,6 +51,10 @@ pub enum Token<'src> {
     #[token("\\")]
     Lambda,
 
+    #[token("Π")]
+    #[token("\\Pi")]
+    Pi,
+
     #[regex(r"(?&ident)")]
     Identifier(&'src str),
 
