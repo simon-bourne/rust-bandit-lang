@@ -39,6 +39,7 @@ impl<'a> Context<'a> {
         output
     }
 
+    // TODO: We need to deep copy global types. What about local types?
     pub fn lookup_type(&self, index: VariableReference<'a>) -> Result<ExpressionRef<'a>> {
         match index {
             VariableReference::Local(index) => Ok(self.local_type(index)),

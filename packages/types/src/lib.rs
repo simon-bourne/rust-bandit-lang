@@ -292,6 +292,7 @@ enum Expression<'src, A: Annotation<'src>> {
         variable_value: A::Expression,
         binding: VariableBinding<'src, A>,
     },
+    // TODO: Do we need to store a constraint on the binding, like `a ~ expression`?
     FunctionType(VariableBinding<'src, A>),
     Lambda(VariableBinding<'src, A>),
     Variable {
