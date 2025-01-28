@@ -3,7 +3,7 @@ use std::rc::Rc;
 use crate::{
     context::VariableLookup,
     pretty::{disambiguate, Document, Operator, Side, TypeAnnotations},
-    EmptyName, Expression, ExpressionRef, Inference, Pretty, Result, Stage, VariableBinding,
+    Expression, ExpressionRef, Inference, Pretty, Result, Stage, VariableBinding,
 };
 
 pub struct Source;
@@ -11,7 +11,6 @@ pub struct Source;
 impl<'src> Stage<'src> for Source {
     type Expression = SourceExpression<'src>;
     type VariableIndex = &'src str;
-    type VariableName = &'src str;
 }
 
 #[derive(Clone)]
@@ -240,7 +239,7 @@ impl<'src> VariableBinding<'src, Source> {
         lookup.with_variable(self.name, |lookup| {
             let in_expression = self.in_expression.to_infer_with_lookup(lookup)?;
             Ok(VariableBinding {
-                name: EmptyName,
+                name: self.name,
                 variable_type,
                 in_expression,
             })

@@ -117,7 +117,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                 [
                     Document::text("let"),
                     binding.variable_type.type_annotatation(
-                        Document::as_string(&binding.name),
+                        Document::as_string(binding.name),
                         None,
                         None,
                         type_annotations,
@@ -168,7 +168,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                 [
                     Document::text("\\"),
                     binding.variable_type.type_annotatation(
-                        Document::as_string(&binding.name),
+                        Document::as_string(binding.name),
                         None,
                         None,
                         type_annotations,

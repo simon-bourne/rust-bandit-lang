@@ -22,7 +22,6 @@ pub struct InferenceError;
 
 pub trait Stage<'src> {
     type Expression: Pretty;
-    type VariableName: 'src + Display;
     type VariableIndex: 'src + Display;
 }
 
@@ -31,7 +30,6 @@ pub struct Inference;
 impl<'src> Stage<'src> for Inference {
     type Expression = ExpressionRef<'src>;
     type VariableIndex = VariableReference<'src>;
-    type VariableName = EmptyName;
 }
 
 struct Inferred;
@@ -39,15 +37,6 @@ struct Inferred;
 impl<'src> Stage<'src> for Inferred {
     type Expression = Rc<Expression<'src, Self>>;
     type VariableIndex = VariableReference<'src>;
-    type VariableName = EmptyName;
-}
-
-pub struct EmptyName;
-
-impl Display for EmptyName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("_")
-    }
 }
 
 #[derive(Clone)]
@@ -76,7 +65,7 @@ impl<'src> ExpressionRef<'src> {
 
     fn function_type(argument_type: Self, result_type: Self) -> Self {
         Self::new(Expression::FunctionType(VariableBinding {
-            name: EmptyName,
+            name: "_",
             variable_type: argument_type,
             in_expression: result_type,
         }))
@@ -244,7 +233,7 @@ enum Expression<'src, S: Stage<'src>> {
 }
 
 struct VariableBinding<'src, S: Stage<'src>> {
-    name: S::VariableName,
+    name: &'src str,
     variable_type: S::Expression,
     in_expression: S::Expression,
 }
@@ -341,7 +330,7 @@ mod tests {
         constructor_type.infer_types(ctx).unwrap();
         assert_eq!(
             constructor_type.to_pretty_string(80),
-            r"\_ : _ → _ ⇒ \_ ⇒ (2 : _ → _) 1"
+            r"\m : _ → _ ⇒ \a ⇒ (2 : _ → _) 1"
         );
     }
 
