@@ -14,7 +14,6 @@ impl<'src> Stage<'src> for Source {
     type VariableName = &'src str;
 }
 
-// TODO: Can this be Box?
 #[derive(Clone)]
 pub struct SourceExpression<'src>(Rc<SrcExprVariants<'src>>);
 
