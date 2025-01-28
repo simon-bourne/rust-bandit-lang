@@ -1,7 +1,7 @@
-use std::{collections::HashMap, rc::Rc};
+use std::rc::Rc;
 
 use crate::{
-    context::{Context, VariableLookup},
+    context::VariableLookup,
     pretty::{disambiguate, Document, Operator, Side, TypeAnnotations},
     EmptyName, Expression, ExpressionRef, Inference, Pretty, Result, Stage, VariableBinding,
 };
@@ -115,9 +115,7 @@ impl<'src> SourceExpression<'src> {
             SrcExprVariants::TypeAnnotation { expression, typ } => {
                 let expression = expression.to_infer_with_lookup(lookup)?;
                 let mut typ = typ.to_infer_with_lookup(lookup)?;
-                // TODO: Can we add these as deferred unifications, so we don't need `ctx``?
-                let ctx = &mut Context::new(HashMap::new());
-                ExpressionRef::unify(ctx, &mut expression.typ(), &mut typ)?;
+                ExpressionRef::unify(&mut expression.typ(), &mut typ)?;
                 expression
             }
             SrcExprVariants::Unknown { typ } => {

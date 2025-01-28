@@ -107,7 +107,7 @@ impl<'src> ExpressionRef<'src> {
         }
     }
 
-    fn unify(ctx: &mut Context<'src>, x: &mut Self, y: &mut Self) -> Result<()> {
+    fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
         x.follow_links();
         y.follow_links();
 
@@ -116,14 +116,14 @@ impl<'src> ExpressionRef<'src> {
         }
 
         let Some(mut x_ref) = x.known() else {
-            Self::unify(ctx, &mut x.typ(), &mut y.typ())?;
+            Self::unify(&mut x.typ(), &mut y.typ())?;
             x.replace(y);
             return Ok(());
         };
 
         let Some(mut y_ref) = y.known() else {
             drop(x_ref);
-            Self::unify(ctx, &mut x.typ(), &mut y.typ())?;
+            Self::unify(&mut x.typ(), &mut y.typ())?;
             y.replace(x);
             return Ok(());
         };
@@ -143,9 +143,9 @@ impl<'src> ExpressionRef<'src> {
                     typ: typ1,
                 },
             ) => {
-                Self::unify(ctx, function, function1)?;
-                Self::unify(ctx, argument, argument1)?;
-                Self::unify(ctx, typ, typ1)?;
+                Self::unify(function, function1)?;
+                Self::unify(argument, argument1)?;
+                Self::unify(typ, typ1)?;
             }
             (
                 Expression::Let {
@@ -157,14 +157,14 @@ impl<'src> ExpressionRef<'src> {
                     binding: binding1,
                 },
             ) => {
-                Self::unify(ctx, variable_value, variable_value1)?;
-                VariableBinding::unify(ctx, binding, binding1)?;
+                Self::unify(variable_value, variable_value1)?;
+                VariableBinding::unify(binding, binding1)?;
             }
             (Expression::FunctionType(binding0), Expression::FunctionType(binding1)) => {
-                VariableBinding::unify(ctx, binding0, binding1)?
+                VariableBinding::unify(binding0, binding1)?
             }
             (Expression::Lambda(binding0), Expression::Lambda(binding1)) => {
-                VariableBinding::unify(ctx, binding0, binding1)?
+                VariableBinding::unify(binding0, binding1)?
             }
             // TODO: Keep track of the max allowed de_bruijn index, so we can assert there's no free
             // varaibles.
@@ -175,9 +175,7 @@ impl<'src> ExpressionRef<'src> {
                     typ: typ1,
                 },
             ) if index == index1 => {
-                let mut ctx_type = ctx.lookup_type(*index)?;
-                Self::unify(ctx, typ, &mut ctx_type)?;
-                Self::unify(ctx, typ1, &mut ctx_type)?
+                Self::unify(typ, typ1)?;
             }
             // It's safer to explicitly ignore each variant
             (Expression::Type, _rhs)
@@ -254,7 +252,6 @@ struct VariableBinding<'src, S: Stage<'src>> {
 impl<'src> VariableBinding<'src, Inference> {
     fn infer_types(&mut self, ctx: &mut Context<'src>) -> Result<()> {
         ExpressionRef::unify(
-            ctx,
             &mut self.variable_type.typ(),
             &mut ExpressionRef::type_of_type(),
         )?;
@@ -264,24 +261,9 @@ impl<'src> VariableBinding<'src, Inference> {
         })
     }
 
-    fn unify(
-        ctx: &mut Context<'src>,
-        binding0: &mut VariableBinding<'src, Inference>,
-        binding1: &mut VariableBinding<'src, Inference>,
-    ) -> Result<()> {
-        ExpressionRef::unify(
-            ctx,
-            &mut binding0.variable_type,
-            &mut binding1.variable_type,
-        )?;
-
-        ctx.with_variable(binding0.variable_type.clone(), |ctx| {
-            ExpressionRef::unify(
-                ctx,
-                &mut binding0.in_expression,
-                &mut binding1.in_expression,
-            )
-        })
+    fn unify(binding0: &mut Self, binding1: &mut Self) -> Result<()> {
+        ExpressionRef::unify(&mut binding0.variable_type, &mut binding1.variable_type)?;
+        ExpressionRef::unify(&mut binding0.in_expression, &mut binding1.in_expression)
     }
 }
 
@@ -290,8 +272,8 @@ impl<'src> Expression<'src, Inference> {
         match self {
             Self::Type => (),
             Self::Variable { index, typ } => {
-                ExpressionRef::unify(ctx, &mut typ.typ(), &mut ExpressionRef::type_of_type())?;
-                ExpressionRef::unify(ctx, typ, &mut ctx.lookup_type(*index)?)?;
+                ExpressionRef::unify(&mut typ.typ(), &mut ExpressionRef::type_of_type())?;
+                ExpressionRef::unify(typ, &mut ctx.lookup_type(*index)?)?;
                 typ.infer_types(ctx)?
             }
             Self::Apply {
@@ -299,9 +281,9 @@ impl<'src> Expression<'src, Inference> {
                 argument,
                 typ,
             } => {
-                ExpressionRef::unify(ctx, &mut typ.typ(), &mut ExpressionRef::type_of_type())?;
+                ExpressionRef::unify(&mut typ.typ(), &mut ExpressionRef::type_of_type())?;
                 let function_type = &mut ExpressionRef::function_type(argument.typ(), typ.clone());
-                ExpressionRef::unify(ctx, function_type, &mut function.typ())?;
+                ExpressionRef::unify(function_type, &mut function.typ())?;
 
                 function.infer_types(ctx)?;
                 argument.infer_types(ctx)?;
