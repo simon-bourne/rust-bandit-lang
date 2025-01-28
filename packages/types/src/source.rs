@@ -27,7 +27,6 @@ pub struct SweetExpression<'src, S: Stage<'src>>(Rc<SrcExprVariants<'src, S>>);
 
 pub type SourceExpression<'src> = SweetExpression<'src, Source>;
 
-// TODO: Can we combine this with SourceExpression?
 pub type NamesResolvedExpression<'src> = SweetExpression<'src, NamesResolved>;
 
 impl<'src> NamesResolvedExpression<'src> {

@@ -25,7 +25,6 @@ pub trait Stage<'src> {
     type Variable: Pretty;
 }
 
-// TODO: Rename to Linked?
 pub struct Inference;
 
 impl<'src> Stage<'src> for Inference {
@@ -105,6 +104,7 @@ impl<'src> ExpressionRef<'src> {
         };
 
         if let Expression::Variable(var) = &mut *x_ref {
+            // TODO: Should we replace `var` with `y`, and do the same for `x` below?
             return Self::unify(&mut var.typ, &mut y.typ());
         }
 
