@@ -4,12 +4,12 @@ use bandit_parser::{
     lex::{SrcToken, Token},
     parser::{expr, Expr},
 };
-use bandit_types::{context::Context, ExpressionRef, Pretty};
+use bandit_types::{context::Context, source::NamesResolvedExpression, Pretty};
 use winnow::Parser;
 
-fn parse(input: &str) -> ExpressionRef<'_> {
+fn parse(input: &str) -> NamesResolvedExpression<'_> {
     let tokens: Vec<SrcToken> = Token::layout(input).collect();
-    expr.parse(&tokens).unwrap().to_infer().unwrap()
+    expr.parse(&tokens).unwrap().resolve_names().unwrap()
 }
 
 fn context<'src>(
@@ -17,7 +17,7 @@ fn context<'src>(
     items: impl IntoIterator<Item = (&'src str, &'src str)>,
 ) -> Context<'src> {
     let mut global_items = HashMap::new();
-    let type_of_type = Expr::type_of_type().to_infer().unwrap();
+    let type_of_type = Expr::type_of_type().resolve_names().unwrap();
 
     for typ in types {
         global_items.insert(typ, type_of_type.clone());
@@ -43,8 +43,8 @@ fn test_with_ctx(input: &str, expected: &str) {
         ],
     );
 
-    let mut expr = parse(input);
-    expr.infer_types(ctx).unwrap();
+    let mut expr = parse(input).link(ctx).unwrap();
+    expr.infer_types().unwrap();
     assert_eq!(expr.to_pretty_string(80), expected);
 }
 

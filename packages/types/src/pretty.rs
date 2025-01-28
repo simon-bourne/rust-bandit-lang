@@ -1,8 +1,11 @@
-use std::rc::Rc;
+use std::fmt;
 
 use pretty::RcDoc;
 
-use crate::{ExprRefVariants, Expression, ExpressionRef, Inferred, Stage};
+use crate::{
+    context::{Variable, VariableReference},
+    ExprRefVariants, Expression, ExpressionRef, Stage,
+};
 
 pub trait Pretty {
     fn to_document(
@@ -26,24 +29,9 @@ pub trait Pretty {
     }
 }
 
-impl Pretty for Rc<Expression<'_, Inferred>> {
-    fn to_document(
-        &self,
-        parent: Option<(Operator, Side)>,
-        type_annotations: TypeAnnotations,
-    ) -> Document {
-        self.as_ref().to_document(parent, type_annotations)
-    }
-
-    fn type_annotatation(
-        &self,
-        term: Document,
-        term_operator: Option<Operator>,
-        parent: Option<(Operator, Side)>,
-        type_annotations: TypeAnnotations,
-    ) -> Document {
-        self.as_ref()
-            .type_annotatation(term, term_operator, parent, type_annotations)
+impl fmt::Debug for ExpressionRef<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.to_pretty_string(80))
     }
 }
 
@@ -116,6 +104,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                 parent.is_some(),
                 [
                     Document::text("let"),
+                    Document::space(),
                     binding.variable_type.type_annotatation(
                         Document::as_string(binding.name),
                         None,
@@ -177,9 +166,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                     binding.in_expression.to_document(None, type_annotations),
                 ],
             ),
-            Self::Variable { index, typ } => {
-                typ.type_annotatation(Document::as_string(index), None, parent, type_annotations)
-            }
+            Self::Variable(var) => var.to_document(parent, type_annotations),
         }
     }
 
@@ -197,12 +184,102 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
         let op = Operator::HasType;
 
         disambiguate(
-            Some(Operator::HasType),
+            Some(op),
             parent,
             [
                 disambiguate(term_operator, Some((op, Side::Left)), [term]),
                 Document::text(" : "),
                 self.to_document(Some((op, Side::Right)), TypeAnnotations::Off),
+            ],
+        )
+    }
+}
+
+impl fmt::Debug for VariableReference<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.to_pretty_string(80))
+    }
+}
+
+impl Pretty for VariableReference<'_> {
+    fn to_document(
+        &self,
+        parent: Option<(Operator, Side)>,
+        type_annotations: TypeAnnotations,
+    ) -> Document {
+        let term = self.name().to_document(parent, type_annotations);
+        self.typ
+            .type_annotatation(term, None, parent, type_annotations)
+    }
+
+    fn type_annotatation(
+        &self,
+        term: Document,
+        term_operator: Option<Operator>,
+        parent: Option<(Operator, Side)>,
+        type_annotations: TypeAnnotations,
+    ) -> Document {
+        self.name()
+            .type_annotatation(term, term_operator, parent, type_annotations)
+    }
+}
+
+impl fmt::Debug for Variable<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.to_pretty_string(80))
+    }
+}
+
+impl Pretty for Variable<'_> {
+    fn to_document(
+        &self,
+        parent: Option<(crate::pretty::Operator, crate::pretty::Side)>,
+        type_annotations: crate::pretty::TypeAnnotations,
+    ) -> crate::pretty::Document {
+        self.name().to_document(parent, type_annotations)
+    }
+
+    fn type_annotatation(
+        &self,
+        term: crate::pretty::Document,
+        term_operator: Option<crate::pretty::Operator>,
+        parent: Option<(crate::pretty::Operator, crate::pretty::Side)>,
+        type_annotations: crate::pretty::TypeAnnotations,
+    ) -> crate::pretty::Document {
+        self.name()
+            .type_annotatation(term, term_operator, parent, type_annotations)
+    }
+}
+
+impl Pretty for &'_ str {
+    fn to_document(
+        &self,
+        _parent: Option<(crate::pretty::Operator, crate::pretty::Side)>,
+        _type_annotations: crate::pretty::TypeAnnotations,
+    ) -> crate::pretty::Document {
+        Document::as_string(self)
+    }
+
+    fn type_annotatation(
+        &self,
+        term: crate::pretty::Document,
+        term_operator: Option<crate::pretty::Operator>,
+        parent: Option<(crate::pretty::Operator, crate::pretty::Side)>,
+        type_annotations: crate::pretty::TypeAnnotations,
+    ) -> crate::pretty::Document {
+        if matches!(type_annotations, TypeAnnotations::Off) {
+            return disambiguate(term_operator, parent, [term]);
+        }
+
+        let op = Operator::HasType;
+
+        disambiguate(
+            Some(op),
+            parent,
+            [
+                disambiguate(term_operator, Some((op, Side::Left)), [term]),
+                Document::text(" : "),
+                Document::as_string(self),
             ],
         )
     }

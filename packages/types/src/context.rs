@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt};
 
-use crate::{ExpressionRef, InferenceError, Result};
+use crate::{source::NamesResolvedExpression, ExpressionRef, InferenceError, Result};
 
 pub struct DeBruijnLevel(usize);
 
@@ -13,7 +13,7 @@ impl fmt::Display for DeBruijnIndex {
     }
 }
 
-pub type GlobalTypes<'a> = HashMap<&'a str, ExpressionRef<'a>>;
+pub type GlobalTypes<'a> = HashMap<&'a str, NamesResolvedExpression<'a>>;
 
 pub struct Context<'a> {
     local_variables: Vec<ExpressionRef<'a>>,
@@ -39,12 +39,16 @@ impl<'a> Context<'a> {
         output
     }
 
-    // TODO: We need to deep copy global types. What about local types?
-    pub fn lookup_type(&self, variable: Variable<'a>) -> Result<ExpressionRef<'a>> {
-        match variable.scope {
+    pub fn lookup_type(&mut self, variable: Variable<'a>) -> Result<VariableReference<'a>> {
+        let typ = match variable.scope {
             VariableScope::Local(index) => Ok(self.local_type(index)),
             VariableScope::Global => self.global_type(variable.name),
-        }
+        }?;
+
+        Ok(VariableReference {
+            name: variable.name,
+            typ,
+        })
     }
 
     fn local_type(&self, index: DeBruijnIndex) -> ExpressionRef<'a> {
@@ -53,8 +57,12 @@ impl<'a> Context<'a> {
         self.local_variables[len - index.0].clone()
     }
 
-    fn global_type(&self, name: &str) -> Result<ExpressionRef<'a>> {
-        self.global_types.get(name).cloned().ok_or(InferenceError)
+    fn global_type(&mut self, name: &str) -> Result<ExpressionRef<'a>> {
+        self.global_types
+            .get(name)
+            .cloned()
+            .ok_or(InferenceError)?
+            .link(self)
     }
 }
 
@@ -98,10 +106,33 @@ impl<'a> VariableLookup<'a> {
     }
 }
 
+pub struct VariableReference<'src> {
+    name: &'src str,
+    pub typ: ExpressionRef<'src>,
+}
+
+impl VariableReference<'_> {
+    pub fn name(&self) -> &str {
+        self.name
+    }
+}
+
+impl fmt::Display for VariableReference<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.name)
+    }
+}
+
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct Variable<'src> {
     name: &'src str,
     scope: VariableScope,
+}
+
+impl Variable<'_> {
+    pub fn name(&self) -> &str {
+        self.name
+    }
 }
 
 impl fmt::Display for Variable<'_> {
