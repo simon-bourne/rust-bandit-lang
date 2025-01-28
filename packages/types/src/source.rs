@@ -2,6 +2,7 @@ use std::{fmt, rc::Rc};
 
 use crate::{
     context::{Context, Variable, VariableLookup},
+    literal::Literal,
     pretty::{disambiguate, Document, Operator, Side, TypeAnnotations},
     Expression, ExpressionRef, Pretty, Result, Stage, VariableBinding,
 };
@@ -77,7 +78,7 @@ impl<'src> SourceExpression<'src> {
     }
 
     pub fn type_of_type() -> Self {
-        Self::new(Expression::Type)
+        Self::new(Expression::Literal(Literal::TypeOfType))
     }
 
     pub fn apply(self, argument: Self) -> Self {
@@ -174,7 +175,7 @@ impl<'src, S: Stage<'src>> GetOperator for SweetExpression<'src, S> {
                 Expression::FunctionType(binding) => {
                     (binding.name == "_").then_some(Operator::Arrow)
                 }
-                Expression::Type
+                Expression::Literal(_)
                 | Expression::Let { .. }
                 | Expression::Lambda(_)
                 | Expression::Variable { .. } => None,
@@ -255,7 +256,7 @@ impl<'src> Expression<'src, Source> {
         lookup: &mut VariableLookup<'src>,
     ) -> Result<NamesResolvedExpression<'src>> {
         let expr = match self {
-            Self::Type => Expression::Type,
+            Self::Literal(literal) => Expression::Literal(literal.clone()),
             Self::Apply {
                 function,
                 argument,

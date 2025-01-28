@@ -78,7 +78,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
         type_annotations: TypeAnnotations,
     ) -> Document {
         match self {
-            Self::Type => Document::text("Type"),
+            Self::Literal(literal) => Document::as_string(literal),
             Self::Apply {
                 function,
                 argument,
