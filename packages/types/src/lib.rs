@@ -22,21 +22,21 @@ pub struct InferenceError;
 
 pub trait Stage<'src> {
     type Expression: Pretty;
-    type VariableIndex: 'src + Display;
+    type Variable: 'src + Display;
 }
 
 pub struct Inference;
 
 impl<'src> Stage<'src> for Inference {
     type Expression = ExpressionRef<'src>;
-    type VariableIndex = VariableReference<'src>;
+    type Variable = VariableReference<'src>;
 }
 
 struct Inferred;
 
 impl<'src> Stage<'src> for Inferred {
     type Expression = Rc<Expression<'src, Self>>;
-    type VariableIndex = VariableReference<'src>;
+    type Variable = VariableReference<'src>;
 }
 
 #[derive(Clone)]
@@ -227,7 +227,7 @@ enum Expression<'src, S: Stage<'src>> {
     FunctionType(VariableBinding<'src, S>),
     Lambda(VariableBinding<'src, S>),
     Variable {
-        index: S::VariableIndex,
+        index: S::Variable,
         typ: S::Expression,
     },
 }

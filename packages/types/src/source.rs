@@ -10,7 +10,7 @@ pub struct Source;
 
 impl<'src> Stage<'src> for Source {
     type Expression = SourceExpression<'src>;
-    type VariableIndex = &'src str;
+    type Variable = &'src str;
 }
 
 #[derive(Clone)]
