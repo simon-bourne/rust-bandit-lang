@@ -5,7 +5,7 @@ use std::{
     result,
 };
 
-use context::{Context, VariableReference};
+use context::{Context, Variable};
 
 pub mod context;
 mod pretty;
@@ -29,14 +29,14 @@ pub struct Inference;
 
 impl<'src> Stage<'src> for Inference {
     type Expression = ExpressionRef<'src>;
-    type Variable = VariableReference<'src>;
+    type Variable = Variable<'src>;
 }
 
 struct Inferred;
 
 impl<'src> Stage<'src> for Inferred {
     type Expression = Rc<Expression<'src, Self>>;
-    type Variable = VariableReference<'src>;
+    type Variable = Variable<'src>;
 }
 
 #[derive(Clone)]
