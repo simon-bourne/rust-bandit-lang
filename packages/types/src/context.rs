@@ -40,10 +40,10 @@ impl<'a> Context<'a> {
     }
 
     // TODO: We need to deep copy global types. What about local types?
-    pub fn lookup_type(&self, index: Variable<'a>) -> Result<ExpressionRef<'a>> {
-        match index {
-            Variable::Local(index) => Ok(self.local_type(index)),
-            Variable::Global(name) => self.global_type(name),
+    pub fn lookup_type(&self, variable: Variable<'a>) -> Result<ExpressionRef<'a>> {
+        match variable.scope {
+            VariableScope::Local(index) => Ok(self.local_type(index)),
+            VariableScope::Global => self.global_type(variable.name),
         }
     }
 
@@ -82,11 +82,13 @@ impl<'a> VariableLookup<'a> {
     }
 
     pub fn lookup(&self, name: &'a str) -> Variable<'a> {
-        if let Some(local_index) = self.lookup_local(name) {
-            Variable::Local(local_index)
+        let scope = if let Some(local_index) = self.lookup_local(name) {
+            VariableScope::Local(local_index)
         } else {
-            Variable::Global(name)
-        }
+            VariableScope::Global
+        };
+
+        Variable { name, scope }
     }
 
     fn lookup_local(&self, name: &str) -> Option<DeBruijnIndex> {
@@ -97,16 +99,19 @@ impl<'a> VariableLookup<'a> {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub enum Variable<'src> {
-    Local(DeBruijnIndex),
-    Global(&'src str),
+pub struct Variable<'src> {
+    name: &'src str,
+    scope: VariableScope,
 }
 
 impl fmt::Display for Variable<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Variable::Local(de_bruijn_index) => de_bruijn_index.fmt(f),
-            Variable::Global(name) => name.fmt(f),
-        }
+        f.write_str(self.name)
     }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum VariableScope {
+    Local(DeBruijnIndex),
+    Global,
 }
