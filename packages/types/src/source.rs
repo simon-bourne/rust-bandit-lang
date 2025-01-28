@@ -114,8 +114,8 @@ impl<'src> SourceExpression<'src> {
             SrcExprVariants::Known { expression } => expression.to_infer(lookup)?,
             SrcExprVariants::TypeAnnotation { expression, typ } => {
                 let expression = expression.to_infer_with_lookup(lookup)?;
-                let mut typ = typ.to_infer_with_lookup(lookup)?;
-                ExpressionRef::unify(&mut expression.typ(), &mut typ)?;
+                let typ = &mut typ.to_infer_with_lookup(lookup)?;
+                ExpressionRef::unify(&mut expression.typ(), typ)?;
                 expression
             }
             SrcExprVariants::Unknown { typ } => {
