@@ -163,33 +163,44 @@ impl<'src> SourceExpression<'src> {
     }
 }
 
-// TODO: Use `operator`
-// impl<'src, S: Stage<'src>> SweetExpression<'src, S> {
-//     fn operator(&self) -> Option<Operator> {
-//         match self.0.as_ref() {
-//             SrcExprVariants::Known { expression } => match expression {
-//                 Expression::Apply { .. } => Some(Operator::Apply),
-//                 Expression::FunctionType(binding) => {
-//                     (binding.name == "_").then_some(Operator::Arrow)
-//                 }
-//                 Expression::Type
-//                 | Expression::Let { .. }
-//                 | Expression::Lambda(_)
-//                 | Expression::Variable { .. } => None,
-//             },
-//             SrcExprVariants::TypeAnnotation { .. } =>
-// Some(Operator::HasType),             SrcExprVariants::Unknown { .. } => None,
-//         }
-//     }
-// }
+trait GetOperator {
+    fn operator(&self) -> Option<Operator>;
+}
 
-impl<'src, S: Stage<'src>> fmt::Debug for SweetExpression<'src, S> {
+impl<'src, S: Stage<'src>> GetOperator for SweetExpression<'src, S> {
+    fn operator(&self) -> Option<Operator> {
+        match self.0.as_ref() {
+            SrcExprVariants::Known { expression } => match expression {
+                Expression::Apply { .. } => Some(Operator::Apply),
+                Expression::FunctionType(binding) => {
+                    (binding.name == "_").then_some(Operator::Arrow)
+                }
+                Expression::Type
+                | Expression::Let { .. }
+                | Expression::Lambda(_)
+                | Expression::Variable { .. } => None,
+            },
+            SrcExprVariants::TypeAnnotation { .. } => Some(Operator::HasType),
+            SrcExprVariants::Unknown { .. } => None,
+        }
+    }
+}
+
+impl<'src, S> fmt::Debug for SweetExpression<'src, S>
+where
+    S::Expression: GetOperator,
+    S: Stage<'src>,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.to_pretty_string(80))
     }
 }
 
-impl<'src, S: Stage<'src>> Pretty for SweetExpression<'src, S> {
+impl<'src, S> Pretty for SweetExpression<'src, S>
+where
+    S::Expression: GetOperator,
+    S: Stage<'src>,
+{
     fn to_document(
         &self,
         parent: Option<(Operator, Side)>,
@@ -202,13 +213,7 @@ impl<'src, S: Stage<'src>> Pretty for SweetExpression<'src, S> {
             SrcExprVariants::TypeAnnotation { expression, typ } => {
                 let has_type = Operator::HasType;
                 let term = expression.to_document(Some((has_type, Side::Left)), type_annotations);
-                typ.type_annotatation(
-                    term,
-                    // TODO: use `expression.operator()`
-                    None,
-                    parent,
-                    type_annotations,
-                )
+                typ.type_annotatation(term, expression.operator(), parent, type_annotations)
             }
             SrcExprVariants::Unknown { typ } => {
                 typ.type_annotatation(Document::text("_"), None, parent, type_annotations)
