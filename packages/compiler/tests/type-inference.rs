@@ -32,8 +32,15 @@ fn context<'src>(
 
 fn test_with_ctx(input: &str, expected: &str) {
     let ctx = &mut context(
-        ["Int", "Bool"],
-        [("one", "Int"), ("true", "Bool"), ("add", "Int → Int → Int")],
+        ["Bool", "Int", "Float"],
+        [
+            ("one", "Int"),
+            ("pi", "Float"),
+            ("true", "Bool"),
+            ("add", "Int → Int → Int"),
+            ("id", "∀a ⇒ a → a"),
+            ("int_to_float", "Int → Float"),
+        ],
     );
 
     let mut expr = parse(input);
@@ -49,4 +56,24 @@ fn one() {
 #[test]
 fn partial_add() {
     test_with_ctx("add one", "(add : Int → Int → Int) (one : Int) : Int → Int");
+}
+
+#[test]
+// TODO: No it shouldn't
+#[should_panic]
+fn simple_id() {
+    test_with_ctx(
+        "id Int one",
+        "((id : ∀a ⇒ a → a) Int : Int → Int) one : Int",
+    );
+}
+
+#[test]
+// TODO: No it shouldn't
+#[should_panic]
+fn multi_id() {
+    test_with_ctx(
+        "add (id Int one) (int_to_float (id Float pi))",
+        "((add : Int → Int → Int) ((id : ∀a => a -> a) Int (one : Int)) : Int → Int) (int_to_float (((id : ∀a => a -> a) Float (pi : Float)))",
+    );
 }
