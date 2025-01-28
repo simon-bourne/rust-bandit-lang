@@ -22,7 +22,7 @@ pub struct InferenceError;
 
 pub trait Stage<'src> {
     type Expression: Pretty;
-    type Variable: 'src + Pretty;
+    type Variable: Pretty;
 }
 
 // TODO: Rename to Linked?
