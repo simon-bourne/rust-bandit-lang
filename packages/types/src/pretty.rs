@@ -213,7 +213,7 @@ impl Pretty for VariableReference<'_> {
         parent: Option<(Operator, Side)>,
         type_annotations: TypeAnnotations,
     ) -> Document {
-        self.name()
+        self.value
             .type_annotation(term, term_operator, parent, type_annotations)
     }
 }
