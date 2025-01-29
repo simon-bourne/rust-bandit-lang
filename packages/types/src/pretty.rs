@@ -4,7 +4,7 @@ use pretty::RcDoc;
 
 use crate::{
     context::{Variable, VariableReference},
-    ExprRefVariants, Expression, ExpressionRef, Stage,
+    ExprRefVariants, Expression, ExpressionRef, Stage, VariableBinding,
 };
 
 pub trait Pretty {
@@ -77,6 +77,17 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
         parent: Option<(Operator, Side)>,
         type_annotations: TypeAnnotations,
     ) -> Document {
+        let binding_doc = |binding: &VariableBinding<'src, S>| {
+            Document::concat([
+                Document::text("{"),
+                Document::as_string(binding.name),
+                Document::text(" = "),
+                binding
+                    .variable_value
+                    .to_document(None, TypeAnnotations::On),
+                Document::text("}"),
+            ])
+        };
         match self {
             Self::Literal(literal) => Document::as_string(literal),
             Self::Apply {
@@ -97,22 +108,12 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                     type_annotations,
                 )
             }
-            Self::Let {
-                variable_value,
-                binding,
-            } => parenthesize_if(
+            Self::Let(binding) => parenthesize_if(
                 parent.is_some(),
                 [
                     Document::text("let"),
                     Document::space(),
-                    binding.variable_type.type_annotatation(
-                        Document::as_string(binding.name),
-                        None,
-                        None,
-                        type_annotations,
-                    ),
-                    Document::text(" = "),
-                    variable_value.to_document(None, type_annotations),
+                    binding_doc(binding),
                     Document::text(" in "),
                     binding.in_expression.to_document(None, type_annotations),
                 ],
@@ -126,9 +127,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                         Some(op),
                         parent,
                         [
-                            binding
-                                .variable_type
-                                .to_document(Some((op, Side::Left)), type_annotations),
+                            binding_doc(binding),
                             Document::text(" → "),
                             binding
                                 .in_expression
@@ -140,12 +139,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                         parent.is_some(),
                         [
                             Document::text("∀"),
-                            binding.variable_type.type_annotatation(
-                                Document::text(variable_name),
-                                None,
-                                None,
-                                type_annotations,
-                            ),
+                            binding_doc(binding),
                             Document::text(" ⇒ "),
                             binding.in_expression.to_document(None, type_annotations),
                         ],
@@ -156,12 +150,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                 parent.is_some(),
                 [
                     Document::text("\\"),
-                    binding.variable_type.type_annotatation(
-                        Document::as_string(binding.name),
-                        None,
-                        None,
-                        type_annotations,
-                    ),
+                    binding_doc(binding),
                     Document::text(" ⇒ "),
                     binding.in_expression.to_document(None, type_annotations),
                 ],
@@ -207,9 +196,14 @@ impl Pretty for VariableReference<'_> {
         parent: Option<(Operator, Side)>,
         type_annotations: TypeAnnotations,
     ) -> Document {
-        let term = self.name().to_document(parent, type_annotations);
-        self.typ
-            .type_annotatation(term, None, parent, type_annotations)
+        if self.value.is_known() {
+            self.value.to_document(parent, type_annotations)
+        } else {
+            let term = self.name().to_document(parent, type_annotations);
+            self.value
+                .typ()
+                .type_annotatation(term, None, parent, type_annotations)
+        }
     }
 
     fn type_annotatation(

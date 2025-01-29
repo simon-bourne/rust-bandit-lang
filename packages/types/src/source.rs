@@ -77,6 +77,14 @@ impl<'src> SourceExpression<'src> {
         }))
     }
 
+    pub fn unknown_with_type(typ: Self) -> Self {
+        Self(Rc::new(SrcExprVariants::Unknown { typ }))
+    }
+
+    pub fn literal_type(name: &'src str) -> Self {
+        Self::new(Expression::Literal(Literal::Type(name.to_string())))
+    }
+
     pub fn type_of_type() -> Self {
         Self::new(Expression::Literal(Literal::TypeOfType))
     }
@@ -89,26 +97,18 @@ impl<'src> SourceExpression<'src> {
         })
     }
 
-    pub fn let_binding(
-        name: &'src str,
-        variable_type: Self,
-        variable_value: Self,
-        in_expression: Self,
-    ) -> Self {
-        Self::new(Expression::Let {
+    pub fn let_binding(name: &'src str, variable_value: Self, in_expression: Self) -> Self {
+        Self::new(Expression::Let(VariableBinding {
+            name,
             variable_value,
-            binding: VariableBinding {
-                name,
-                variable_type,
-                in_expression,
-            },
-        })
+            in_expression,
+        }))
     }
 
     pub fn function_type(name: &'src str, argument_type: Self, result_type: Self) -> Self {
         Self::new(Expression::FunctionType(VariableBinding {
             name,
-            variable_type: argument_type,
+            variable_value: Self::unknown_with_type(argument_type),
             in_expression: result_type,
         }))
     }
@@ -116,7 +116,7 @@ impl<'src> SourceExpression<'src> {
     pub fn lambda(name: &'src str, argument_type: Self, in_expression: Self) -> Self {
         Self::new(Expression::Lambda(VariableBinding {
             name,
-            variable_type: argument_type,
+            variable_value: Self::unknown_with_type(argument_type),
             in_expression,
         }))
     }
@@ -266,16 +266,7 @@ impl<'src> Expression<'src, Source> {
                 argument: argument.resolve_names_with_lookup(lookup)?,
                 typ: typ.resolve_names_with_lookup(lookup)?,
             },
-            Self::Let {
-                variable_value,
-                binding,
-            } => {
-                let variable_value = variable_value.resolve_names_with_lookup(lookup)?;
-                Expression::Let {
-                    variable_value,
-                    binding: binding.resolve_names(lookup)?,
-                }
-            }
+            Self::Let(binding) => Expression::Let(binding.resolve_names(lookup)?),
             Self::FunctionType(binding) => Expression::FunctionType(binding.resolve_names(lookup)?),
             Self::Lambda(binding) => Expression::Lambda(binding.resolve_names(lookup)?),
             Self::Variable(name) => Expression::Variable(lookup.lookup(name)),
@@ -292,13 +283,13 @@ impl<'src> VariableBinding<'src, Source> {
         &self,
         lookup: &mut VariableLookup<'src>,
     ) -> Result<VariableBinding<'src, NamesResolved>> {
-        let variable_type = self.variable_type.resolve_names_with_lookup(lookup)?;
+        let variable_value = self.variable_value.resolve_names_with_lookup(lookup)?;
 
         lookup.with_variable(self.name, |lookup| {
             let in_expression = self.in_expression.resolve_names_with_lookup(lookup)?;
             Ok(VariableBinding {
                 name: self.name,
-                variable_type,
+                variable_value,
                 in_expression,
             })
         })

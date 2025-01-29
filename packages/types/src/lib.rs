@@ -62,10 +62,10 @@ impl<'src> ExpressionRef<'src> {
         Self::new(Expression::Literal(lit))
     }
 
-    fn function_type(argument_type: Self, result_type: Self) -> Self {
+    fn function_type(argument_value: Self, result_type: Self) -> Self {
         Self::new(Expression::FunctionType(VariableBinding {
             name: "_",
-            variable_type: argument_type,
+            variable_value: argument_value,
             in_expression: result_type,
         }))
     }
@@ -105,25 +105,32 @@ impl<'src> ExpressionRef<'src> {
 
         let Some(mut x_ref) = x.known() else {
             Self::unify(&mut x.typ(), &mut y.typ())?;
-            x.replace(y);
+            x.replace_with(y);
             return Ok(());
         };
 
         if let Expression::Variable(var) = &mut *x_ref {
             // TODO: Should we replace `var` with `y`, and do the same for `x` below?
-            return Self::unify(&mut var.typ, &mut y.typ());
+            // TODO: Factor this out with the other handling of variables on the RHS.
+            Self::unify(&mut var.value, y)?;
+            Self::unify(&mut var.value.typ(), &mut y.typ())?;
+            drop(x_ref);
+            return Ok(());
         }
 
         let Some(mut y_ref) = y.known() else {
             drop(x_ref);
             Self::unify(&mut x.typ(), &mut y.typ())?;
-            y.replace(x);
+            y.replace_with(x);
             return Ok(());
         };
 
         if let Expression::Variable(var) = &mut *y_ref {
             drop(x_ref);
-            return Self::unify(&mut var.typ, &mut x.typ());
+            Self::unify(&mut var.value, x)?;
+            Self::unify(&mut var.value.typ(), &mut x.typ())?;
+            drop(y_ref);
+            return Ok(());
         }
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
@@ -146,18 +153,8 @@ impl<'src> ExpressionRef<'src> {
                 Self::unify(argument, argument1)?;
                 Self::unify(typ, typ1)?;
             }
-            (
-                Expression::Let {
-                    variable_value,
-                    binding,
-                },
-                Expression::Let {
-                    variable_value: variable_value1,
-                    binding: binding1,
-                },
-            ) => {
-                Self::unify(variable_value, variable_value1)?;
-                VariableBinding::unify(binding, binding1)?;
+            (Expression::Let(binding0), Expression::Let(binding1)) => {
+                VariableBinding::unify(binding0, binding1)?
             }
             (Expression::FunctionType(binding0), Expression::FunctionType(binding1)) => {
                 VariableBinding::unify(binding0, binding1)?
@@ -176,12 +173,12 @@ impl<'src> ExpressionRef<'src> {
 
         drop(x_ref);
         drop(y_ref);
-        x.replace(y);
+        x.replace_with(y);
 
         Ok(())
     }
 
-    fn replace(&mut self, other: &Self) {
+    fn replace_with(&mut self, other: &Self) {
         RefCell::replace(
             &self.0,
             ExprRefVariants::Link {
@@ -202,6 +199,14 @@ impl<'src> ExpressionRef<'src> {
         .ok()
     }
 
+    fn is_known(&self) -> bool {
+        match &*self.0.borrow() {
+            ExprRefVariants::Known { .. } => true,
+            ExprRefVariants::Unknown { .. } => false,
+            ExprRefVariants::Link { target } => target.is_known(),
+        }
+    }
+
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
             ExprRefVariants::Known { expression } => expression.typ(),
@@ -218,11 +223,7 @@ enum Expression<'src, S: Stage<'src>> {
         argument: S::Expression,
         typ: S::Expression,
     },
-    Let {
-        variable_value: S::Expression,
-        binding: VariableBinding<'src, S>,
-    },
-    // TODO: Do we need to store a constraint on the binding, like `a ~ expression`?
+    Let(VariableBinding<'src, S>),
     FunctionType(VariableBinding<'src, S>),
     Lambda(VariableBinding<'src, S>),
     Variable(S::Variable),
@@ -230,22 +231,31 @@ enum Expression<'src, S: Stage<'src>> {
 
 struct VariableBinding<'src, S: Stage<'src>> {
     name: &'src str,
-    variable_type: S::Expression,
+    variable_value: S::Expression,
     in_expression: S::Expression,
 }
 
 impl VariableBinding<'_, Inference> {
     fn infer_types(&mut self) -> Result<()> {
+        // TODO: Is this required?
         ExpressionRef::unify(
-            &mut self.variable_type.typ(),
+            &mut self.variable_value.typ().typ(),
             &mut ExpressionRef::type_of_type(),
         )?;
-        self.variable_type.infer_types()?;
+        self.variable_value.infer_types()?;
         self.in_expression.infer_types()
     }
 
     fn unify(binding0: &mut Self, binding1: &mut Self) -> Result<()> {
-        ExpressionRef::unify(&mut binding0.variable_type, &mut binding1.variable_type)?;
+        ExpressionRef::unify(
+            &mut binding0.variable_value.typ(),
+            &mut binding1.variable_value.typ(),
+        )?;
+        ExpressionRef::unify(&mut binding0.variable_value, &mut binding1.variable_value)?;
+        ExpressionRef::unify(
+            &mut binding0.in_expression.typ(),
+            &mut binding1.in_expression.typ(),
+        )?;
         ExpressionRef::unify(&mut binding0.in_expression, &mut binding1.in_expression)
     }
 }
@@ -253,13 +263,13 @@ impl VariableBinding<'_, Inference> {
 impl<'src> VariableBinding<'src, NamesResolved> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<'src, Inference>> {
         let name = self.name;
-        let variable_type = self.variable_type.link(ctx)?;
+        let variable_value = self.variable_value.link(ctx)?;
         let in_expression =
-            ctx.with_variable(variable_type.clone(), |ctx| self.in_expression.link(ctx))?;
+            ctx.with_variable(variable_value.clone(), |ctx| self.in_expression.link(ctx))?;
 
         Ok(VariableBinding {
             name,
-            variable_type,
+            variable_value,
             in_expression,
         })
     }
@@ -278,16 +288,10 @@ impl<'src> Expression<'src, NamesResolved> {
                 argument: argument.link(ctx)?,
                 typ: typ.link(ctx)?,
             },
-            Self::Let {
-                variable_value,
-                binding,
-            } => Expression::Let {
-                variable_value: variable_value.link(ctx)?,
-                binding: binding.link(ctx)?,
-            },
+            Self::Let(binding) => Expression::Let(binding.link(ctx)?),
             Self::FunctionType(binding) => Expression::FunctionType(binding.link(ctx)?),
             Self::Lambda(binding) => Expression::Lambda(binding.link(ctx)?),
-            Self::Variable(variable) => Expression::Variable(ctx.lookup_type(*variable)?),
+            Self::Variable(variable) => Expression::Variable(ctx.lookup_value(*variable)?),
         }))
     }
 }
@@ -297,9 +301,9 @@ impl<'src> Expression<'src, Inference> {
         match self {
             Self::Literal(_) => (),
             Self::Variable(var) => {
-                let typ = &mut var.typ;
-                ExpressionRef::unify(&mut typ.typ(), &mut ExpressionRef::type_of_type())?;
-                typ.infer_types()?
+                let value = &mut var.value;
+                ExpressionRef::unify(&mut value.typ().typ(), &mut ExpressionRef::type_of_type())?;
+                value.infer_types()?
             }
             Self::Apply {
                 function,
@@ -307,20 +311,15 @@ impl<'src> Expression<'src, Inference> {
                 typ,
             } => {
                 ExpressionRef::unify(&mut typ.typ(), &mut ExpressionRef::type_of_type())?;
-                let function_type = &mut ExpressionRef::function_type(argument.typ(), typ.clone());
+                let function_type =
+                    &mut ExpressionRef::function_type(argument.clone(), typ.clone());
                 ExpressionRef::unify(function_type, &mut function.typ())?;
 
                 function.infer_types()?;
                 argument.infer_types()?;
                 typ.infer_types()?;
             }
-            Self::Let {
-                variable_value,
-                binding,
-            } => {
-                variable_value.infer_types()?;
-                binding.infer_types()?;
-            }
+            Self::Let(binding) => binding.infer_types()?,
             Self::FunctionType(binding) => binding.infer_types()?,
             Self::Lambda(binding) => binding.infer_types()?,
         }
@@ -331,12 +330,12 @@ impl<'src> Expression<'src, Inference> {
     fn typ(&self) -> ExpressionRef<'src> {
         match self {
             Self::Literal(literal) => ExpressionRef::literal(literal.typ()),
-            Self::Variable(var) => var.typ.clone(),
+            Self::Variable(var) => var.value.typ(),
             Self::Apply { typ, .. } => typ.clone(),
-            Self::Let { binding, .. } => binding.in_expression.typ(),
+            Self::Let(binding) => binding.in_expression.typ(),
             Self::FunctionType(_binding) => ExpressionRef::type_of_type(),
             Self::Lambda(binding) => ExpressionRef::function_type(
-                binding.variable_type.clone(),
+                binding.variable_value.clone(),
                 binding.in_expression.typ(),
             ),
         }
@@ -366,7 +365,7 @@ mod tests {
         constructor_type.infer_types().unwrap();
         assert_eq!(
             constructor_type.to_pretty_string(80),
-            r"\m : _ → _ ⇒ \a ⇒ (m : _ → _) a"
+            r"\{m = _ : {_ = a} → _} ⇒ \{a = _} ⇒ (m : {_ = a} → _) a"
         );
     }
 
@@ -377,15 +376,11 @@ mod tests {
     #[should_panic]
     fn let_error() {
         // let x : Int = 1 in x : Float
+        // TODO:
         let int_type = Expr::variable("Int");
         let float_type = Expr::variable("Float");
         let one = Expr::variable("one").has_type(int_type.clone());
-        let let_binding = Expr::let_binding(
-            "x",
-            int_type.clone(),
-            one,
-            Expr::variable("x").has_type(float_type),
-        );
+        let let_binding = Expr::let_binding("x", one, Expr::variable("x").has_type(float_type));
 
         let mut global_types = HashMap::new();
         global_types.insert("one", int_type.resolve_names().unwrap());

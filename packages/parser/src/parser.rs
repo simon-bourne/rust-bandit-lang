@@ -105,7 +105,7 @@ fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     )
     .map(
         |((var, typ), _assign, variable_value, _linend, in_expression)| {
-            Expr::let_binding(var, typ, variable_value, in_expression)
+            Expr::let_binding(var, variable_value.has_type(typ), in_expression)
         },
     )
 }
@@ -166,12 +166,12 @@ mod tests {
 
     #[test]
     fn pi() {
-        parse("∀x ⇒ x", "∀x ⇒ x");
+        parse("∀x ⇒ x", "∀{x = _} ⇒ x");
     }
 
     #[test]
     fn lambda() {
-        parse(r"(\x ⇒ x) Type", r"(\x ⇒ x) Type");
+        parse(r"(\x ⇒ x) Type", r"(\{x = _} ⇒ x) Type");
     }
 
     #[test]

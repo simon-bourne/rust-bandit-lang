@@ -13,52 +13,52 @@ impl fmt::Display for DeBruijnIndex {
     }
 }
 
-pub type GlobalTypes<'a> = HashMap<&'a str, NamesResolvedExpression<'a>>;
+pub type GlobalValues<'a> = HashMap<&'a str, NamesResolvedExpression<'a>>;
 
 pub struct Context<'a> {
     local_variables: Vec<ExpressionRef<'a>>,
-    global_types: GlobalTypes<'a>,
+    global_variables: GlobalValues<'a>,
 }
 
 impl<'a> Context<'a> {
-    pub fn new(global_types: GlobalTypes<'a>) -> Self {
+    pub fn new(global_variables: GlobalValues<'a>) -> Self {
         Self {
             local_variables: Vec::new(),
-            global_types,
+            global_variables,
         }
     }
 
     pub fn with_variable<Output>(
         &mut self,
-        typ: ExpressionRef<'a>,
+        value: ExpressionRef<'a>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Output {
-        self.local_variables.push(typ.clone());
+        self.local_variables.push(value.clone());
         let output = f(self);
         self.local_variables.pop();
         output
     }
 
-    pub fn lookup_type(&mut self, variable: Variable<'a>) -> Result<VariableReference<'a>> {
-        let typ = match variable.scope {
-            VariableScope::Local(index) => Ok(self.local_type(index)),
-            VariableScope::Global => self.global_type(variable.name),
+    pub fn lookup_value(&mut self, variable: Variable<'a>) -> Result<VariableReference<'a>> {
+        let value = match variable.scope {
+            VariableScope::Local(index) => Ok(self.local_value(index)),
+            VariableScope::Global => self.global_value(variable.name),
         }?;
 
         Ok(VariableReference {
             name: variable.name,
-            typ,
+            value,
         })
     }
 
-    fn local_type(&self, index: DeBruijnIndex) -> ExpressionRef<'a> {
+    fn local_value(&self, index: DeBruijnIndex) -> ExpressionRef<'a> {
         let len = self.local_variables.len();
         assert!(index.0 <= len);
         self.local_variables[len - index.0].clone()
     }
 
-    fn global_type(&mut self, name: &str) -> Result<ExpressionRef<'a>> {
-        self.global_types
+    fn global_value(&mut self, name: &str) -> Result<ExpressionRef<'a>> {
+        self.global_variables
             .get(name)
             .cloned()
             .ok_or(InferenceError)?
@@ -108,7 +108,7 @@ impl<'a> VariableLookup<'a> {
 
 pub struct VariableReference<'src> {
     name: &'src str,
-    pub typ: ExpressionRef<'src>,
+    pub value: ExpressionRef<'src>,
 }
 
 impl VariableReference<'_> {
