@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn lambda() {
-        // TODO: Once we have normalization, this should infer the type to be `Type`
+        // TODO: This should infer the type to be `Type`
         parse(r"(\x ⇒ x) Type", r"(\x ⇒ x) Type : _");
     }
 
