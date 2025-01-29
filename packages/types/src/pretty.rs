@@ -11,25 +11,25 @@ pub trait Pretty {
     fn to_document(
         &self,
         parent: Option<(Operator, Side)>,
-        type_annotations: TypeAnnotations,
+        annotations: Annotation,
     ) -> Document;
 
     fn annotate_with_type(
         &self,
         typ: &(impl Pretty + ?Sized),
         parent: Option<(Operator, Side)>,
-        type_annotations: TypeAnnotations,
+        annotation: Annotation,
     ) -> Document {
         annotate_with_type(
-            |parent| self.to_document(parent, TypeAnnotations::Off),
+            |parent| self.to_document(parent, Annotation::Off),
             typ,
             parent,
-            type_annotations,
+            annotation,
         )
     }
 
     fn to_pretty_string(&self, width: usize) -> String {
-        self.to_document(None, TypeAnnotations::On)
+        self.to_document(None, Annotation::On)
             .pretty(width)
             .to_string()
     }
@@ -39,9 +39,9 @@ fn annotate_with_type(
     to_doc: impl FnOnce(Option<(Operator, Side)>) -> Document,
     typ: &(impl ?Sized + Pretty),
     parent: Option<(Operator, Side)>,
-    type_annotations: TypeAnnotations,
+    annotation: Annotation,
 ) -> Document {
-    if matches!(type_annotations, TypeAnnotations::Off) {
+    if matches!(annotation, Annotation::Off) {
         return to_doc(parent);
     }
 
@@ -53,7 +53,7 @@ fn annotate_with_type(
         [
             to_doc(Some((op, Side::Left))),
             Document::text(" : "),
-            typ.to_document(Some((op, Side::Right)), TypeAnnotations::Off),
+            typ.to_document(Some((op, Side::Right)), Annotation::Off),
         ],
     )
 }
@@ -68,16 +68,16 @@ impl Pretty for ExpressionRef<'_> {
     fn to_document(
         &self,
         parent: Option<(Operator, Side)>,
-        type_annotations: TypeAnnotations,
+        annotation: Annotation,
     ) -> Document {
         match &*self.0.borrow() {
             ExprRefVariants::Known { expression } => {
-                expression.to_document(parent, type_annotations)
+                expression.to_document(parent, annotation)
             }
             ExprRefVariants::Unknown { typ } => {
-                "_".annotate_with_type(typ, parent, type_annotations)
+                "_".annotate_with_type(typ, parent, annotation)
             }
-            ExprRefVariants::Link { target } => target.to_document(parent, type_annotations),
+            ExprRefVariants::Link { target } => target.to_document(parent, annotation),
         }
     }
 }
@@ -86,7 +86,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
     fn to_document(
         &self,
         parent: Option<(Operator, Side)>,
-        type_annotations: TypeAnnotations,
+        annotation: Annotation,
     ) -> Document {
         let binding_doc = |binding: &VariableBinding<'src, S>| {
             Document::concat([
@@ -95,7 +95,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                 Document::text(" = "),
                 binding
                     .variable_value
-                    .to_document(None, TypeAnnotations::On),
+                    .to_document(None, Annotation::On),
                 Document::text("}"),
             ])
         };
@@ -114,15 +114,15 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                             Some(Operator::Apply),
                             parent,
                             [
-                                function.to_document(Some((op, Side::Left)), type_annotations),
+                                function.to_document(Some((op, Side::Left)), annotation),
                                 Document::space(),
-                                argument.to_document(Some((op, Side::Right)), type_annotations),
+                                argument.to_document(Some((op, Side::Right)), annotation),
                             ],
                         )
                     },
                     typ,
                     parent,
-                    type_annotations,
+                    annotation,
                 )
             }
             // TODO: Fix bindings"
@@ -133,7 +133,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                     Document::space(),
                     binding_doc(binding),
                     Document::text(" in "),
-                    binding.in_expression.to_document(None, type_annotations),
+                    binding.in_expression.to_document(None, annotation),
                 ],
             ),
             Self::FunctionType(binding) => {
@@ -149,7 +149,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                             Document::text(" → "),
                             binding
                                 .in_expression
-                                .to_document(Some((op, Side::Right)), type_annotations),
+                                .to_document(Some((op, Side::Right)), annotation),
                         ],
                     )
                 } else {
@@ -159,7 +159,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                             Document::text("∀"),
                             binding_doc(binding),
                             Document::text(" ⇒ "),
-                            binding.in_expression.to_document(None, type_annotations),
+                            binding.in_expression.to_document(None, annotation),
                         ],
                     )
                 }
@@ -170,10 +170,10 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                     Document::text("\\"),
                     binding_doc(binding),
                     Document::text(" ⇒ "),
-                    binding.in_expression.to_document(None, type_annotations),
+                    binding.in_expression.to_document(None, annotation),
                 ],
             ),
-            Self::Variable(var) => var.to_document(parent, type_annotations),
+            Self::Variable(var) => var.to_document(parent, annotation),
         }
     }
 }
@@ -188,10 +188,10 @@ impl Pretty for VariableReference<'_> {
     fn to_document(
         &self,
         parent: Option<(Operator, Side)>,
-        type_annotations: TypeAnnotations,
+        annotation: Annotation,
     ) -> Document {
         self.name()
-            .annotate_with_type(&self.value.typ(), parent, type_annotations)
+            .annotate_with_type(&self.value.typ(), parent, annotation)
     }
 }
 
@@ -205,9 +205,9 @@ impl Pretty for Variable<'_> {
     fn to_document(
         &self,
         parent: Option<(crate::pretty::Operator, crate::pretty::Side)>,
-        type_annotations: crate::pretty::TypeAnnotations,
+        annotation: crate::pretty::Annotation,
     ) -> crate::pretty::Document {
-        self.name().to_document(parent, type_annotations)
+        self.name().to_document(parent, annotation)
     }
 }
 
@@ -215,7 +215,7 @@ impl Pretty for str {
     fn to_document(
         &self,
         _parent: Option<(crate::pretty::Operator, crate::pretty::Side)>,
-        _type_annotations: crate::pretty::TypeAnnotations,
+        _annotation: crate::pretty::Annotation,
     ) -> crate::pretty::Document {
         Document::as_string(self)
     }
@@ -225,9 +225,9 @@ impl Pretty for &str {
     fn to_document(
         &self,
         parent: Option<(Operator, Side)>,
-        type_annotations: TypeAnnotations,
+        annotation: Annotation,
     ) -> Document {
-        (*self).to_document(parent, type_annotations)
+        (*self).to_document(parent, annotation)
     }
 }
 
@@ -317,7 +317,7 @@ pub enum Side {
 pub type Document = RcDoc<'static>;
 
 #[derive(Copy, Clone)]
-pub enum TypeAnnotations {
+pub enum Annotation {
     On,
     Off,
 }

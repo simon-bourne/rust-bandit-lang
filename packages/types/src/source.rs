@@ -3,7 +3,7 @@ use std::{fmt, rc::Rc};
 use crate::{
     context::{Context, Variable, VariableLookup},
     literal::Literal,
-    pretty::{Document, Operator, Side, TypeAnnotations},
+    pretty::{Document, Operator, Side, Annotation},
     Expression, ExpressionRef, Pretty, Result, Stage, VariableBinding,
 };
 
@@ -179,17 +179,17 @@ where
     fn to_document(
         &self,
         parent: Option<(Operator, Side)>,
-        type_annotations: TypeAnnotations,
+        annotation: Annotation,
     ) -> Document {
         match self.0.as_ref() {
             SrcExprVariants::Known { expression } => {
-                expression.to_document(parent, type_annotations)
+                expression.to_document(parent, annotation)
             }
             SrcExprVariants::TypeAnnotation { expression, typ } => {
-                expression.annotate_with_type(typ, parent, type_annotations)
+                expression.annotate_with_type(typ, parent, annotation)
             }
             SrcExprVariants::Unknown { typ } => {
-                "_".annotate_with_type(typ, parent, type_annotations)
+                "_".annotate_with_type(typ, parent, annotation)
             }
         }
     }
