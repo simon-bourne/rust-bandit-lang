@@ -110,7 +110,6 @@ impl<'src> ExpressionRef<'src> {
         };
 
         if let Expression::Variable(var) = &mut *x_ref {
-            // TODO: Should we replace `var` with `y`, and do the same for `x` below?
             // TODO: Factor this out with the other handling of variables on the RHS.
             Self::unify(&mut var.value, y)?;
             Self::unify(&mut var.value.typ(), &mut y.typ())?;
@@ -197,14 +196,6 @@ impl<'src> ExpressionRef<'src> {
             }
         })
         .ok()
-    }
-
-    fn is_known(&self) -> bool {
-        match &*self.0.borrow() {
-            ExprRefVariants::Known { .. } => true,
-            ExprRefVariants::Unknown { .. } => false,
-            ExprRefVariants::Link { target } => target.is_known(),
-        }
     }
 
     fn typ(&self) -> Self {
@@ -365,7 +356,7 @@ mod tests {
         constructor_type.infer_types().unwrap();
         assert_eq!(
             constructor_type.to_pretty_string(80),
-            r"\{m = _ : {_ = a} → _} ⇒ \{a = _} ⇒ (m : {_ = a} → _) a"
+            r"\{m = _ : {_ = a : _} → _} ⇒ \{a = _ : _} ⇒ (m : {_ = a : _} → _) (a : _) : _"
         );
     }
 

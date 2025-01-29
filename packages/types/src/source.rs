@@ -3,7 +3,7 @@ use std::{fmt, rc::Rc};
 use crate::{
     context::{Context, Variable, VariableLookup},
     literal::Literal,
-    pretty::{disambiguate, Document, Operator, Side, TypeAnnotations},
+    pretty::{Document, Operator, Side, TypeAnnotations},
     Expression, ExpressionRef, Pretty, Result, Stage, VariableBinding,
 };
 
@@ -163,32 +163,8 @@ impl<'src> SourceExpression<'src> {
     }
 }
 
-trait GetOperator {
-    fn operator(&self) -> Option<Operator>;
-}
-
-impl<'src, S: Stage<'src>> GetOperator for SweetExpression<'src, S> {
-    fn operator(&self) -> Option<Operator> {
-        match self.0.as_ref() {
-            SrcExprVariants::Known { expression } => match expression {
-                Expression::Apply { .. } => Some(Operator::Apply),
-                Expression::FunctionType(binding) => {
-                    (binding.name == "_").then_some(Operator::Arrow)
-                }
-                Expression::Literal(_)
-                | Expression::Let { .. }
-                | Expression::Lambda(_)
-                | Expression::Variable { .. } => None,
-            },
-            SrcExprVariants::TypeAnnotation { .. } => Some(Operator::HasType),
-            SrcExprVariants::Unknown { .. } => None,
-        }
-    }
-}
-
 impl<'src, S> fmt::Debug for SweetExpression<'src, S>
 where
-    S::Expression: GetOperator,
     S: Stage<'src>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -198,7 +174,6 @@ where
 
 impl<'src, S> Pretty for SweetExpression<'src, S>
 where
-    S::Expression: GetOperator,
     S: Stage<'src>,
 {
     fn to_document(
@@ -211,41 +186,11 @@ where
                 expression.to_document(parent, type_annotations)
             }
             SrcExprVariants::TypeAnnotation { expression, typ } => {
-                let has_type = Operator::HasType;
-                let term = expression.to_document(Some((has_type, Side::Left)), type_annotations);
-                typ.type_annotation(term, expression.operator(), parent, type_annotations)
+                expression.annotate_with_type(typ, parent, type_annotations)
             }
             SrcExprVariants::Unknown { typ } => {
-                typ.type_annotation(Document::text("_"), None, parent, type_annotations)
+                "_".annotate_with_type(typ, parent, type_annotations)
             }
-        }
-    }
-
-    fn type_annotation(
-        &self,
-        term: Document,
-        term_operator: Option<Operator>,
-        parent: Option<(Operator, Side)>,
-        type_annotations: TypeAnnotations,
-    ) -> Document {
-        match self.0.as_ref() {
-            SrcExprVariants::Known { expression } => {
-                expression.type_annotation(term, term_operator, parent, type_annotations)
-            }
-            SrcExprVariants::TypeAnnotation { .. } => {
-                let op = Operator::HasType;
-                let typ = self.to_document(Some((op, Side::Left)), type_annotations);
-                disambiguate(
-                    Some(op),
-                    parent,
-                    [
-                        disambiguate(term_operator, Some((op, Side::Right)), [term]),
-                        Document::text(":"),
-                        typ,
-                    ],
-                )
-            }
-            SrcExprVariants::Unknown { .. } => term,
         }
     }
 }

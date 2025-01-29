@@ -14,19 +14,48 @@ pub trait Pretty {
         type_annotations: TypeAnnotations,
     ) -> Document;
 
-    fn type_annotation(
+    fn annotate_with_type(
         &self,
-        term: Document,
-        term_operator: Option<Operator>,
+        typ: &(impl Pretty + ?Sized),
         parent: Option<(Operator, Side)>,
         type_annotations: TypeAnnotations,
-    ) -> Document;
+    ) -> Document {
+        annotate_with_type(
+            |parent| self.to_document(parent, TypeAnnotations::Off),
+            typ,
+            parent,
+            type_annotations,
+        )
+    }
 
     fn to_pretty_string(&self, width: usize) -> String {
         self.to_document(None, TypeAnnotations::On)
             .pretty(width)
             .to_string()
     }
+}
+
+fn annotate_with_type(
+    to_doc: impl FnOnce(Option<(Operator, Side)>) -> Document,
+    typ: &(impl ?Sized + Pretty),
+    parent: Option<(Operator, Side)>,
+    type_annotations: TypeAnnotations,
+) -> Document {
+    if matches!(type_annotations, TypeAnnotations::Off) {
+        return to_doc(parent);
+    }
+
+    let op = Operator::HasType;
+
+    disambiguate(
+        Some(op),
+        parent,
+        [
+            to_doc(Some((op, Side::Left))),
+            Document::text(" : "),
+            typ.to_document(Some((op, Side::Right)), TypeAnnotations::Off),
+        ],
+    )
 }
 
 impl fmt::Debug for ExpressionRef<'_> {
@@ -46,27 +75,9 @@ impl Pretty for ExpressionRef<'_> {
                 expression.to_document(parent, type_annotations)
             }
             ExprRefVariants::Unknown { typ } => {
-                typ.type_annotation(Document::text("_"), None, parent, type_annotations)
+                "_".annotate_with_type(typ, parent, type_annotations)
             }
             ExprRefVariants::Link { target } => target.to_document(parent, type_annotations),
-        }
-    }
-
-    fn type_annotation(
-        &self,
-        term: Document,
-        term_operator: Option<Operator>,
-        parent: Option<(Operator, Side)>,
-        type_annotations: TypeAnnotations,
-    ) -> Document {
-        match &*self.0.borrow() {
-            ExprRefVariants::Known { expression } => {
-                expression.type_annotation(term, term_operator, parent, type_annotations)
-            }
-            ExprRefVariants::Unknown { .. } => term,
-            ExprRefVariants::Link { target } => {
-                target.type_annotation(term, term_operator, parent, type_annotations)
-            }
         }
     }
 }
@@ -97,17 +108,24 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
             } => {
                 let op = Operator::Apply;
 
-                typ.type_annotation(
-                    Document::concat([
-                        function.to_document(Some((op, Side::Left)), type_annotations),
-                        Document::space(),
-                        argument.to_document(Some((op, Side::Right)), type_annotations),
-                    ]),
-                    Some(op),
+                annotate_with_type(
+                    |parent| {
+                        disambiguate(
+                            Some(Operator::Apply),
+                            parent,
+                            [
+                                function.to_document(Some((op, Side::Left)), type_annotations),
+                                Document::space(),
+                                argument.to_document(Some((op, Side::Right)), type_annotations),
+                            ],
+                        )
+                    },
+                    typ,
                     parent,
                     type_annotations,
                 )
             }
+            // TODO: Fix bindings"
             Self::Let(binding) => parenthesize_if(
                 parent.is_some(),
                 [
@@ -158,30 +176,6 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
             Self::Variable(var) => var.to_document(parent, type_annotations),
         }
     }
-
-    fn type_annotation(
-        &self,
-        term: Document,
-        term_operator: Option<Operator>,
-        parent: Option<(Operator, Side)>,
-        type_annotations: TypeAnnotations,
-    ) -> Document {
-        if matches!(type_annotations, TypeAnnotations::Off) {
-            return disambiguate(term_operator, parent, [term]);
-        }
-
-        let op = Operator::HasType;
-
-        disambiguate(
-            Some(op),
-            parent,
-            [
-                disambiguate(term_operator, Some((op, Side::Left)), [term]),
-                Document::text(" : "),
-                self.to_document(Some((op, Side::Right)), TypeAnnotations::Off),
-            ],
-        )
-    }
 }
 
 impl fmt::Debug for VariableReference<'_> {
@@ -196,25 +190,8 @@ impl Pretty for VariableReference<'_> {
         parent: Option<(Operator, Side)>,
         type_annotations: TypeAnnotations,
     ) -> Document {
-        if self.value.is_known() {
-            self.value.to_document(parent, type_annotations)
-        } else {
-            let term = self.name().to_document(parent, type_annotations);
-            self.value
-                .typ()
-                .type_annotation(term, None, parent, type_annotations)
-        }
-    }
-
-    fn type_annotation(
-        &self,
-        term: Document,
-        term_operator: Option<Operator>,
-        parent: Option<(Operator, Side)>,
-        type_annotations: TypeAnnotations,
-    ) -> Document {
-        self.value
-            .type_annotation(term, term_operator, parent, type_annotations)
+        self.name()
+            .annotate_with_type(&self.value.typ(), parent, type_annotations)
     }
 }
 
@@ -232,20 +209,9 @@ impl Pretty for Variable<'_> {
     ) -> crate::pretty::Document {
         self.name().to_document(parent, type_annotations)
     }
-
-    fn type_annotation(
-        &self,
-        term: crate::pretty::Document,
-        term_operator: Option<crate::pretty::Operator>,
-        parent: Option<(crate::pretty::Operator, crate::pretty::Side)>,
-        type_annotations: crate::pretty::TypeAnnotations,
-    ) -> crate::pretty::Document {
-        self.name()
-            .type_annotation(term, term_operator, parent, type_annotations)
-    }
 }
 
-impl Pretty for &'_ str {
+impl Pretty for str {
     fn to_document(
         &self,
         _parent: Option<(crate::pretty::Operator, crate::pretty::Side)>,
@@ -253,29 +219,15 @@ impl Pretty for &'_ str {
     ) -> crate::pretty::Document {
         Document::as_string(self)
     }
+}
 
-    fn type_annotation(
+impl Pretty for &str {
+    fn to_document(
         &self,
-        term: crate::pretty::Document,
-        term_operator: Option<crate::pretty::Operator>,
-        parent: Option<(crate::pretty::Operator, crate::pretty::Side)>,
-        type_annotations: crate::pretty::TypeAnnotations,
-    ) -> crate::pretty::Document {
-        if matches!(type_annotations, TypeAnnotations::Off) {
-            return disambiguate(term_operator, parent, [term]);
-        }
-
-        let op = Operator::HasType;
-
-        disambiguate(
-            Some(op),
-            parent,
-            [
-                disambiguate(term_operator, Some((op, Side::Left)), [term]),
-                Document::text(" : "),
-                Document::as_string(self),
-            ],
-        )
+        parent: Option<(Operator, Side)>,
+        type_annotations: TypeAnnotations,
+    ) -> Document {
+        (*self).to_document(parent, type_annotations)
     }
 }
 

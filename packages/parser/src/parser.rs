@@ -166,12 +166,12 @@ mod tests {
 
     #[test]
     fn pi() {
-        parse("∀x ⇒ x", "∀{x = _} ⇒ x");
+        parse("∀x ⇒ x", "∀{x = _ : _} ⇒ x");
     }
 
     #[test]
     fn lambda() {
-        parse(r"(\x ⇒ x) Type", r"(\{x = _} ⇒ x) Type");
+        parse(r"(\x ⇒ x) Type", r"(\{x = _ : _} ⇒ x) Type : _");
     }
 
     #[test]

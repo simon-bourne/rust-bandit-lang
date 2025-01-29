@@ -67,7 +67,7 @@ fn partial_add() {
 fn simple_id() {
     test_with_ctx(
         "id Int one",
-        "((id : (∀{a = Int} ⇒ {_ = _ : Int} → Int)) Int : {_ = _ : Int} → Int) (one : Int) : Int",
+        "((id : (∀{a = Int} ⇒ {_ = _ : a} → a)) (Int : Type) : {_ = _ : a} → a) (one : a) : a",
     );
 }
 
@@ -75,6 +75,6 @@ fn simple_id() {
 fn multi_id() {
     test_with_ctx(
         "add (id Int one) (float_to_int (id Float pi))",
-        "((add : {_ = ((id : (∀{a = Int} ⇒ {_ = _ : Int} → Int)) Int : {_ = _ : Int} → Int) (one : Int) : Int} → {_ = (float_to_int : {_ = ((id : (∀{a = Float} ⇒ {_ = _ : Float} → Float)) Float : {_ = _ : Float} → Float) (pi : Float) : Float} → Int) (((id : (∀{a = Float} ⇒ {_ = _ : Float} → Float)) Float : {_ = _ : Float} → Float) (pi : Float) : Float) : Int} → Int) (((id : (∀{a = Int} ⇒ {_ = _ : Int} → Int)) Int : {_ = _ : Int} → Int) (one : Int) : Int) : {_ = (float_to_int : {_ = ((id : (∀{a = Float} ⇒ {_ = _ : Float} → Float)) Float : {_ = _ : Float} → Float) (pi : Float) : Float} → Int) (((id : (∀{a = Float} ⇒ {_ = _ : Float} → Float)) Float : {_ = _ : Float} → Float) (pi : Float) : Float) : Int} → Int) ((float_to_int : {_ = ((id : (∀{a = Float} ⇒ {_ = _ : Float} → Float)) Float : {_ = _ : Float} → Float) (pi : Float) : Float} → Int) (((id : (∀{a = Float} ⇒ {_ = _ : Float} → Float)) Float : {_ = _ : Float} → Float) (pi : Float) : Float) : Int) : Int",
+        "((add : {_ = ((id : (∀{a = Int} ⇒ {_ = _ : a} → a)) (Int : Type) : {_ = _ : a} → a) (one : a) : Int} → {_ = (float_to_int : {_ = ((id : (∀{a = Float} ⇒ {_ = _ : a} → a)) (Float : Type) : {_ = _ : a} → a) (pi : a) : Float} → Int) (((id : (∀{a = Float} ⇒ {_ = _ : a} → a)) (Float : Type) : {_ = _ : a} → a) (pi : a) : Float) : Int} → Int) (((id : (∀{a = Int} ⇒ {_ = _ : a} → a)) (Int : Type) : {_ = _ : a} → a) (one : a) : Int) : {_ = (float_to_int : {_ = ((id : (∀{a = Float} ⇒ {_ = _ : a} → a)) (Float : Type) : {_ = _ : a} → a) (pi : a) : Float} → Int) (((id : (∀{a = Float} ⇒ {_ = _ : a} → a)) (Float : Type) : {_ = _ : a} → a) (pi : a) : Float) : Int} → Int) ((float_to_int : {_ = ((id : (∀{a = Float} ⇒ {_ = _ : a} → a)) (Float : Type) : {_ = _ : a} → a) (pi : a) : Float} → Int) (((id : (∀{a = Float} ⇒ {_ = _ : a} → a)) (Float : Type) : {_ = _ : a} → a) (pi : a) : Float) : Int) : Int"
     );
 }
