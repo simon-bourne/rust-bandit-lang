@@ -3,7 +3,7 @@ use std::{fmt, rc::Rc};
 use crate::{
     context::{Context, Variable, VariableLookup},
     literal::Literal,
-    pretty::{Document, Operator, Side, Annotation},
+    pretty::{Annotation, Document, Operator, Side},
     Expression, ExpressionRef, Pretty, Result, Stage, VariableBinding,
 };
 
@@ -176,22 +176,32 @@ impl<'src, S> Pretty for SweetExpression<'src, S>
 where
     S: Stage<'src>,
 {
-    fn to_document(
-        &self,
-        parent: Option<(Operator, Side)>,
-        annotation: Annotation,
-    ) -> Document {
+    fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
         match self.0.as_ref() {
-            SrcExprVariants::Known { expression } => {
-                expression.to_document(parent, annotation)
-            }
+            SrcExprVariants::Known { expression } => expression.to_document(parent, annotation),
             SrcExprVariants::TypeAnnotation { expression, typ } => {
                 expression.annotate_with_type(typ, parent, annotation)
             }
-            SrcExprVariants::Unknown { typ } => {
-                "_".annotate_with_type(typ, parent, annotation)
-            }
+            SrcExprVariants::Unknown { typ } => "_".annotate_with_type(typ, parent, annotation),
         }
+    }
+
+    fn type_to_document(
+        &self,
+        parent: Option<(Operator, Side)>,
+        annotations: Annotation,
+    ) -> Document {
+        match self.0.as_ref() {
+            SrcExprVariants::Known { expression } => {
+                expression.type_to_document(parent, annotations)
+            }
+            SrcExprVariants::TypeAnnotation { typ, .. } => typ.to_document(parent, annotations),
+            SrcExprVariants::Unknown { typ } => typ.to_document(parent, annotations),
+        }
+    }
+
+    fn is_known(&self) -> bool {
+        !matches!(self.0.as_ref(), SrcExprVariants::Unknown { .. })
     }
 }
 

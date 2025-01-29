@@ -8,7 +8,9 @@ use crate::{
 };
 
 pub trait Pretty {
-    fn to_document(
+    fn to_document(&self, parent: Option<(Operator, Side)>, annotations: Annotation) -> Document;
+
+    fn type_to_document(
         &self,
         parent: Option<(Operator, Side)>,
         annotations: Annotation,
@@ -27,6 +29,8 @@ pub trait Pretty {
             annotation,
         )
     }
+
+    fn is_known(&self) -> bool;
 
     fn to_pretty_string(&self, width: usize) -> String {
         self.to_document(None, Annotation::On)
@@ -65,37 +69,39 @@ impl fmt::Debug for ExpressionRef<'_> {
 }
 
 impl Pretty for ExpressionRef<'_> {
-    fn to_document(
+    fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
+        match &*self.0.borrow() {
+            ExprRefVariants::Known { expression } => expression.to_document(parent, annotation),
+            ExprRefVariants::Unknown { typ } => "_".annotate_with_type(typ, parent, annotation),
+            ExprRefVariants::Link { target } => target.to_document(parent, annotation),
+        }
+    }
+
+    fn type_to_document(
         &self,
         parent: Option<(Operator, Side)>,
-        annotation: Annotation,
+        annotations: Annotation,
     ) -> Document {
+        self.typ().to_document(parent, annotations)
+    }
+
+    fn is_known(&self) -> bool {
         match &*self.0.borrow() {
-            ExprRefVariants::Known { expression } => {
-                expression.to_document(parent, annotation)
-            }
-            ExprRefVariants::Unknown { typ } => {
-                "_".annotate_with_type(typ, parent, annotation)
-            }
-            ExprRefVariants::Link { target } => target.to_document(parent, annotation),
+            ExprRefVariants::Known { .. } => true,
+            ExprRefVariants::Unknown { .. } => false,
+            ExprRefVariants::Link { target } => target.is_known(),
         }
     }
 }
 
 impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
-    fn to_document(
-        &self,
-        parent: Option<(Operator, Side)>,
-        annotation: Annotation,
-    ) -> Document {
+    fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
         let binding_doc = |binding: &VariableBinding<'src, S>| {
             Document::concat([
                 Document::text("{"),
                 Document::as_string(binding.name),
                 Document::text(" = "),
-                binding
-                    .variable_value
-                    .to_document(None, Annotation::On),
+                binding.variable_value.to_document(None, Annotation::On),
                 Document::text("}"),
             ])
         };
@@ -125,7 +131,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                     annotation,
                 )
             }
-            // TODO: Fix bindings"
+            // TODO(to_doc): Fix bindings"
             Self::Let(binding) => parenthesize_if(
                 parent.is_some(),
                 [
@@ -136,23 +142,11 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                     binding.in_expression.to_document(None, annotation),
                 ],
             ),
+            // TODO(to_doc): Fix bindings"
             Self::FunctionType(binding) => {
-                let variable_name = binding.name.to_string();
+                let variable_name = &binding.name;
 
-                if variable_name == "_" {
-                    let op = Operator::Arrow;
-                    disambiguate(
-                        Some(op),
-                        parent,
-                        [
-                            binding_doc(binding),
-                            Document::text(" → "),
-                            binding
-                                .in_expression
-                                .to_document(Some((op, Side::Right)), annotation),
-                        ],
-                    )
-                } else {
+                if variable_name.is_known() {
                     parenthesize_if(
                         parent.is_some(),
                         [
@@ -162,8 +156,26 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                             binding.in_expression.to_document(None, annotation),
                         ],
                     )
+                } else {
+                    // TODO: Operator::Arrow.to_document(binding.variable_value,
+                    // binding.in_expression)
+                    let op = Operator::Arrow;
+                    disambiguate(
+                        Some(op),
+                        parent,
+                        [
+                            binding
+                                .variable_value
+                                .type_to_document(Some((op, Side::Left)), Annotation::Off),
+                            Document::text(" → "),
+                            binding
+                                .in_expression
+                                .to_document(Some((op, Side::Right)), Annotation::Off),
+                        ],
+                    )
                 }
             }
+            // TODO(to_doc): Fix bindings"
             Self::Lambda(binding) => parenthesize_if(
                 parent.is_some(),
                 [
@@ -176,6 +188,28 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
             Self::Variable(var) => var.to_document(parent, annotation),
         }
     }
+
+    fn type_to_document(
+        &self,
+        parent: Option<(Operator, Side)>,
+        // TODO: Remove this param?
+        annotations: Annotation,
+    ) -> Document {
+        match self {
+            Self::Literal(literal) => Document::as_string(literal),
+            Self::Apply { typ, .. } => typ.to_document(parent, annotations),
+            Self::Let(variable_binding)
+            | Self::FunctionType(variable_binding)
+            | Self::Lambda(variable_binding) => variable_binding
+                .variable_value
+                .type_to_document(parent, annotations),
+            Self::Variable(variable) => variable.type_to_document(parent, annotations),
+        }
+    }
+
+    fn is_known(&self) -> bool {
+        true
+    }
 }
 
 impl fmt::Debug for VariableReference<'_> {
@@ -185,13 +219,22 @@ impl fmt::Debug for VariableReference<'_> {
 }
 
 impl Pretty for VariableReference<'_> {
-    fn to_document(
-        &self,
-        parent: Option<(Operator, Side)>,
-        annotation: Annotation,
-    ) -> Document {
+    fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
+        // TODO(to_doc): "x[ : T][ = e]"
         self.name()
             .annotate_with_type(&self.value.typ(), parent, annotation)
+    }
+
+    fn type_to_document(
+        &self,
+        parent: Option<(Operator, Side)>,
+        annotations: Annotation,
+    ) -> Document {
+        self.value.type_to_document(parent, annotations)
+    }
+
+    fn is_known(&self) -> bool {
+        self.name().is_known()
     }
 }
 
@@ -209,6 +252,18 @@ impl Pretty for Variable<'_> {
     ) -> crate::pretty::Document {
         self.name().to_document(parent, annotation)
     }
+
+    fn type_to_document(
+        &self,
+        parent: Option<(Operator, Side)>,
+        annotations: Annotation,
+    ) -> Document {
+        self.name().type_to_document(parent, annotations)
+    }
+
+    fn is_known(&self) -> bool {
+        self.name().is_known()
+    }
 }
 
 impl Pretty for str {
@@ -219,15 +274,35 @@ impl Pretty for str {
     ) -> crate::pretty::Document {
         Document::as_string(self)
     }
+
+    fn type_to_document(
+        &self,
+        parent: Option<(Operator, Side)>,
+        annotations: Annotation,
+    ) -> Document {
+        "_".to_document(parent, annotations)
+    }
+
+    fn is_known(&self) -> bool {
+        self != "_"
+    }
 }
 
 impl Pretty for &str {
-    fn to_document(
+    fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
+        (*self).to_document(parent, annotation)
+    }
+
+    fn type_to_document(
         &self,
         parent: Option<(Operator, Side)>,
-        annotation: Annotation,
+        annotations: Annotation,
     ) -> Document {
-        (*self).to_document(parent, annotation)
+        (*self).type_to_document(parent, annotations)
+    }
+
+    fn is_known(&self) -> bool {
+        (*self).is_known()
     }
 }
 
@@ -257,6 +332,7 @@ fn parenthesize(docs: impl IntoIterator<Item = Document>) -> Document {
 
 #[derive(Copy, Clone)]
 pub enum Operator {
+    Equals,
     HasType,
     Arrow,
     Apply,
@@ -293,14 +369,16 @@ impl Operator {
 
     fn precedence(self) -> usize {
         match self {
-            Self::HasType => 0,
-            Self::Arrow => 1,
-            Self::Apply => 2,
+            Self::Equals => 0,
+            Self::HasType => 1,
+            Self::Arrow => 2,
+            Self::Apply => 3,
         }
     }
 
     fn associativity(self) -> Side {
         match self {
+            Self::Equals => Side::Right,
             Self::HasType => Side::Right,
             Self::Arrow => Side::Right,
             Self::Apply => Side::Left,
