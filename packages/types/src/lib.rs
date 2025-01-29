@@ -356,7 +356,7 @@ mod tests {
         constructor_type.infer_types().unwrap();
         assert_eq!(
             constructor_type.to_pretty_string(80),
-            r"\{m = _ : {_ = a : _} → _} ⇒ \{a = _ : _} ⇒ (m : {_ = a : _} → _) (a : _) : _"
+            r"\m : _ → _ ⇒ \a ⇒ (m : _ → _) a : _"
         );
     }
 

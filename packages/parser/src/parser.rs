@@ -166,12 +166,13 @@ mod tests {
 
     #[test]
     fn pi() {
-        parse("∀x ⇒ x", "∀{x = _ : _} ⇒ x");
+        parse("∀x ⇒ x", "∀x ⇒ x");
     }
 
     #[test]
     fn lambda() {
-        parse(r"(\x ⇒ x) Type", r"(\{x = _ : _} ⇒ x) Type : _");
+        // TODO: Once we have normalization, this should infer the type to be `Type`
+        parse(r"(\x ⇒ x) Type", r"(\x ⇒ x) Type : _");
     }
 
     #[test]

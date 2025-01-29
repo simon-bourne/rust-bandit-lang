@@ -42,16 +42,16 @@ pub trait Pretty {
 }
 
 fn annotate_with_type(
-    to_doc: impl FnOnce(Option<(Operator, Side)>) -> Document,
+    term: impl FnOnce(Option<(Operator, Side)>) -> Document,
     typ: &(impl ?Sized + Pretty),
     parent: Option<(Operator, Side)>,
     annotation: Annotation,
 ) -> Document {
-    if matches!(annotation, Annotation::Off) {
-        return to_doc(parent);
+    if annotation == Annotation::Off {
+        return term(parent);
     }
 
-    Operator::HasType.to_document(parent, to_doc, |parent| {
+    Operator::HasType.to_document(parent, term, |parent| {
         typ.to_document(parent, Annotation::Off)
     })
 }
@@ -132,10 +132,10 @@ fn variable_to_document(
 
     if value.is_known() {
         Operator::Equals.to_document(parent, variable, |parent| {
-            value.to_document(parent, Annotation::Off)
+            value.to_document(parent, annotation)
         })
     } else {
-        Document::as_string(name)
+        variable(parent)
     }
 }
 

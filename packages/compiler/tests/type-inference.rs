@@ -57,17 +57,14 @@ fn one() {
 
 #[test]
 fn partial_add() {
-    test_with_ctx(
-        "add one",
-        "(add : {_ = _ : Int} → {_ = _ : Int} → Int) (one : Int) : {_ = _ : Int} → Int",
-    );
+    test_with_ctx("add one", "(add : Int → Int → Int) (one : Int) : Int → Int");
 }
 
 #[test]
 fn simple_id() {
     test_with_ctx(
         "id Int one",
-        "((id : (∀{a = Int} ⇒ {_ = _ : a} → a)) (Int : Type) : {_ = _ : a} → a) (one : a) : a",
+        "((id : (∀a ⇒ a → a)) (Int : Type = Int) : a → a) (one : a) : a",
     );
 }
 
@@ -75,6 +72,6 @@ fn simple_id() {
 fn multi_id() {
     test_with_ctx(
         "add (id Int one) (float_to_int (id Float pi))",
-        "((add : {_ = ((id : (∀{a = Int} ⇒ {_ = _ : a} → a)) (Int : Type) : {_ = _ : a} → a) (one : a) : Int} → {_ = (float_to_int : {_ = ((id : (∀{a = Float} ⇒ {_ = _ : a} → a)) (Float : Type) : {_ = _ : a} → a) (pi : a) : Float} → Int) (((id : (∀{a = Float} ⇒ {_ = _ : a} → a)) (Float : Type) : {_ = _ : a} → a) (pi : a) : Float) : Int} → Int) (((id : (∀{a = Int} ⇒ {_ = _ : a} → a)) (Int : Type) : {_ = _ : a} → a) (one : a) : Int) : {_ = (float_to_int : {_ = ((id : (∀{a = Float} ⇒ {_ = _ : a} → a)) (Float : Type) : {_ = _ : a} → a) (pi : a) : Float} → Int) (((id : (∀{a = Float} ⇒ {_ = _ : a} → a)) (Float : Type) : {_ = _ : a} → a) (pi : a) : Float) : Int} → Int) ((float_to_int : {_ = ((id : (∀{a = Float} ⇒ {_ = _ : a} → a)) (Float : Type) : {_ = _ : a} → a) (pi : a) : Float} → Int) (((id : (∀{a = Float} ⇒ {_ = _ : a} → a)) (Float : Type) : {_ = _ : a} → a) (pi : a) : Float) : Int) : Int"
+        "((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) (Int : Type = Int) : a → a) (one : a) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a ⇒ a → a)) (Float : Type = Float) : a → a) (pi : a) : Float) : Int) : Int"
     );
 }
