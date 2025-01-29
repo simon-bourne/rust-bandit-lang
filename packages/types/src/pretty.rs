@@ -49,17 +49,7 @@ fn annotate_with_type(
         return to_doc(parent);
     }
 
-    let op = Operator::HasType;
-
-    disambiguate(
-        Some(op),
-        parent,
-        [
-            to_doc(Some((op, Side::Left))),
-            Document::text(" : "),
-            typ.to_document(Some((op, Side::Right)), Annotation::Off),
-        ],
-    )
+    Operator::HasType.to_document(parent, to_doc, typ, Annotation::Off)
 }
 
 impl fmt::Debug for ExpressionRef<'_> {
@@ -111,26 +101,19 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                 function,
                 argument,
                 typ,
-            } => {
-                let op = Operator::Apply;
-
-                annotate_with_type(
-                    |parent| {
-                        disambiguate(
-                            Some(Operator::Apply),
-                            parent,
-                            [
-                                function.to_document(Some((op, Side::Left)), annotation),
-                                Document::space(),
-                                argument.to_document(Some((op, Side::Right)), annotation),
-                            ],
-                        )
-                    },
-                    typ,
-                    parent,
-                    annotation,
-                )
-            }
+            } => annotate_with_type(
+                |parent| {
+                    Operator::Apply.to_document(
+                        parent,
+                        |parent| function.to_document(parent, annotation),
+                        argument,
+                        annotation,
+                    )
+                },
+                typ,
+                parent,
+                annotation,
+            ),
             // TODO(to_doc): Fix bindings"
             Self::Let(binding) => parenthesize_if(
                 parent.is_some(),
@@ -157,21 +140,15 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                         ],
                     )
                 } else {
-                    // TODO: Operator::Arrow.to_document(binding.variable_value,
-                    // binding.in_expression)
-                    let op = Operator::Arrow;
-                    disambiguate(
-                        Some(op),
+                    Operator::Arrow.to_document(
                         parent,
-                        [
+                        |parent| {
                             binding
                                 .variable_value
-                                .type_to_document(Some((op, Side::Left)), Annotation::Off),
-                            Document::text(" → "),
-                            binding
-                                .in_expression
-                                .to_document(Some((op, Side::Right)), Annotation::Off),
-                        ],
+                                .type_to_document(parent, Annotation::Off)
+                        },
+                        &binding.in_expression,
+                        Annotation::Off,
                     )
                 }
             }
@@ -306,28 +283,16 @@ impl Pretty for &str {
     }
 }
 
-pub fn disambiguate(
-    operator: Option<Operator>,
-    parent: Option<(Operator, Side)>,
-    docs: impl IntoIterator<Item = Document>,
-) -> Document {
-    parenthesize_if(operator.is_some_and(|op| op.parenthesize(parent)), docs)
-}
-
 fn parenthesize_if(condition: bool, docs: impl IntoIterator<Item = Document>) -> Document {
     if condition {
-        parenthesize(docs)
+        Document::concat([
+            Document::text("("),
+            Document::concat(docs),
+            Document::text(")"),
+        ])
     } else {
         Document::concat(docs)
     }
-}
-
-fn parenthesize(docs: impl IntoIterator<Item = Document>) -> Document {
-    Document::concat([
-        Document::text("("),
-        Document::concat(docs),
-        Document::text(")"),
-    ])
 }
 
 #[derive(Copy, Clone)]
@@ -339,6 +304,28 @@ pub enum Operator {
 }
 
 impl Operator {
+    pub fn to_document(
+        self,
+        parent: Option<(Operator, Side)>,
+        left: impl FnOnce(Option<(Operator, Side)>) -> Document,
+        right: &(impl ?Sized + Pretty),
+        annotation: Annotation,
+    ) -> Document {
+        parenthesize_if(
+            self.parenthesize(parent),
+            [
+                left(Some((self, Side::Left))),
+                Document::text(match self {
+                    Self::Equals => " = ",
+                    Self::HasType => " : ",
+                    Self::Arrow => " → ",
+                    Self::Apply => " ",
+                }),
+                right.to_document(Some((self, Side::Right)), annotation),
+            ],
+        )
+    }
+
     fn parenthesize(self, parent: Option<(Operator, Side)>) -> bool {
         let Some((parent, side)) = parent else {
             return false;
