@@ -203,6 +203,14 @@ where
     fn is_known(&self) -> bool {
         !matches!(self.0.as_ref(), SrcExprVariants::Unknown { .. })
     }
+
+    fn type_is_known(&self) -> bool {
+        match self.0.as_ref() {
+            SrcExprVariants::Known { expression } => expression.type_is_known(),
+            SrcExprVariants::TypeAnnotation { typ, .. } => typ.is_known(),
+            SrcExprVariants::Unknown { typ } => typ.is_known(),
+        }
+    }
 }
 
 impl<'src> Expression<'src, Source> {
