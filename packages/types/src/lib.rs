@@ -370,15 +370,10 @@ mod tests {
     }
 
     #[test]
-    // TODO: This test should pass. It currently tries to unify the variables "Int" and "Float".
-    // These are both types and so have a type of "Type". Because we only try and unify the
-    // variable's types, this succeeds.
-    #[should_panic]
     fn let_error() {
         // let x : Int = 1 in x : Float
-        // TODO:
-        let int_type = Expr::variable("Int");
-        let float_type = Expr::variable("Float");
+        let int_type = Expr::literal_type("Int");
+        let float_type = Expr::literal_type("Float");
         let one = Expr::variable("one").has_type(int_type.clone());
         let let_binding = Expr::let_binding("x", one, Expr::variable("x").has_type(float_type));
 
@@ -388,6 +383,6 @@ mod tests {
         global_types.insert("Float", Expr::type_of_type().resolve_names().unwrap());
         let ctx = &mut Context::new(global_types);
 
-        assert!(let_binding.link(ctx).unwrap().infer_types().is_err());
+        assert!(let_binding.link(ctx).is_err());
     }
 }
