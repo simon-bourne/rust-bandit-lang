@@ -186,17 +186,11 @@ where
         }
     }
 
-    fn type_to_document(
-        &self,
-        parent: Option<(Operator, Side)>,
-        annotations: Annotation,
-    ) -> Document {
+    fn type_to_document(&self, parent: Option<(Operator, Side)>) -> Document {
         match self.0.as_ref() {
-            SrcExprVariants::Known { expression } => {
-                expression.type_to_document(parent, annotations)
-            }
-            SrcExprVariants::TypeAnnotation { typ, .. } => typ.to_document(parent, annotations),
-            SrcExprVariants::Unknown { typ } => typ.to_document(parent, annotations),
+            SrcExprVariants::Known { expression } => expression.type_to_document(parent),
+            SrcExprVariants::TypeAnnotation { typ, .. } => typ.to_document(parent, Annotation::Off),
+            SrcExprVariants::Unknown { typ } => typ.to_document(parent, Annotation::Off),
         }
     }
 
