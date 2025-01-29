@@ -171,7 +171,6 @@ mod tests {
 
     #[test]
     fn lambda() {
-        // TODO: This should infer the type to be `Type`
         parse(r"(\x ⇒ x) Type", r"(\x ⇒ x) Type : _");
     }
 
