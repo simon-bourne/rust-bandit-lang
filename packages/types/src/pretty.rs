@@ -14,7 +14,7 @@ pub trait Pretty {
         type_annotations: TypeAnnotations,
     ) -> Document;
 
-    fn type_annotatation(
+    fn type_annotation(
         &self,
         term: Document,
         term_operator: Option<Operator>,
@@ -46,13 +46,13 @@ impl Pretty for ExpressionRef<'_> {
                 expression.to_document(parent, type_annotations)
             }
             ExprRefVariants::Unknown { typ } => {
-                typ.type_annotatation(Document::text("_"), None, parent, type_annotations)
+                typ.type_annotation(Document::text("_"), None, parent, type_annotations)
             }
             ExprRefVariants::Link { target } => target.to_document(parent, type_annotations),
         }
     }
 
-    fn type_annotatation(
+    fn type_annotation(
         &self,
         term: Document,
         term_operator: Option<Operator>,
@@ -61,11 +61,11 @@ impl Pretty for ExpressionRef<'_> {
     ) -> Document {
         match &*self.0.borrow() {
             ExprRefVariants::Known { expression } => {
-                expression.type_annotatation(term, term_operator, parent, type_annotations)
+                expression.type_annotation(term, term_operator, parent, type_annotations)
             }
             ExprRefVariants::Unknown { .. } => term,
             ExprRefVariants::Link { target } => {
-                target.type_annotatation(term, term_operator, parent, type_annotations)
+                target.type_annotation(term, term_operator, parent, type_annotations)
             }
         }
     }
@@ -97,7 +97,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
             } => {
                 let op = Operator::Apply;
 
-                typ.type_annotatation(
+                typ.type_annotation(
                     Document::concat([
                         function.to_document(Some((op, Side::Left)), type_annotations),
                         Document::space(),
@@ -159,7 +159,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
         }
     }
 
-    fn type_annotatation(
+    fn type_annotation(
         &self,
         term: Document,
         term_operator: Option<Operator>,
@@ -202,11 +202,11 @@ impl Pretty for VariableReference<'_> {
             let term = self.name().to_document(parent, type_annotations);
             self.value
                 .typ()
-                .type_annotatation(term, None, parent, type_annotations)
+                .type_annotation(term, None, parent, type_annotations)
         }
     }
 
-    fn type_annotatation(
+    fn type_annotation(
         &self,
         term: Document,
         term_operator: Option<Operator>,
@@ -214,7 +214,7 @@ impl Pretty for VariableReference<'_> {
         type_annotations: TypeAnnotations,
     ) -> Document {
         self.name()
-            .type_annotatation(term, term_operator, parent, type_annotations)
+            .type_annotation(term, term_operator, parent, type_annotations)
     }
 }
 
@@ -233,7 +233,7 @@ impl Pretty for Variable<'_> {
         self.name().to_document(parent, type_annotations)
     }
 
-    fn type_annotatation(
+    fn type_annotation(
         &self,
         term: crate::pretty::Document,
         term_operator: Option<crate::pretty::Operator>,
@@ -241,7 +241,7 @@ impl Pretty for Variable<'_> {
         type_annotations: crate::pretty::TypeAnnotations,
     ) -> crate::pretty::Document {
         self.name()
-            .type_annotatation(term, term_operator, parent, type_annotations)
+            .type_annotation(term, term_operator, parent, type_annotations)
     }
 }
 
@@ -254,7 +254,7 @@ impl Pretty for &'_ str {
         Document::as_string(self)
     }
 
-    fn type_annotatation(
+    fn type_annotation(
         &self,
         term: crate::pretty::Document,
         term_operator: Option<crate::pretty::Operator>,

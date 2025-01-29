@@ -213,15 +213,15 @@ where
             SrcExprVariants::TypeAnnotation { expression, typ } => {
                 let has_type = Operator::HasType;
                 let term = expression.to_document(Some((has_type, Side::Left)), type_annotations);
-                typ.type_annotatation(term, expression.operator(), parent, type_annotations)
+                typ.type_annotation(term, expression.operator(), parent, type_annotations)
             }
             SrcExprVariants::Unknown { typ } => {
-                typ.type_annotatation(Document::text("_"), None, parent, type_annotations)
+                typ.type_annotation(Document::text("_"), None, parent, type_annotations)
             }
         }
     }
 
-    fn type_annotatation(
+    fn type_annotation(
         &self,
         term: Document,
         term_operator: Option<Operator>,
@@ -230,7 +230,7 @@ where
     ) -> Document {
         match self.0.as_ref() {
             SrcExprVariants::Known { expression } => {
-                expression.type_annotatation(term, term_operator, parent, type_annotations)
+                expression.type_annotation(term, term_operator, parent, type_annotations)
             }
             SrcExprVariants::TypeAnnotation { .. } => {
                 let op = Operator::HasType;
