@@ -41,7 +41,7 @@ fn test_with_ctx(input: &str, expected: &str) {
             ("true", "Bool"),
             ("add", "Int → Int → Int"),
             ("id", "∀a ⇒ a → a"),
-            ("int_to_float", "Int → Float"),
+            ("float_to_int", "Float → Int"),
         ],
     );
 
@@ -72,11 +72,9 @@ fn simple_id() {
 }
 
 #[test]
-// TODO: No it shouldn't
-#[should_panic]
 fn multi_id() {
     test_with_ctx(
-        "add (id Int one) (int_to_float (id Float pi))",
-        "((add : Int → Int → Int) ((id : ∀a => a -> a) Int (one : Int)) : Int → Int) (int_to_float (((id : ∀a => a -> a) Float (pi : Float)))",
+        "add (id Int one) (float_to_int (id Float pi))",
+        "((add : {_ = ((id : (∀{a = Int} ⇒ {_ = _ : Int} → Int)) Int : {_ = _ : Int} → Int) (one : Int) : Int} → {_ = (float_to_int : {_ = ((id : (∀{a = Float} ⇒ {_ = _ : Float} → Float)) Float : {_ = _ : Float} → Float) (pi : Float) : Float} → Int) (((id : (∀{a = Float} ⇒ {_ = _ : Float} → Float)) Float : {_ = _ : Float} → Float) (pi : Float) : Float) : Int} → Int) (((id : (∀{a = Int} ⇒ {_ = _ : Int} → Int)) Int : {_ = _ : Int} → Int) (one : Int) : Int) : {_ = (float_to_int : {_ = ((id : (∀{a = Float} ⇒ {_ = _ : Float} → Float)) Float : {_ = _ : Float} → Float) (pi : Float) : Float} → Int) (((id : (∀{a = Float} ⇒ {_ = _ : Float} → Float)) Float : {_ = _ : Float} → Float) (pi : Float) : Float) : Int} → Int) ((float_to_int : {_ = ((id : (∀{a = Float} ⇒ {_ = _ : Float} → Float)) Float : {_ = _ : Float} → Float) (pi : Float) : Float} → Int) (((id : (∀{a = Float} ⇒ {_ = _ : Float} → Float)) Float : {_ = _ : Float} → Float) (pi : Float) : Float) : Int) : Int",
     );
 }
