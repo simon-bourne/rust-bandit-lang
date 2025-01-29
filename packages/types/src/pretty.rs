@@ -84,17 +84,30 @@ impl Pretty for ExpressionRef<'_> {
     }
 }
 
+impl<'src, S: Stage<'src>> VariableBinding<'src, S> {
+    // TODO: Fix this to annotate with the type if it's known
+    fn to_document(&self) -> Document {
+        let binding = if self.variable_value.is_known() {
+            Operator::Equals.to_document(
+                None,
+                |parent| self.name.to_document(parent, Annotation::Off),
+                &self.variable_value,
+                Annotation::Off,
+            )
+        } else {
+            Document::as_string(self.name)
+        };
+
+        Document::concat([
+            binding,
+            Document::text(" ⇒ "),
+            self.in_expression.to_document(None, Annotation::Off),
+        ])
+    }
+}
+
 impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
-        let binding_doc = |binding: &VariableBinding<'src, S>| {
-            Document::concat([
-                Document::text("{"),
-                Document::as_string(binding.name),
-                Document::text(" = "),
-                binding.variable_value.to_document(None, Annotation::On),
-                Document::text("}"),
-            ])
-        };
         match self {
             Self::Literal(literal) => Document::as_string(literal),
             Self::Apply {
@@ -114,30 +127,21 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                 parent,
                 annotation,
             ),
-            // TODO(to_doc): Fix bindings"
             Self::Let(binding) => parenthesize_if(
                 parent.is_some(),
                 [
                     Document::text("let"),
                     Document::space(),
-                    binding_doc(binding),
-                    Document::text(" in "),
-                    binding.in_expression.to_document(None, annotation),
+                    binding.to_document(),
                 ],
             ),
-            // TODO(to_doc): Fix bindings"
             Self::FunctionType(binding) => {
                 let variable_name = &binding.name;
 
                 if variable_name.is_known() {
                     parenthesize_if(
                         parent.is_some(),
-                        [
-                            Document::text("∀"),
-                            binding_doc(binding),
-                            Document::text(" ⇒ "),
-                            binding.in_expression.to_document(None, annotation),
-                        ],
+                        [Document::text("∀"), binding.to_document()],
                     )
                 } else {
                     Operator::Arrow.to_document(
@@ -152,15 +156,9 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
                     )
                 }
             }
-            // TODO(to_doc): Fix bindings"
             Self::Lambda(binding) => parenthesize_if(
                 parent.is_some(),
-                [
-                    Document::text("\\"),
-                    binding_doc(binding),
-                    Document::text(" ⇒ "),
-                    binding.in_expression.to_document(None, annotation),
-                ],
+                [Document::text("\\"), binding.to_document()],
             ),
             Self::Variable(var) => var.to_document(parent, annotation),
         }
