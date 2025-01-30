@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt};
+use std::collections::HashMap;
 
 use crate::{source::NamesResolvedExpression, ExpressionRef, InferenceError, Result};
 
@@ -6,12 +6,6 @@ pub struct DeBruijnLevel(usize);
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct DeBruijnIndex(usize);
-
-impl fmt::Display for DeBruijnIndex {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
 
 pub type GlobalValues<'a> = HashMap<&'a str, NamesResolvedExpression<'a>>;
 
@@ -115,12 +109,6 @@ pub struct Variable<'src> {
 impl Variable<'_> {
     pub fn name(&self) -> &str {
         self.name
-    }
-}
-
-impl fmt::Display for Variable<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.name)
     }
 }
 

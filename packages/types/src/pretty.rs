@@ -222,7 +222,7 @@ impl fmt::Debug for VariableReference<'_> {
 
 impl Pretty for VariableReference<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
-        variable_to_document(self.name(), &self.value, parent, annotation)
+        variable_to_document(self.name, &self.value, parent, annotation)
     }
 
     fn type_to_document(&self, parent: Option<(Operator, Side)>) -> Document {
@@ -230,7 +230,7 @@ impl Pretty for VariableReference<'_> {
     }
 
     fn is_known(&self) -> bool {
-        self.name().is_known()
+        self.name.is_known()
     }
 
     fn type_is_known(&self) -> bool {

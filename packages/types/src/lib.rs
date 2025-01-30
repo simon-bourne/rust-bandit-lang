@@ -1,6 +1,5 @@
 use std::{
     cell::{RefCell, RefMut},
-    fmt,
     ops::ControlFlow,
     rc::Rc,
     result,
@@ -345,20 +344,8 @@ impl<'src> Expression<'src, Inference> {
 }
 
 pub struct VariableReference<'src> {
-    pub name: &'src str,
-    pub value: ExpressionRef<'src>,
-}
-
-impl VariableReference<'_> {
-    pub fn name(&self) -> &str {
-        self.name
-    }
-}
-
-impl fmt::Display for VariableReference<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.name)
-    }
+    name: &'src str,
+    value: ExpressionRef<'src>,
 }
 
 #[cfg(test)]
