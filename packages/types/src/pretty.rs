@@ -3,8 +3,8 @@ use std::fmt;
 use pretty::RcDoc;
 
 use crate::{
-    context::{Variable, VariableReference},
-    ExprRefVariants, Expression, ExpressionRef, Stage, VariableBinding,
+    context::Variable, ExprRefVariants, Expression, ExpressionRef, Stage, VariableBinding,
+    VariableReference,
 };
 
 pub trait Pretty {

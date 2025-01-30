@@ -30,25 +30,22 @@ impl<'a> Context<'a> {
 
     pub fn with_variable<Output>(
         &mut self,
+        name: &'a str,
         value: ExpressionRef<'a>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Output {
-        self.local_variables.push(value.clone());
+        self.local_variables
+            .push(ExpressionRef::variable(name, value.clone()));
         let output = f(self);
         self.local_variables.pop();
         output
     }
 
-    pub fn lookup_value(&mut self, variable: Variable<'a>) -> Result<VariableReference<'a>> {
-        let value = match variable.scope {
+    pub fn lookup_value(&mut self, variable: Variable<'a>) -> Result<ExpressionRef<'a>> {
+        match variable.scope {
             VariableScope::Local(index) => Ok(self.local_value(index)),
             VariableScope::Global => self.global_value(variable.name),
-        }?;
-
-        Ok(VariableReference {
-            name: variable.name,
-            value,
-        })
+        }
     }
 
     fn local_value(&self, index: DeBruijnIndex) -> ExpressionRef<'a> {
@@ -103,23 +100,6 @@ impl<'a> VariableLookup<'a> {
         let level = self.variables.get(name)?.last()?;
         assert!(level.0 < self.variable_count);
         Some(DeBruijnIndex(self.variable_count - level.0))
-    }
-}
-
-pub struct VariableReference<'src> {
-    name: &'src str,
-    pub value: ExpressionRef<'src>,
-}
-
-impl VariableReference<'_> {
-    pub fn name(&self) -> &str {
-        self.name
-    }
-}
-
-impl fmt::Display for VariableReference<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.name)
     }
 }
 

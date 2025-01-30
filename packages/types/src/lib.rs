@@ -1,10 +1,11 @@
 use std::{
     cell::{RefCell, RefMut},
+    fmt,
     rc::Rc,
     result,
 };
 
-use context::{Context, VariableReference};
+use context::Context;
 
 pub mod context;
 pub mod literal;
@@ -70,6 +71,10 @@ impl<'src> ExpressionRef<'src> {
         }))
     }
 
+    fn variable(name: &'src str, value: Self) -> Self {
+        Self::new(Expression::Variable(VariableReference { name, value }))
+    }
+
     fn new(expression: Expression<'src, Inference>) -> Self {
         Self(Rc::new(RefCell::new(ExprRefVariants::Known { expression })))
     }
@@ -113,6 +118,7 @@ impl<'src> ExpressionRef<'src> {
             // TODO: Factor this out with the other handling of variables on the RHS.
             Self::unify(&mut var.value, y)?;
             drop(x_ref);
+            x.replace_with(y);
             return Ok(());
         }
 
@@ -127,6 +133,7 @@ impl<'src> ExpressionRef<'src> {
             drop(x_ref);
             Self::unify(&mut var.value, x)?;
             drop(y_ref);
+            y.replace_with(x);
             return Ok(());
         }
 
@@ -245,8 +252,9 @@ impl<'src> VariableBinding<'src, NamesResolved> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<'src, Inference>> {
         let name = self.name;
         let variable_value = self.variable_value.link(ctx)?;
-        let in_expression =
-            ctx.with_variable(variable_value.clone(), |ctx| self.in_expression.link(ctx))?;
+        let in_expression = ctx.with_variable(name, variable_value.clone(), |ctx| {
+            self.in_expression.link(ctx)
+        })?;
 
         Ok(VariableBinding {
             name,
@@ -272,7 +280,8 @@ impl<'src> Expression<'src, NamesResolved> {
             Self::Let(binding) => Expression::Let(binding.link(ctx)?),
             Self::FunctionType(binding) => Expression::FunctionType(binding.link(ctx)?),
             Self::Lambda(binding) => Expression::Lambda(binding.link(ctx)?),
-            Self::Variable(variable) => Expression::Variable(ctx.lookup_value(*variable)?),
+            // TODO: Don't return
+            Self::Variable(variable) => return ctx.lookup_value(*variable),
         }))
     }
 }
@@ -320,6 +329,23 @@ impl<'src> Expression<'src, Inference> {
                 binding.in_expression.typ(),
             ),
         }
+    }
+}
+
+pub struct VariableReference<'src> {
+    pub name: &'src str,
+    pub value: ExpressionRef<'src>,
+}
+
+impl VariableReference<'_> {
+    pub fn name(&self) -> &str {
+        self.name
+    }
+}
+
+impl fmt::Display for VariableReference<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.name)
     }
 }
 
