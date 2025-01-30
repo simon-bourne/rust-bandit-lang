@@ -25,7 +25,7 @@ fn context<'src>(
     for (name, typ) in items {
         global_items.insert(
             name,
-            Expr::unknown_with_type(parse(typ)).resolve_names().unwrap(),
+            Expr::constant(name, parse(typ)).resolve_names().unwrap(),
         );
     }
 
@@ -58,22 +58,19 @@ fn one() {
 
 #[test]
 fn simple_apply() {
-    // TODO: Currently we unify the unknown value from the Pi type of `abs` with
-    // `one`, which eliminates the variable. Do we need opaque variables that never
-    // get replaced when unifying (but they stiill check)?
-    test_with_ctx("abs one", "(abs : Int → Int) (_ : Int) : Int");
+    test_with_ctx("abs one", "(abs : Int → Int) (one : Int) : Int");
 }
 
 #[test]
 fn partial_add() {
-    test_with_ctx("add one", "(add : Int → Int → Int) (_ : Int) : Int → Int");
+    test_with_ctx("add one", "(add : Int → Int → Int) (one : Int) : Int → Int");
 }
 
 #[test]
 fn simple_id() {
     test_with_ctx(
         "id Int one",
-        "((id : (∀a ⇒ Int → Int)) Int : Int → Int) (_ : Int) : Int",
+        "((id : (∀a ⇒ Int → Int)) (Int : Type) : Int → Int) (one : Int) : Int",
     );
 }
 
@@ -81,6 +78,6 @@ fn simple_id() {
 fn multi_id() {
     test_with_ctx(
         "add (id Int one) (float_to_int (id Float pi))",
-        "((add : Int → Int → Int) (((id : (∀a ⇒ Int → Int)) Int : Int → Int) (_ : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a ⇒ Float → Float)) Float : Float → Float) (_ : Float) : Float) : Int) : Int"
+        "((add : Int → Int → Int) (((id : (∀a ⇒ Int → Int)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a ⇒ Float → Float)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
 }

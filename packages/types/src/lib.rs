@@ -8,12 +8,10 @@ use std::{
 
 use context::Context;
 
-pub mod constant;
 pub mod context;
 mod pretty;
 pub mod source;
 
-use constant::Constant;
 pub use pretty::Pretty;
 use source::NamesResolved;
 
@@ -57,11 +55,7 @@ impl<'src> ExpressionRef<'src> {
     }
 
     fn type_of_type() -> Self {
-        Self::constant(Constant::TypeOfType)
-    }
-
-    fn constant(lit: Constant) -> Self {
-        Self::new(Expression::Constant(lit))
+        Self::new(Expression::TypeOfType)
     }
 
     fn function_type(argument_value: Self, result_type: Self) -> Self {
@@ -137,8 +131,17 @@ impl<'src> ExpressionRef<'src> {
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
-            (Expression::Constant(constant0), Expression::Constant(constant1))
-                if constant0 == constant1 => {}
+            (Expression::TypeOfType, Expression::TypeOfType) => (),
+            (
+                Expression::Constant {
+                    name: name0,
+                    typ: typ0,
+                },
+                Expression::Constant {
+                    name: name1,
+                    typ: typ1,
+                },
+            ) if name0 == name1 => Self::unify(typ0, typ1)?,
             (
                 Expression::Apply {
                     function,
@@ -165,7 +168,8 @@ impl<'src> ExpressionRef<'src> {
                 VariableBinding::unify(binding0, binding1)?
             }
             // It's safer to explicitly ignore each variant
-            (Expression::Constant(_), _rhs)
+            (Expression::TypeOfType, _rhs)
+            | (Expression::Constant { .. }, _rhs)
             | (Expression::Apply { .. }, _rhs)
             | (Expression::Let { .. }, _rhs)
             | (Expression::FunctionType(_), _rhs)
@@ -211,7 +215,11 @@ impl<'src> ExpressionRef<'src> {
 }
 
 enum Expression<'src, S: Stage<'src>> {
-    Constant(Constant),
+    TypeOfType,
+    Constant {
+        name: &'src str,
+        typ: S::Expression,
+    },
     Apply {
         function: S::Expression,
         argument: S::Expression,
@@ -265,7 +273,11 @@ impl<'src> VariableBinding<'src, NamesResolved> {
 impl<'src> Expression<'src, NamesResolved> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<ExpressionRef<'src>> {
         Ok(ExpressionRef::new(match self {
-            Self::Constant(constant) => Expression::Constant(constant.clone()),
+            Self::TypeOfType => Expression::TypeOfType,
+            Self::Constant { name, typ } => Expression::Constant {
+                name,
+                typ: typ.link(ctx)?,
+            },
             Self::Apply {
                 function,
                 argument,
@@ -287,7 +299,8 @@ impl<'src> Expression<'src, NamesResolved> {
 impl<'src> Expression<'src, Inference> {
     fn infer_types(&mut self) -> Result<()> {
         match self {
-            Self::Constant(_) => (),
+            Self::TypeOfType => (),
+            Self::Constant { typ, .. } => typ.infer_types()?,
             Self::Variable(var) => {
                 let value = &mut var.value;
                 ExpressionRef::unify(&mut value.typ().typ(), &mut ExpressionRef::type_of_type())?;
@@ -317,7 +330,8 @@ impl<'src> Expression<'src, Inference> {
 
     fn typ(&self) -> ExpressionRef<'src> {
         match self {
-            Self::Constant(constant) => ExpressionRef::constant(constant.typ()),
+            Self::TypeOfType => ExpressionRef::type_of_type(),
+            Self::Constant { typ, .. } => typ.clone(),
             Self::Variable(var) => var.value.typ(),
             Self::Apply { typ, .. } => typ.clone(),
             Self::Let(binding) => binding.in_expression.typ(),

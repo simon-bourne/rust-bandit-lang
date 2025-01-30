@@ -1,7 +1,6 @@
 use std::{fmt, rc::Rc};
 
 use crate::{
-    constant::Constant,
     context::{Context, Variable, VariableLookup},
     pretty::{Annotation, Document, Operator, Side},
     Expression, ExpressionRef, Pretty, Result, Stage, VariableBinding,
@@ -82,11 +81,18 @@ impl<'src> SourceExpression<'src> {
     }
 
     pub fn type_constant(name: &'src str) -> Self {
-        Self::new(Expression::Constant(Constant::Type(name.to_string())))
+        Self::new(Expression::Constant {
+            name,
+            typ: Self::type_of_type(),
+        })
+    }
+
+    pub fn constant(name: &'src str, typ: Self) -> Self {
+        Self::new(Expression::Constant { name, typ })
     }
 
     pub fn type_of_type() -> Self {
-        Self::new(Expression::Constant(Constant::TypeOfType))
+        Self::new(Expression::TypeOfType)
     }
 
     pub fn apply(self, argument: Self) -> Self {
@@ -217,7 +223,11 @@ impl<'src> Expression<'src, Source> {
         lookup: &mut VariableLookup<'src>,
     ) -> Result<NamesResolvedExpression<'src>> {
         let expr = match self {
-            Self::Constant(constant) => Expression::Constant(constant.clone()),
+            Self::TypeOfType => Expression::TypeOfType,
+            Self::Constant { name, typ } => Expression::Constant {
+                name,
+                typ: typ.resolve_names()?,
+            },
             Self::Apply {
                 function,
                 argument,

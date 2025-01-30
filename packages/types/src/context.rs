@@ -62,7 +62,7 @@ impl<'a> Context<'a> {
             .ok_or(InferenceError)?
             .link(self)?;
 
-        Ok(ExpressionRef::variable(name, value))
+        Ok(value)
     }
 }
 
