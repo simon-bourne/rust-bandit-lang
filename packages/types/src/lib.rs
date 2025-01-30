@@ -112,7 +112,6 @@ impl<'src> ExpressionRef<'src> {
         if let Expression::Variable(var) = &mut *x_ref {
             // TODO: Factor this out with the other handling of variables on the RHS.
             Self::unify(&mut var.value, y)?;
-            Self::unify(&mut var.value.typ(), &mut y.typ())?;
             drop(x_ref);
             return Ok(());
         }
@@ -127,7 +126,6 @@ impl<'src> ExpressionRef<'src> {
         if let Expression::Variable(var) = &mut *y_ref {
             drop(x_ref);
             Self::unify(&mut var.value, x)?;
-            Self::unify(&mut var.value.typ(), &mut x.typ())?;
             drop(y_ref);
             return Ok(());
         }
