@@ -1,6 +1,7 @@
 use std::{
     cell::{RefCell, RefMut},
     fmt,
+    ops::ControlFlow,
     rc::Rc,
     result,
 };
@@ -100,42 +101,39 @@ impl<'src> ExpressionRef<'src> {
         }
     }
 
+    fn unify_non_equal(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
+        let mut borrowed = self.0.borrow_mut();
+
+        match &mut *borrowed {
+            ExprRefVariants::Unknown { typ } => {
+                Self::unify(typ, &mut other.typ())?;
+            }
+            ExprRefVariants::Known {
+                expression: Expression::Variable(var),
+            } => {
+                Self::unify(&mut var.value, other)?;
+            }
+            _ => return Ok(ControlFlow::Continue(())),
+        }
+
+        drop(borrowed);
+        self.replace_with(other);
+        Ok(ControlFlow::Break(()))
+    }
+
     fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
         x.follow_links();
         y.follow_links();
 
-        if Rc::ptr_eq(&x.0, &y.0) {
+        if Rc::ptr_eq(&x.0, &y.0)
+            || x.unify_non_equal(y)?.is_break()
+            || y.unify_non_equal(x)?.is_break()
+        {
             return Ok(());
         }
 
-        let Some(mut x_ref) = x.known() else {
-            Self::unify(&mut x.typ(), &mut y.typ())?;
-            x.replace_with(y);
-            return Ok(());
-        };
-
-        if let Expression::Variable(var) = &mut *x_ref {
-            // TODO: Factor this out with the other handling of variables on the RHS.
-            Self::unify(&mut var.value, y)?;
-            drop(x_ref);
-            x.replace_with(y);
-            return Ok(());
-        }
-
-        let Some(mut y_ref) = y.known() else {
-            drop(x_ref);
-            Self::unify(&mut x.typ(), &mut y.typ())?;
-            y.replace_with(x);
-            return Ok(());
-        };
-
-        if let Expression::Variable(var) = &mut *y_ref {
-            drop(x_ref);
-            Self::unify(&mut var.value, x)?;
-            drop(y_ref);
-            y.replace_with(x);
-            return Ok(());
-        }
+        let mut x_ref = x.known().expect("x should be known at this point");
+        let mut y_ref = y.known().expect("y should be known at this point");
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
