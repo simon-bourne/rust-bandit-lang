@@ -236,15 +236,7 @@ impl VariableBinding<'_, Inference> {
     }
 
     fn unify(binding0: &mut Self, binding1: &mut Self) -> Result<()> {
-        ExpressionRef::unify(
-            &mut binding0.variable_value.typ(),
-            &mut binding1.variable_value.typ(),
-        )?;
         ExpressionRef::unify(&mut binding0.variable_value, &mut binding1.variable_value)?;
-        ExpressionRef::unify(
-            &mut binding0.in_expression.typ(),
-            &mut binding1.in_expression.typ(),
-        )?;
         ExpressionRef::unify(&mut binding0.in_expression, &mut binding1.in_expression)
     }
 }
