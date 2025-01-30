@@ -134,7 +134,7 @@ fn variable_to_document(
 impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
         match self {
-            Self::Literal(literal) => Document::as_string(literal),
+            Self::Constant(constant) => Document::as_string(constant),
             Self::Apply {
                 function,
                 argument,
@@ -185,7 +185,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
 
     fn type_to_document(&self, parent: Option<(Operator, Side)>) -> Document {
         match self {
-            Self::Literal(literal) => Document::as_string(literal),
+            Self::Constant(constant) => Document::as_string(constant),
             Self::Apply { typ, .. } => typ.to_document(parent, Annotation::Off),
             Self::Let(variable_binding)
             | Self::FunctionType(variable_binding)
@@ -202,7 +202,7 @@ impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
 
     fn type_is_known(&self) -> bool {
         match self {
-            Self::Literal(_) => true,
+            Self::Constant(_) => true,
             Self::Apply { typ, .. } => typ.is_known(),
             Self::Let(binding) | Self::FunctionType(binding) | Self::Lambda(binding) => {
                 binding.variable_value.type_is_known()

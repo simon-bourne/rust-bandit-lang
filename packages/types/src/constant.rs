@@ -1,18 +1,18 @@
 use std::fmt;
 
 #[derive(Clone, Eq, PartialEq)]
-pub enum Literal {
+pub enum Constant {
     TypeOfType,
     Type(String),
 }
 
-impl Literal {
+impl Constant {
     pub fn typ(&self) -> Self {
         Self::TypeOfType
     }
 }
 
-impl fmt::Display for Literal {
+impl fmt::Display for Constant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::TypeOfType => "Type",
