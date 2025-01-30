@@ -54,12 +54,15 @@ impl<'a> Context<'a> {
         self.local_variables[len - index.0].clone()
     }
 
-    fn global_value(&mut self, name: &str) -> Result<ExpressionRef<'a>> {
-        self.global_variables
+    fn global_value(&mut self, name: &'a str) -> Result<ExpressionRef<'a>> {
+        let value = self
+            .global_variables
             .get(name)
             .cloned()
             .ok_or(InferenceError)?
-            .link(self)
+            .link(self)?;
+
+        Ok(ExpressionRef::variable(name, value))
     }
 }
 
