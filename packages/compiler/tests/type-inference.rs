@@ -39,6 +39,7 @@ fn test_with_ctx(input: &str, expected: &str) {
             ("one", "Int"),
             ("pi", "Float"),
             ("true", "Bool"),
+            ("abs", "Int → Int"),
             ("add", "Int → Int → Int"),
             ("id", "∀a ⇒ a → a"),
             ("float_to_int", "Float → Int"),
@@ -56,8 +57,15 @@ fn one() {
 }
 
 #[test]
+fn simple_apply() {
+    // TODO: Currently we unify the unknown value from the Pi type of `abs` with
+    // `one`, which eliminates the variable. Do we need opaque variables that never
+    // get replaced when unifying (but they stiill check)?
+    test_with_ctx("abs one", "(abs : Int → Int) (_ : Int) : Int");
+}
+
+#[test]
 fn partial_add() {
-    // TODO: The `_` should be `one`.
     test_with_ctx("add one", "(add : Int → Int → Int) (_ : Int) : Int → Int");
 }
 
