@@ -21,7 +21,6 @@ impl<'src> ExpressionReference<'src> for NamesResolvedExpression<'src> {
     type Variable = Variable<'src>;
 }
 
-// TODO: Make private
 type SweetExpression<'src, Expr> = Rc<SrcExprVariants<'src, Expr>>;
 
 #[derive(Clone)]

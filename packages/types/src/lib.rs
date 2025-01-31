@@ -14,7 +14,6 @@ pub type Result<T> = result::Result<T, InferenceError>;
 #[derive(Debug)]
 pub struct InferenceError;
 
-// TODO: Rename
 pub trait ExpressionReference<'src>: Pretty {
     type Variable: Pretty;
 }
@@ -51,8 +50,6 @@ enum VariableScope {
     Global,
 }
 
-// TODO: Make private. need to make `SourceExpression` and
-// `NamesResolvedExpression` newtypes
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct Variable<'src> {
     name: &'src str,
