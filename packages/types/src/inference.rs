@@ -5,7 +5,9 @@ use std::{
     rc::Rc,
 };
 
-use crate::{Expression, InferenceError, Pretty, Result, SharedMut, Stage, VariableBinding};
+use crate::{
+    Expression, ExpressionReference, InferenceError, Pretty, Result, SharedMut, VariableBinding,
+};
 
 mod pretty;
 
@@ -14,7 +16,7 @@ pub struct ExpressionRef<'src>(SharedMut<ExprRefVariants<'src>>);
 
 enum ExprRefVariants<'src> {
     Known {
-        expression: Expression<'src, Inference>,
+        expression: Expression<'src, ExpressionRef<'src>>,
     },
     Unknown {
         typ: ExpressionRef<'src>,
@@ -45,7 +47,7 @@ impl<'src> ExpressionRef<'src> {
         Self::new(Expression::Variable(VariableReference { name, value }))
     }
 
-    pub(crate) fn new(expression: Expression<'src, Inference>) -> Self {
+    pub(crate) fn new(expression: Expression<'src, Self>) -> Self {
         Self(Rc::new(RefCell::new(ExprRefVariants::Known { expression })))
     }
 
@@ -178,7 +180,7 @@ impl<'src> ExpressionRef<'src> {
         *self = other.clone();
     }
 
-    fn known<'a>(&'a self) -> Option<RefMut<'a, Expression<'src, Inference>>> {
+    fn known<'a>(&'a self) -> Option<RefMut<'a, Expression<'src, Self>>> {
         RefMut::filter_map(self.0.borrow_mut(), |x| {
             if let ExprRefVariants::Known { expression } = x {
                 Some(expression)
@@ -204,14 +206,11 @@ impl fmt::Debug for ExpressionRef<'_> {
     }
 }
 
-pub(crate) struct Inference;
-
-impl<'src> Stage<'src> for Inference {
-    type Expression = ExpressionRef<'src>;
+impl<'src> ExpressionReference<'src> for ExpressionRef<'src> {
     type Variable = VariableReference<'src>;
 }
 
-pub(crate) struct VariableReference<'src> {
+pub struct VariableReference<'src> {
     name: &'src str,
     value: ExpressionRef<'src>,
 }
@@ -222,7 +221,7 @@ impl fmt::Debug for VariableReference<'_> {
     }
 }
 
-impl VariableBinding<'_, Inference> {
+impl<'src> VariableBinding<'src, ExpressionRef<'src>> {
     fn infer_types(&mut self) -> Result<()> {
         // TODO: Is this required?
         ExpressionRef::unify(
@@ -239,7 +238,7 @@ impl VariableBinding<'_, Inference> {
     }
 }
 
-impl<'src> Expression<'src, Inference> {
+impl<'src> Expression<'src, ExpressionRef<'src>> {
     fn infer_types(&mut self) -> Result<()> {
         match self {
             Self::TypeOfType => (),

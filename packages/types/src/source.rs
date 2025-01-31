@@ -1,4 +1,4 @@
-use std::{fmt, rc::Rc};
+use std::rc::Rc;
 
 use context::VariableLookup;
 
@@ -7,37 +7,31 @@ use super::{
     pretty::{Annotation, Document, Operator, Side},
 };
 use crate::{
-    inference::{ExpressionRef, Inference},
-    Expression, Pretty, Result, Stage, Variable, VariableBinding,
+    inference::ExpressionRef, Expression, ExpressionReference, Pretty, Result, Variable,
+    VariableBinding,
 };
 
 mod context;
 
-#[derive(Clone)]
-pub struct Source;
-
-impl<'src> Stage<'src> for Source {
-    type Expression = SourceExpression<'src>;
+impl<'src> ExpressionReference<'src> for SourceExpression<'src> {
     type Variable = &'src str;
 }
 
-#[derive(Clone)]
-pub struct NamesResolved;
-
-impl<'src> Stage<'src> for NamesResolved {
-    type Expression = NamesResolvedExpression<'src>;
+impl<'src> ExpressionReference<'src> for NamesResolvedExpression<'src> {
     type Variable = Variable<'src>;
 }
 
+// TODO: Make private
+type SweetExpression<'src, Expr> = Rc<SrcExprVariants<'src, Expr>>;
+
 #[derive(Clone)]
-pub struct SweetExpression<'src, S: Stage<'src>>(Rc<SrcExprVariants<'src, S>>);
+pub struct SourceExpression<'src>(SweetExpression<'src, Self>);
 
-pub type SourceExpression<'src> = SweetExpression<'src, Source>;
-
-pub type NamesResolvedExpression<'src> = SweetExpression<'src, NamesResolved>;
+#[derive(Clone)]
+pub struct NamesResolvedExpression<'src>(SweetExpression<'src, Self>);
 
 impl<'src> NamesResolvedExpression<'src> {
-    fn new(expr: SrcExprVariants<'src, NamesResolved>) -> Self {
+    fn new(expr: SrcExprVariants<'src, Self>) -> Self {
         Self(Rc::new(expr))
     }
 }
@@ -57,17 +51,10 @@ impl<'src> NamesResolvedExpression<'src> {
     }
 }
 
-enum SrcExprVariants<'src, T: Stage<'src>> {
-    Known {
-        expression: Expression<'src, T>,
-    },
-    TypeAnnotation {
-        expression: T::Expression,
-        typ: T::Expression,
-    },
-    Unknown {
-        typ: T::Expression,
-    },
+enum SrcExprVariants<'src, Expr: ExpressionReference<'src>> {
+    Known { expression: Expression<'src, Expr> },
+    TypeAnnotation { expression: Expr, typ: Expr },
+    Unknown { typ: Expr },
 }
 
 impl<'src> SourceExpression<'src> {
@@ -171,21 +158,12 @@ impl<'src> SourceExpression<'src> {
         })
     }
 
-    fn new(expression: Expression<'src, Source>) -> Self {
+    fn new(expression: Expression<'src, Self>) -> Self {
         Self(Rc::new(SrcExprVariants::Known { expression }))
     }
 }
 
-impl<'src, S> fmt::Debug for SweetExpression<'src, S>
-where
-    S: Stage<'src>,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_pretty_string(80))
-    }
-}
-
-impl<'src> Expression<'src, Source> {
+impl<'src> Expression<'src, SourceExpression<'src>> {
     fn resolve_names(
         &self,
         lookup: &mut VariableLookup<'src>,
@@ -217,11 +195,11 @@ impl<'src> Expression<'src, Source> {
     }
 }
 
-impl<'src> VariableBinding<'src, Source> {
+impl<'src> VariableBinding<'src, SourceExpression<'src>> {
     fn resolve_names(
         &self,
         lookup: &mut VariableLookup<'src>,
-    ) -> Result<VariableBinding<'src, NamesResolved>> {
+    ) -> Result<VariableBinding<'src, NamesResolvedExpression<'src>>> {
         let variable_value = self.variable_value.resolve_names_with_lookup(lookup)?;
 
         lookup.with_variable(self.name, |lookup| {
@@ -235,12 +213,49 @@ impl<'src> VariableBinding<'src, Source> {
     }
 }
 
+impl Pretty for SourceExpression<'_> {
+    fn to_document(&self, parent: Option<(Operator, Side)>, annotations: Annotation) -> Document {
+        self.0.to_document(parent, annotations)
+    }
+
+    // TODO: Have a `typ()` method instead
+    fn type_to_document(&self, parent: Option<(Operator, Side)>) -> Document {
+        self.0.type_to_document(parent)
+    }
+
+    fn is_known(&self) -> bool {
+        self.0.is_known()
+    }
+
+    fn type_is_known(&self) -> bool {
+        self.0.type_is_known()
+    }
+}
+
+impl Pretty for NamesResolvedExpression<'_> {
+    fn to_document(&self, parent: Option<(Operator, Side)>, annotations: Annotation) -> Document {
+        self.0.to_document(parent, annotations)
+    }
+
+    fn type_to_document(&self, parent: Option<(Operator, Side)>) -> Document {
+        self.0.type_to_document(parent)
+    }
+
+    fn is_known(&self) -> bool {
+        self.0.is_known()
+    }
+
+    fn type_is_known(&self) -> bool {
+        self.0.type_is_known()
+    }
+}
+
 impl<'src, S> Pretty for SweetExpression<'src, S>
 where
-    S: Stage<'src>,
+    S: ExpressionReference<'src>,
 {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
-        match self.0.as_ref() {
+        match self.as_ref() {
             SrcExprVariants::Known { expression } => expression.to_document(parent, annotation),
             SrcExprVariants::TypeAnnotation { expression, typ } => {
                 expression.annotate_with_type(typ, parent, annotation)
@@ -250,7 +265,7 @@ where
     }
 
     fn type_to_document(&self, parent: Option<(Operator, Side)>) -> Document {
-        match self.0.as_ref() {
+        match self.as_ref() {
             SrcExprVariants::Known { expression } => expression.type_to_document(parent),
             SrcExprVariants::TypeAnnotation { typ, .. } => typ.to_document(parent, Annotation::Off),
             SrcExprVariants::Unknown { typ } => typ.to_document(parent, Annotation::Off),
@@ -258,7 +273,7 @@ where
     }
 
     fn is_known(&self) -> bool {
-        match self.0.as_ref() {
+        match self.as_ref() {
             SrcExprVariants::Known { expression } => expression.is_known(),
             SrcExprVariants::TypeAnnotation { expression, .. } => expression.is_known(),
             SrcExprVariants::Unknown { .. } => false,
@@ -266,7 +281,7 @@ where
     }
 
     fn type_is_known(&self) -> bool {
-        match self.0.as_ref() {
+        match self.as_ref() {
             SrcExprVariants::Known { expression } => expression.type_is_known(),
             SrcExprVariants::TypeAnnotation { typ, .. } => typ.is_known(),
             SrcExprVariants::Unknown { typ } => typ.is_known(),
@@ -274,7 +289,7 @@ where
     }
 }
 
-impl<'src> Expression<'src, NamesResolved> {
+impl<'src> Expression<'src, NamesResolvedExpression<'src>> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<ExpressionRef<'src>> {
         Ok(ExpressionRef::new(match self {
             Self::TypeOfType => Expression::TypeOfType,
@@ -300,8 +315,8 @@ impl<'src> Expression<'src, NamesResolved> {
     }
 }
 
-impl<'src> VariableBinding<'src, NamesResolved> {
-    fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<'src, Inference>> {
+impl<'src> VariableBinding<'src, NamesResolvedExpression<'src>> {
+    fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<'src, ExpressionRef<'src>>> {
         let name = self.name;
         let variable_value = self.variable_value.link(ctx)?;
         let in_expression = ctx.with_variable(name, variable_value.clone(), |ctx| {

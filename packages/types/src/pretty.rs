@@ -1,6 +1,6 @@
 use pretty::RcDoc;
 
-use super::{Expression, Stage, VariableBinding};
+use super::{Expression, ExpressionReference, VariableBinding};
 use crate::Variable;
 
 pub trait Pretty {
@@ -51,7 +51,7 @@ impl Pretty for Variable<'_> {
     }
 }
 
-impl<'src, S: Stage<'src>> VariableBinding<'src, S> {
+impl<'src, Expr: ExpressionReference<'src>> VariableBinding<'src, Expr> {
     fn to_document(&self, annotation: Annotation) -> Document {
         Document::concat([
             variable_to_document(self.name, &self.variable_value, None, annotation),
@@ -94,7 +94,7 @@ pub fn variable_to_document(
     }
 }
 
-impl<'src, S: Stage<'src>> Pretty for Expression<'src, S> {
+impl<'src, Expr: ExpressionReference<'src>> Pretty for Expression<'src, Expr> {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
         match self {
             Self::TypeOfType => Document::text("Type"),

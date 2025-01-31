@@ -14,32 +14,32 @@ pub type Result<T> = result::Result<T, InferenceError>;
 #[derive(Debug)]
 pub struct InferenceError;
 
-pub trait Stage<'src> {
-    type Expression: Pretty;
+// TODO: Rename
+pub trait ExpressionReference<'src>: Pretty {
     type Variable: Pretty;
 }
 
-enum Expression<'src, S: Stage<'src>> {
+enum Expression<'src, Expr: ExpressionReference<'src>> {
     TypeOfType,
     Constant {
         name: &'src str,
-        typ: S::Expression,
+        typ: Expr,
     },
     Apply {
-        function: S::Expression,
-        argument: S::Expression,
-        typ: S::Expression,
+        function: Expr,
+        argument: Expr,
+        typ: Expr,
     },
-    Let(VariableBinding<'src, S>),
-    FunctionType(VariableBinding<'src, S>),
-    Lambda(VariableBinding<'src, S>),
-    Variable(S::Variable),
+    Let(VariableBinding<'src, Expr>),
+    FunctionType(VariableBinding<'src, Expr>),
+    Lambda(VariableBinding<'src, Expr>),
+    Variable(Expr::Variable),
 }
 
-struct VariableBinding<'src, S: Stage<'src>> {
+struct VariableBinding<'src, Expr: ExpressionReference<'src>> {
     name: &'src str,
-    variable_value: S::Expression,
-    in_expression: S::Expression,
+    variable_value: Expr,
+    in_expression: Expr,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
