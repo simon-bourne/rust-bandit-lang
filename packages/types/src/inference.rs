@@ -52,6 +52,8 @@ impl<'src> InferenceExpression<'src> {
     }
 
     pub fn infer_types(&mut self) -> Result<()> {
+        Self::unify(&mut self.typ().typ(), &mut Self::type_of_type())?;
+
         match &mut *self.0.borrow_mut() {
             ExprRefVariants::Known { expression } => expression.infer_types(),
             ExprRefVariants::Unknown { typ } => typ.infer_types(),
@@ -223,11 +225,6 @@ impl fmt::Debug for VariableReference<'_> {
 
 impl<'src> VariableBinding<'src, InferenceExpression<'src>> {
     fn infer_types(&mut self) -> Result<()> {
-        // TODO: Is this required?
-        InferenceExpression::unify(
-            &mut self.variable_value.typ().typ(),
-            &mut InferenceExpression::type_of_type(),
-        )?;
         self.variable_value.infer_types()?;
         self.in_expression.infer_types()
     }
@@ -243,14 +240,7 @@ impl<'src> Expression<'src, InferenceExpression<'src>> {
         match self {
             Self::TypeOfType => (),
             Self::Constant { typ, .. } => typ.infer_types()?,
-            Self::Variable(var) => {
-                let value = &mut var.value;
-                InferenceExpression::unify(
-                    &mut value.typ().typ(),
-                    &mut InferenceExpression::type_of_type(),
-                )?;
-                value.infer_types()?
-            }
+            Self::Variable(var) => var.value.infer_types()?,
             Self::Apply {
                 function,
                 argument,
