@@ -307,7 +307,6 @@ impl<'src> Expression<'src, NamesResolvedExpression<'src>> {
             Self::Let(binding) => Expression::Let(binding.link(ctx)?),
             Self::FunctionType(binding) => Expression::FunctionType(binding.link(ctx)?),
             Self::Lambda(binding) => Expression::Lambda(binding.link(ctx)?),
-            // TODO: Don't return
             Self::Variable(variable) => return ctx.lookup_value(*variable),
         }))
     }
