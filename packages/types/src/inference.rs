@@ -45,7 +45,6 @@ impl<'src> ExpressionRef<'src> {
         Self::new(Expression::Variable(VariableReference { name, value }))
     }
 
-    // TODO: Make private
     pub(crate) fn new(expression: Expression<'src, Inference>) -> Self {
         Self(Rc::new(RefCell::new(ExprRefVariants::Known { expression })))
     }

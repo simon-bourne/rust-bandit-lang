@@ -145,7 +145,6 @@ impl<'src> SourceExpression<'src> {
         }))
     }
 
-    // TODO: Make private
     pub fn resolve_names(&self) -> Result<NamesResolvedExpression<'src>> {
         self.resolve_names_with_lookup(&mut VariableLookup::default())
     }
