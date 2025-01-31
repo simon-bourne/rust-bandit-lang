@@ -1,11 +1,10 @@
+// TODO: Move to inference::context
 use std::collections::HashMap;
 
-use crate::{source::NamesResolvedExpression, ExpressionRef, InferenceError, Result};
-
-pub struct DeBruijnLevel(usize);
-
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub struct DeBruijnIndex(usize);
+use crate::{
+    inference::ExpressionRef, source::NamesResolvedExpression, DeBruijnIndex, InferenceError,
+    Result, Variable, VariableScope,
+};
 
 pub type GlobalValues<'a> = HashMap<&'a str, NamesResolvedExpression<'a>>;
 
@@ -22,7 +21,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn with_variable<Output>(
+    pub(crate) fn with_variable<Output>(
         &mut self,
         name: &'a str,
         value: ExpressionRef<'a>,
@@ -35,7 +34,7 @@ impl<'a> Context<'a> {
         output
     }
 
-    pub fn lookup_value(&mut self, variable: Variable<'a>) -> Result<ExpressionRef<'a>> {
+    pub(crate) fn lookup_value(&mut self, variable: Variable<'a>) -> Result<ExpressionRef<'a>> {
         match variable.scope {
             VariableScope::Local(index) => Ok(self.local_value(index)),
             VariableScope::Global => self.global_value(variable.name),
@@ -58,62 +57,4 @@ impl<'a> Context<'a> {
 
         Ok(value)
     }
-}
-
-#[derive(Default)]
-pub struct VariableLookup<'a> {
-    variables: HashMap<&'a str, Vec<DeBruijnLevel>>,
-    variable_count: usize,
-}
-
-impl<'a> VariableLookup<'a> {
-    pub fn with_variable<Output>(
-        &mut self,
-        name: &'a str,
-        f: impl FnOnce(&mut Self) -> Output,
-    ) -> Output {
-        let level = DeBruijnLevel(self.variable_count);
-        self.variable_count += 1;
-        self.variables.entry(name).or_default().push(level);
-        let output = f(self);
-        self.variables.entry(name).and_modify(|levels| {
-            levels.pop();
-        });
-        self.variable_count -= 1;
-        output
-    }
-
-    pub fn lookup(&self, name: &'a str) -> Variable<'a> {
-        let scope = if let Some(local_index) = self.lookup_local(name) {
-            VariableScope::Local(local_index)
-        } else {
-            VariableScope::Global
-        };
-
-        Variable { name, scope }
-    }
-
-    fn lookup_local(&self, name: &str) -> Option<DeBruijnIndex> {
-        let level = self.variables.get(name)?.last()?;
-        assert!(level.0 < self.variable_count);
-        Some(DeBruijnIndex(self.variable_count - level.0))
-    }
-}
-
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub struct Variable<'src> {
-    name: &'src str,
-    scope: VariableScope,
-}
-
-impl Variable<'_> {
-    pub fn name(&self) -> &str {
-        self.name
-    }
-}
-
-#[derive(Copy, Clone, Eq, PartialEq)]
-enum VariableScope {
-    Local(DeBruijnIndex),
-    Global,
 }
