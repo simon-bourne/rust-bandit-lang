@@ -71,14 +71,12 @@ pub fn variable_to_document(
         return Document::as_string(name);
     }
 
-    let variable_type = |parent| value.type_to_document(parent);
-
     let variable = |parent| {
         if value.type_is_known() {
             Operator::HasType.to_document(
                 parent,
                 |_parent| Document::as_string(name),
-                variable_type,
+                |parent| value.type_to_document(parent),
             )
         } else {
             Document::as_string(name)
