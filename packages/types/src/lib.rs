@@ -82,16 +82,17 @@ impl<'src> ExpressionRef<'src> {
     }
 
     fn follow_links(&mut self) {
-        loop {
-            let borrowed = self.0.borrow();
-            let ExprRefVariants::Link { target } = &*borrowed else {
+        // Collapse links from the bottom up so they are also collapsed for other
+        // expressions that reference this chain.
+        let link = {
+            let ExprRefVariants::Link { target } = &mut *self.0.borrow_mut() else {
                 return;
             };
+            target.follow_links();
+            target.clone()
+        };
 
-            let link = target.clone();
-            drop(borrowed);
-            *self = link;
-        }
+        *self = link;
     }
 
     fn unify_non_equal(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
