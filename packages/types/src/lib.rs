@@ -51,7 +51,8 @@ enum VariableScope {
     Global,
 }
 
-// TODO: Make private
+// TODO: Make private. need to make `SourceExpression` and
+// `NamesResolvedExpression` newtypes
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct Variable<'src> {
     name: &'src str,
