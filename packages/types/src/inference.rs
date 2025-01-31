@@ -12,21 +12,21 @@ use crate::{
 mod pretty;
 
 #[derive(Clone)]
-pub struct ExpressionRef<'src>(SharedMut<ExprRefVariants<'src>>);
+pub struct InferenceExpression<'src>(SharedMut<ExprRefVariants<'src>>);
 
 enum ExprRefVariants<'src> {
     Known {
-        expression: Expression<'src, ExpressionRef<'src>>,
+        expression: Expression<'src, InferenceExpression<'src>>,
     },
     Unknown {
-        typ: ExpressionRef<'src>,
+        typ: InferenceExpression<'src>,
     },
     Link {
-        target: ExpressionRef<'src>,
+        target: InferenceExpression<'src>,
     },
 }
 
-impl<'src> ExpressionRef<'src> {
+impl<'src> InferenceExpression<'src> {
     pub fn unknown(typ: Self) -> Self {
         Self(Rc::new(RefCell::new(ExprRefVariants::Unknown { typ })))
     }
@@ -200,19 +200,19 @@ impl<'src> ExpressionRef<'src> {
     }
 }
 
-impl fmt::Debug for ExpressionRef<'_> {
+impl fmt::Debug for InferenceExpression<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.to_pretty_string(80))
     }
 }
 
-impl<'src> ExpressionReference<'src> for ExpressionRef<'src> {
+impl<'src> ExpressionReference<'src> for InferenceExpression<'src> {
     type Variable = VariableReference<'src>;
 }
 
 pub struct VariableReference<'src> {
     name: &'src str,
-    value: ExpressionRef<'src>,
+    value: InferenceExpression<'src>,
 }
 
 impl fmt::Debug for VariableReference<'_> {
@@ -221,31 +221,31 @@ impl fmt::Debug for VariableReference<'_> {
     }
 }
 
-impl<'src> VariableBinding<'src, ExpressionRef<'src>> {
+impl<'src> VariableBinding<'src, InferenceExpression<'src>> {
     fn infer_types(&mut self) -> Result<()> {
         // TODO: Is this required?
-        ExpressionRef::unify(
+        InferenceExpression::unify(
             &mut self.variable_value.typ().typ(),
-            &mut ExpressionRef::type_of_type(),
+            &mut InferenceExpression::type_of_type(),
         )?;
         self.variable_value.infer_types()?;
         self.in_expression.infer_types()
     }
 
     fn unify(binding0: &mut Self, binding1: &mut Self) -> Result<()> {
-        ExpressionRef::unify(&mut binding0.variable_value, &mut binding1.variable_value)?;
-        ExpressionRef::unify(&mut binding0.in_expression, &mut binding1.in_expression)
+        InferenceExpression::unify(&mut binding0.variable_value, &mut binding1.variable_value)?;
+        InferenceExpression::unify(&mut binding0.in_expression, &mut binding1.in_expression)
     }
 }
 
-impl<'src> Expression<'src, ExpressionRef<'src>> {
+impl<'src> Expression<'src, InferenceExpression<'src>> {
     fn infer_types(&mut self) -> Result<()> {
         match self {
             Self::TypeOfType => (),
             Self::Constant { typ, .. } => typ.infer_types()?,
             Self::Variable(var) => {
                 let value = &mut var.value;
-                ExpressionRef::unify(&mut value.typ().typ(), &mut ExpressionRef::type_of_type())?;
+                InferenceExpression::unify(&mut value.typ().typ(), &mut InferenceExpression::type_of_type())?;
                 value.infer_types()?
             }
             Self::Apply {
@@ -253,10 +253,10 @@ impl<'src> Expression<'src, ExpressionRef<'src>> {
                 argument,
                 typ,
             } => {
-                ExpressionRef::unify(&mut typ.typ(), &mut ExpressionRef::type_of_type())?;
+                InferenceExpression::unify(&mut typ.typ(), &mut InferenceExpression::type_of_type())?;
                 let function_type =
-                    &mut ExpressionRef::function_type(argument.clone(), typ.clone());
-                ExpressionRef::unify(function_type, &mut function.typ())?;
+                    &mut InferenceExpression::function_type(argument.clone(), typ.clone());
+                InferenceExpression::unify(function_type, &mut function.typ())?;
 
                 function.infer_types()?;
                 argument.infer_types()?;
@@ -270,15 +270,15 @@ impl<'src> Expression<'src, ExpressionRef<'src>> {
         Ok(())
     }
 
-    fn typ(&self) -> ExpressionRef<'src> {
+    fn typ(&self) -> InferenceExpression<'src> {
         match self {
-            Self::TypeOfType => ExpressionRef::type_of_type(),
+            Self::TypeOfType => InferenceExpression::type_of_type(),
             Self::Constant { typ, .. } => typ.clone(),
             Self::Variable(var) => var.value.typ(),
             Self::Apply { typ, .. } => typ.clone(),
             Self::Let(binding) => binding.in_expression.typ(),
-            Self::FunctionType(_binding) => ExpressionRef::type_of_type(),
-            Self::Lambda(binding) => ExpressionRef::function_type(
+            Self::FunctionType(_binding) => InferenceExpression::type_of_type(),
+            Self::Lambda(binding) => InferenceExpression::function_type(
                 binding.variable_value.clone(),
                 binding.in_expression.typ(),
             ),

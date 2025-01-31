@@ -7,7 +7,7 @@ use super::{
     pretty::{Annotation, Document, Operator, Side},
 };
 use crate::{
-    inference::ExpressionRef, Expression, ExpressionReference, Pretty, Result, Variable,
+    inference::InferenceExpression, Expression, ExpressionReference, Pretty, Result, Variable,
     VariableBinding,
 };
 
@@ -37,16 +37,16 @@ impl<'src> NamesResolvedExpression<'src> {
 }
 
 impl<'src> NamesResolvedExpression<'src> {
-    pub fn link(&self, ctx: &mut Context<'src>) -> Result<ExpressionRef<'src>> {
+    pub fn link(&self, ctx: &mut Context<'src>) -> Result<InferenceExpression<'src>> {
         Ok(match self.0.as_ref() {
             SrcExprVariants::Known { expression } => expression.link(ctx)?,
             SrcExprVariants::TypeAnnotation { expression, typ } => {
                 let expression = expression.link(ctx)?;
                 let mut typ = typ.link(ctx)?;
-                ExpressionRef::unify(&mut expression.typ(), &mut typ)?;
+                InferenceExpression::unify(&mut expression.typ(), &mut typ)?;
                 expression
             }
-            SrcExprVariants::Unknown { typ } => ExpressionRef::unknown(typ.link(ctx)?),
+            SrcExprVariants::Unknown { typ } => InferenceExpression::unknown(typ.link(ctx)?),
         })
     }
 }
@@ -136,7 +136,7 @@ impl<'src> SourceExpression<'src> {
         self.resolve_names_with_lookup(&mut VariableLookup::default())
     }
 
-    pub fn link(&self, ctx: &mut Context<'src>) -> Result<ExpressionRef<'src>> {
+    pub fn link(&self, ctx: &mut Context<'src>) -> Result<InferenceExpression<'src>> {
         self.resolve_names()?.link(ctx)
     }
 
@@ -290,8 +290,8 @@ where
 }
 
 impl<'src> Expression<'src, NamesResolvedExpression<'src>> {
-    fn link(&self, ctx: &mut Context<'src>) -> Result<ExpressionRef<'src>> {
-        Ok(ExpressionRef::new(match self {
+    fn link(&self, ctx: &mut Context<'src>) -> Result<InferenceExpression<'src>> {
+        Ok(InferenceExpression::new(match self {
             Self::TypeOfType => Expression::TypeOfType,
             Self::Constant { name, typ } => Expression::Constant {
                 name,
@@ -316,7 +316,7 @@ impl<'src> Expression<'src, NamesResolvedExpression<'src>> {
 }
 
 impl<'src> VariableBinding<'src, NamesResolvedExpression<'src>> {
-    fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<'src, ExpressionRef<'src>>> {
+    fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<'src, InferenceExpression<'src>>> {
         let name = self.name;
         let variable_value = self.variable_value.link(ctx)?;
         let in_expression = ctx.with_variable(name, variable_value.clone(), |ctx| {
