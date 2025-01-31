@@ -217,7 +217,6 @@ impl Pretty for SourceExpression<'_> {
         self.0.to_document(parent, annotations)
     }
 
-    // TODO: Have a `typ()` method instead
     fn type_to_document(&self, parent: Option<(Operator, Side)>) -> Document {
         self.0.type_to_document(parent)
     }
