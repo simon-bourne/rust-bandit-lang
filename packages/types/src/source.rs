@@ -316,7 +316,10 @@ impl<'src> Expression<'src, NamesResolvedExpression<'src>> {
 }
 
 impl<'src> VariableBinding<'src, NamesResolvedExpression<'src>> {
-    fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<'src, InferenceExpression<'src>>> {
+    fn link(
+        &self,
+        ctx: &mut Context<'src>,
+    ) -> Result<VariableBinding<'src, InferenceExpression<'src>>> {
         let name = self.name;
         let variable_value = self.variable_value.link(ctx)?;
         let in_expression = ctx.with_variable(name, variable_value.clone(), |ctx| {

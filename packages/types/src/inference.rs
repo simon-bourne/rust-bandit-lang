@@ -245,7 +245,10 @@ impl<'src> Expression<'src, InferenceExpression<'src>> {
             Self::Constant { typ, .. } => typ.infer_types()?,
             Self::Variable(var) => {
                 let value = &mut var.value;
-                InferenceExpression::unify(&mut value.typ().typ(), &mut InferenceExpression::type_of_type())?;
+                InferenceExpression::unify(
+                    &mut value.typ().typ(),
+                    &mut InferenceExpression::type_of_type(),
+                )?;
                 value.infer_types()?
             }
             Self::Apply {
@@ -253,7 +256,10 @@ impl<'src> Expression<'src, InferenceExpression<'src>> {
                 argument,
                 typ,
             } => {
-                InferenceExpression::unify(&mut typ.typ(), &mut InferenceExpression::type_of_type())?;
+                InferenceExpression::unify(
+                    &mut typ.typ(),
+                    &mut InferenceExpression::type_of_type(),
+                )?;
                 let function_type =
                     &mut InferenceExpression::function_type(argument.clone(), typ.clone());
                 InferenceExpression::unify(function_type, &mut function.typ())?;

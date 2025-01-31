@@ -33,7 +33,10 @@ impl<'a> Context<'a> {
         output
     }
 
-    pub(crate) fn lookup_value(&mut self, variable: Variable<'a>) -> Result<InferenceExpression<'a>> {
+    pub(crate) fn lookup_value(
+        &mut self,
+        variable: Variable<'a>,
+    ) -> Result<InferenceExpression<'a>> {
         match variable.scope {
             VariableScope::Local(index) => Ok(self.local_value(index)),
             VariableScope::Global => self.global_value(variable.name),
