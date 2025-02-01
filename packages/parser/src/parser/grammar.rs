@@ -4,14 +4,14 @@ use winnow::{
     PResult, Parser as _,
 };
 
-use super::{Expr, Parser, TokenList};
+use super::{Expression, Parser, TokenList};
 use crate::lex::{Grouping, Keyword, NamedOperator, SrcToken, Token};
 
-pub fn expr<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> PResult<Expr<'src>> {
+pub fn expr<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> PResult<Expression<'src>> {
     type_annotations().parse_next(input)
 }
 
-fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
+fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
     separated_foldr1(
         function_types(),
         NamedOperator::HasType,
@@ -19,19 +19,19 @@ fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     )
 }
 
-fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
+fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
     separated_foldr1(
         function_applications(),
         NamedOperator::To,
-        |input_type, _, output_type| Expr::function_type("_", input_type, output_type),
+        |input_type, _, output_type| Expression::function_type("_", input_type, output_type),
     )
 }
 
-fn function_applications<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
-    repeat(1.., primary()).map(|es: Vec<_>| es.into_iter().reduce(Expr::apply).unwrap())
+fn function_applications<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
+    repeat(1.., primary()).map(|es: Vec<_>| es.into_iter().reduce(Expression::apply).unwrap())
 }
 
-fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
+fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
     alt((
         typ(),
         variable(),
@@ -42,19 +42,19 @@ fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     ))
 }
 
-fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
-    identifier().verify_map(|name| (name == "Type").then(Expr::type_of_type))
+fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
+    identifier().verify_map(|name| (name == "Type").then(Expression::type_of_type))
 }
 
-fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
+fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
     preceded(
         Keyword::Forall,
         separated_pair(variable_binding(), Token::SuchThat, expr),
     )
-    .map(|((var, typ), expr)| Expr::function_type(var, typ, expr))
+    .map(|((var, typ), expr)| Expression::function_type(var, typ, expr))
 }
 
-fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
+fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
     preceded(
         Keyword::Let,
         (
@@ -67,30 +67,30 @@ fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
     )
     .map(
         |((var, typ), _assign, variable_value, _linend, in_expression)| {
-            Expr::let_binding(var, variable_value.has_type(typ), in_expression)
+            Expression::let_binding(var, variable_value.has_type(typ), in_expression)
         },
     )
 }
 
-fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
+fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
     preceded(
         Token::Lambda,
         separated_pair(variable_binding(), Token::SuchThat, expr),
     )
-    .map(|((var, typ), expr)| Expr::lambda(var, typ, expr))
+    .map(|((var, typ), expr)| Expression::lambda(var, typ, expr))
 }
 
 // TODO: Multiple variable bindings
-fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, Expr<'src>)> {
+fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, Expression<'src>)> {
     (
         identifier(),
         opt(preceded(NamedOperator::HasType, expr))
-            .map(|typ| typ.unwrap_or_else(Expr::unknown_type)),
+            .map(|typ| typ.unwrap_or_else(Expression::unknown_type)),
     )
 }
 
-fn variable<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expr<'src>> {
-    identifier().map(Expr::variable)
+fn variable<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
+    identifier().map(Expression::variable)
 }
 
 fn identifier<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, &'src str> {

@@ -4,7 +4,7 @@ use winnow::{error::ContextError, token::one_of, PResult};
 
 use crate::lex::{Keyword, NamedOperator, SrcToken, Token};
 
-pub type Expr<'a> = SourceExpression<'a>;
+pub type Expression<'a> = SourceExpression<'a>;
 pub type TokenList<'tok, 'src> = &'tok [SrcToken<'src>];
 
 pub trait Parser<'tok, 'src: 'tok, Out>:

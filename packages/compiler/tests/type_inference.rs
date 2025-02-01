@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use bandit_parser::{
     lex::{SrcToken, Token},
-    parser::{expr, Expr},
+    parser::{expr, Expression},
 };
 use bandit_types::{context::Context, sweet::SourceExpression, Pretty};
 use winnow::Parser;
@@ -19,13 +19,15 @@ fn context<'src>(
     let mut global_items = HashMap::new();
 
     for typ in types {
-        global_items.insert(typ, Expr::type_constant(typ).resolve_names().unwrap());
+        global_items.insert(typ, Expression::type_constant(typ).resolve_names().unwrap());
     }
 
     for (name, typ) in items {
         global_items.insert(
             name,
-            Expr::constant(name, parse(typ)).resolve_names().unwrap(),
+            Expression::constant(name, parse(typ))
+                .resolve_names()
+                .unwrap(),
         );
     }
 
