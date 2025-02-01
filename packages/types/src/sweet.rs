@@ -3,7 +3,6 @@ use std::{marker::PhantomData, rc::Rc};
 use super::pretty::{Annotation, Document, Operator, Side};
 use crate::{pretty::TypeAnnotated, Expression, ExpressionReference, Pretty, VariableBinding};
 
-mod context;
 mod names_resolved;
 mod source;
 

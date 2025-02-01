@@ -1,7 +1,11 @@
-use super::{context::VariableLookup, NamesResolvedExpression, SrcExprVariants, SweetExpression};
+use context::VariableLookup;
+
+use super::{NamesResolvedExpression, SrcExprVariants, SweetExpression};
 use crate::{
     context::Context, inference::InferenceExpression, Expression, Result, VariableBinding,
 };
+
+mod context;
 
 pub type SourceExpression<'src> = SweetExpression<'src, &'src str>;
 
