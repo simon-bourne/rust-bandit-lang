@@ -192,14 +192,6 @@ impl<'src> InferenceExpression<'src> {
         })
         .ok()
     }
-
-    pub fn typ(&self) -> Self {
-        match &*self.0.borrow() {
-            ExprRefVariants::Known { expression } => expression.typ(),
-            ExprRefVariants::Unknown { typ } => typ.clone(),
-            ExprRefVariants::Link { target } => target.typ(),
-        }
-    }
 }
 
 impl fmt::Debug for InferenceExpression<'_> {
@@ -210,6 +202,24 @@ impl fmt::Debug for InferenceExpression<'_> {
 
 impl<'src> ExpressionReference<'src> for InferenceExpression<'src> {
     type Variable = VariableReference<'src>;
+
+    fn is_known(&self) -> bool {
+        match &*self.0.borrow() {
+            ExprRefVariants::Known { .. } => true,
+            ExprRefVariants::Unknown { .. } => false,
+            ExprRefVariants::Link { target } => target.is_known(),
+        }
+    }
+
+    fn typ(&self) -> Self {
+        match &*self.0.borrow() {
+            ExprRefVariants::Known { expression } => {
+                expression.typ(Self::new, |variable| variable.value.typ())
+            }
+            ExprRefVariants::Unknown { typ } => typ.clone(),
+            ExprRefVariants::Link { target } => target.typ(),
+        }
+    }
 }
 
 pub struct VariableReference<'src> {
@@ -264,20 +274,5 @@ impl<'src> Expression<'src, InferenceExpression<'src>> {
         }
 
         Ok(())
-    }
-
-    fn typ(&self) -> InferenceExpression<'src> {
-        match self {
-            Self::TypeOfType => InferenceExpression::type_of_type(),
-            Self::Constant { typ, .. } => typ.clone(),
-            Self::Variable(var) => var.value.typ(),
-            Self::Apply { typ, .. } => typ.clone(),
-            Self::Let(binding) => binding.in_expression.typ(),
-            Self::FunctionType(_binding) => InferenceExpression::type_of_type(),
-            Self::Lambda(binding) => InferenceExpression::function_type(
-                binding.variable_value.clone(),
-                binding.in_expression.typ(),
-            ),
-        }
     }
 }

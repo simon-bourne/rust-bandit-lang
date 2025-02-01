@@ -14,8 +14,12 @@ pub type Result<T> = result::Result<T, InferenceError>;
 #[derive(Debug)]
 pub struct InferenceError;
 
-pub trait ExpressionReference<'src>: Pretty {
+pub trait ExpressionReference<'src>: Pretty + Clone + Sized {
     type Variable: Pretty;
+
+    fn is_known(&self) -> bool;
+
+    fn typ(&self) -> Self;
 }
 
 enum Expression<'src, Expr: ExpressionReference<'src>> {
@@ -33,6 +37,30 @@ enum Expression<'src, Expr: ExpressionReference<'src>> {
     FunctionType(VariableBinding<'src, Expr>),
     Lambda(VariableBinding<'src, Expr>),
     Variable(Expr::Variable),
+}
+
+impl<'src, Expr: ExpressionReference<'src>> Expression<'src, Expr> {
+    fn typ(
+        &self,
+        new: impl FnOnce(Self) -> Expr,
+        variable_type: impl FnOnce(&Expr::Variable) -> Expr,
+    ) -> Expr {
+        match self {
+            Expression::TypeOfType => new(Expression::TypeOfType),
+            Expression::Constant { typ, .. } => typ.clone(),
+            Expression::Apply { typ, .. } => typ.clone(),
+            Expression::Let(variable_binding) => variable_binding.in_expression.typ(),
+            Expression::FunctionType(_) => new(Expression::TypeOfType),
+            Expression::Lambda(variable_binding) => {
+                new(Expression::FunctionType(VariableBinding {
+                    name: "_",
+                    variable_value: variable_binding.variable_value.clone(),
+                    in_expression: variable_binding.in_expression.typ(),
+                }))
+            }
+            Expression::Variable(variable) => variable_type(variable),
+        }
+    }
 }
 
 struct VariableBinding<'src, Expr: ExpressionReference<'src>> {

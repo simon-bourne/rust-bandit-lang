@@ -6,26 +6,6 @@ use crate::Variable;
 pub trait Pretty {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotations: Annotation) -> Document;
 
-    fn type_to_document(&self, parent: Option<(Operator, Side)>) -> Document;
-
-    fn annotate_with_type(
-        &self,
-        typ: &(impl Pretty + ?Sized),
-        parent: Option<(Operator, Side)>,
-        annotation: Annotation,
-    ) -> Document {
-        annotate_with_type(
-            |parent| self.to_document(parent, Annotation::Off),
-            typ,
-            parent,
-            annotation,
-        )
-    }
-
-    fn is_known(&self) -> bool;
-
-    fn type_is_known(&self) -> bool;
-
     fn to_pretty_string(&self, width: usize) -> String {
         self.to_document(None, Annotation::On)
             .pretty(width)
@@ -36,18 +16,6 @@ pub trait Pretty {
 impl Pretty for Variable<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
         self.name.to_document(parent, annotation)
-    }
-
-    fn type_to_document(&self, parent: Option<(Operator, Side)>) -> Document {
-        self.name.type_to_document(parent)
-    }
-
-    fn is_known(&self) -> bool {
-        self.name.is_known()
-    }
-
-    fn type_is_known(&self) -> bool {
-        false
     }
 }
 
@@ -61,9 +29,9 @@ impl<'src, Expr: ExpressionReference<'src>> VariableBinding<'src, Expr> {
     }
 }
 
-pub fn variable_to_document(
+pub fn variable_to_document<'src>(
     name: &str,
-    value: &impl Pretty,
+    value: &impl ExpressionReference<'src>,
     parent: Option<(Operator, Side)>,
     annotation: Annotation,
 ) -> Document {
@@ -72,11 +40,13 @@ pub fn variable_to_document(
     }
 
     let variable = |parent| {
-        if value.type_is_known() {
+        let typ = value.typ();
+
+        if typ.is_known() {
             Operator::HasType.to_document(
                 parent,
                 |_parent| Document::as_string(name),
-                |parent| value.type_to_document(parent),
+                |parent| typ.to_document(parent, Annotation::Off),
             )
         } else {
             Document::as_string(name)
@@ -96,7 +66,9 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for Expression<'src, Expr> {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
         match self {
             Self::TypeOfType => Document::text("Type"),
-            Self::Constant { name, typ } => name.annotate_with_type(typ, parent, annotation),
+            Self::Constant { name, typ } => {
+                annotate_with_type(|_| Document::as_string(name), typ, parent, annotation)
+            }
             Self::Apply {
                 function,
                 argument,
@@ -122,9 +94,9 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for Expression<'src, Expr> {
                 ],
             ),
             Self::FunctionType(binding) => {
-                let variable_name = &binding.name;
+                let variable_name = binding.name;
 
-                if variable_name.is_known() {
+                if variable_name != "_" {
                     parenthesize_if(
                         parent.is_some(),
                         [Document::text("∀"), binding.to_document(annotation)],
@@ -132,7 +104,12 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for Expression<'src, Expr> {
                 } else {
                     Operator::Arrow.to_document(
                         parent,
-                        |parent| binding.variable_value.type_to_document(parent),
+                        |parent| {
+                            binding
+                                .variable_value
+                                .typ()
+                                .to_document(parent, Annotation::Off)
+                        },
                         |parent| binding.in_expression.to_document(parent, Annotation::Off),
                     )
                 }
@@ -144,52 +121,11 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for Expression<'src, Expr> {
             Self::Variable(var) => var.to_document(parent, annotation),
         }
     }
-
-    fn type_to_document(&self, parent: Option<(Operator, Side)>) -> Document {
-        match self {
-            Self::TypeOfType => self.to_document(parent, Annotation::Off),
-            Self::Constant { typ, .. } => typ.to_document(parent, Annotation::Off),
-            Self::Apply { typ, .. } => typ.to_document(parent, Annotation::Off),
-            Self::Let(variable_binding)
-            | Self::FunctionType(variable_binding)
-            | Self::Lambda(variable_binding) => {
-                variable_binding.variable_value.type_to_document(parent)
-            }
-            Self::Variable(variable) => variable.type_to_document(parent),
-        }
-    }
-
-    fn is_known(&self) -> bool {
-        true
-    }
-
-    fn type_is_known(&self) -> bool {
-        match self {
-            Self::TypeOfType => true,
-            Self::Constant { typ, .. } | Self::Apply { typ, .. } => typ.is_known(),
-            Self::Let(binding) | Self::FunctionType(binding) | Self::Lambda(binding) => {
-                binding.variable_value.type_is_known()
-            }
-            Self::Variable(variable) => variable.type_is_known(),
-        }
-    }
 }
 
 impl Pretty for str {
     fn to_document(&self, _parent: Option<(Operator, Side)>, _annotation: Annotation) -> Document {
         Document::as_string(self)
-    }
-
-    fn type_to_document(&self, parent: Option<(Operator, Side)>) -> Document {
-        "_".to_document(parent, Annotation::Off)
-    }
-
-    fn is_known(&self) -> bool {
-        self != "_"
-    }
-
-    fn type_is_known(&self) -> bool {
-        false
     }
 }
 
@@ -197,21 +133,9 @@ impl Pretty for &str {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
         (*self).to_document(parent, annotation)
     }
-
-    fn type_to_document(&self, parent: Option<(Operator, Side)>) -> Document {
-        (*self).type_to_document(parent)
-    }
-
-    fn is_known(&self) -> bool {
-        (*self).is_known()
-    }
-
-    fn type_is_known(&self) -> bool {
-        (*self).type_is_known()
-    }
 }
 
-fn annotate_with_type(
+pub fn annotate_with_type(
     term: impl FnOnce(Option<(Operator, Side)>) -> Document,
     typ: &(impl ?Sized + Pretty),
     parent: Option<(Operator, Side)>,

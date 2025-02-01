@@ -7,18 +7,34 @@ use super::{
     pretty::{Annotation, Document, Operator, Side},
 };
 use crate::{
-    inference::InferenceExpression, Expression, ExpressionReference, Pretty, Result, Variable,
-    VariableBinding,
+    inference::InferenceExpression, pretty::annotate_with_type, Expression, ExpressionReference,
+    Pretty, Result, Variable, VariableBinding,
 };
 
 mod context;
 
 impl<'src> ExpressionReference<'src> for SourceExpression<'src> {
     type Variable = &'src str;
+
+    fn is_known(&self) -> bool {
+        self.0.is_known()
+    }
+
+    fn typ(&self) -> Self {
+        self.0.typ(Self::known, |_| Self::unknown_type())
+    }
 }
 
 impl<'src> ExpressionReference<'src> for NamesResolvedExpression<'src> {
     type Variable = Variable<'src>;
+
+    fn is_known(&self) -> bool {
+        self.0.is_known()
+    }
+
+    fn typ(&self) -> Self {
+        self.0.typ(Self::known, |_| Self::unknown_type())
+    }
 }
 
 type SweetExpression<'src, Expr> = Rc<SrcExprVariants<'src, Expr>>;
@@ -30,12 +46,24 @@ pub struct SourceExpression<'src>(SweetExpression<'src, Self>);
 pub struct NamesResolvedExpression<'src>(SweetExpression<'src, Self>);
 
 impl<'src> NamesResolvedExpression<'src> {
+    fn unknown_type() -> Self {
+        Self::new(SrcExprVariants::Unknown {
+            typ: Self::type_of_type(),
+        })
+    }
+
+    pub fn type_of_type() -> Self {
+        Self::known(Expression::TypeOfType)
+    }
+
     fn new(expr: SrcExprVariants<'src, Self>) -> Self {
         Self(Rc::new(expr))
     }
-}
 
-impl<'src> NamesResolvedExpression<'src> {
+    fn known(expression: Expression<'src, Self>) -> Self {
+        Self(Rc::new(SrcExprVariants::Known { expression }))
+    }
+
     pub fn link(&self, ctx: &mut Context<'src>) -> Result<InferenceExpression<'src>> {
         Ok(match self.0.as_ref() {
             SrcExprVariants::Known { expression } => expression.link(ctx)?,
@@ -56,6 +84,28 @@ enum SrcExprVariants<'src, Expr: ExpressionReference<'src>> {
     Unknown { typ: Expr },
 }
 
+impl<'src, Expr: ExpressionReference<'src>> SrcExprVariants<'src, Expr> {
+    fn is_known(&self) -> bool {
+        match self {
+            Self::Known { .. } => true,
+            Self::TypeAnnotation { expression, .. } => expression.is_known(),
+            Self::Unknown { .. } => false,
+        }
+    }
+
+    fn typ(
+        &self,
+        new: impl FnOnce(Expression<'src, Expr>) -> Expr,
+        variable_type: impl FnOnce(&Expr::Variable) -> Expr,
+    ) -> Expr {
+        match self {
+            Self::Known { expression } => expression.typ(new, variable_type),
+            Self::TypeAnnotation { typ, .. } => typ.clone(),
+            Self::Unknown { typ } => typ.clone(),
+        }
+    }
+}
+
 impl<'src> SourceExpression<'src> {
     pub fn unknown_term() -> Self {
         Self(Rc::new(SrcExprVariants::Unknown {
@@ -74,22 +124,22 @@ impl<'src> SourceExpression<'src> {
     }
 
     pub fn type_constant(name: &'src str) -> Self {
-        Self::new(Expression::Constant {
+        Self::known(Expression::Constant {
             name,
             typ: Self::type_of_type(),
         })
     }
 
     pub fn constant(name: &'src str, typ: Self) -> Self {
-        Self::new(Expression::Constant { name, typ })
+        Self::known(Expression::Constant { name, typ })
     }
 
     pub fn type_of_type() -> Self {
-        Self::new(Expression::TypeOfType)
+        Self::known(Expression::TypeOfType)
     }
 
     pub fn apply(self, argument: Self) -> Self {
-        Self::new(Expression::Apply {
+        Self::known(Expression::Apply {
             function: self,
             argument,
             typ: Self::unknown_type(),
@@ -97,7 +147,7 @@ impl<'src> SourceExpression<'src> {
     }
 
     pub fn let_binding(name: &'src str, variable_value: Self, in_expression: Self) -> Self {
-        Self::new(Expression::Let(VariableBinding {
+        Self::known(Expression::Let(VariableBinding {
             name,
             variable_value,
             in_expression,
@@ -105,7 +155,7 @@ impl<'src> SourceExpression<'src> {
     }
 
     pub fn function_type(name: &'src str, argument_type: Self, result_type: Self) -> Self {
-        Self::new(Expression::FunctionType(VariableBinding {
+        Self::known(Expression::FunctionType(VariableBinding {
             name,
             variable_value: Self::unknown_with_type(argument_type),
             in_expression: result_type,
@@ -113,7 +163,7 @@ impl<'src> SourceExpression<'src> {
     }
 
     pub fn lambda(name: &'src str, argument_type: Self, in_expression: Self) -> Self {
-        Self::new(Expression::Lambda(VariableBinding {
+        Self::known(Expression::Lambda(VariableBinding {
             name,
             variable_value: Self::unknown_with_type(argument_type),
             in_expression,
@@ -121,7 +171,7 @@ impl<'src> SourceExpression<'src> {
     }
 
     pub fn variable(name: &'src str) -> Self {
-        Self::new(Expression::Variable(name))
+        Self::known(Expression::Variable(name))
     }
 
     pub fn has_type(self, typ: Self) -> Self {
@@ -157,7 +207,7 @@ impl<'src> SourceExpression<'src> {
         })
     }
 
-    fn new(expression: Expression<'src, Self>) -> Self {
+    fn known(expression: Expression<'src, Self>) -> Self {
         Self(Rc::new(SrcExprVariants::Known { expression }))
     }
 }
@@ -216,35 +266,11 @@ impl Pretty for SourceExpression<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotations: Annotation) -> Document {
         self.0.to_document(parent, annotations)
     }
-
-    fn type_to_document(&self, parent: Option<(Operator, Side)>) -> Document {
-        self.0.type_to_document(parent)
-    }
-
-    fn is_known(&self) -> bool {
-        self.0.is_known()
-    }
-
-    fn type_is_known(&self) -> bool {
-        self.0.type_is_known()
-    }
 }
 
 impl Pretty for NamesResolvedExpression<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotations: Annotation) -> Document {
         self.0.to_document(parent, annotations)
-    }
-
-    fn type_to_document(&self, parent: Option<(Operator, Side)>) -> Document {
-        self.0.type_to_document(parent)
-    }
-
-    fn is_known(&self) -> bool {
-        self.0.is_known()
-    }
-
-    fn type_is_known(&self) -> bool {
-        self.0.type_is_known()
     }
 }
 
@@ -255,34 +281,15 @@ where
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
         match self.as_ref() {
             SrcExprVariants::Known { expression } => expression.to_document(parent, annotation),
-            SrcExprVariants::TypeAnnotation { expression, typ } => {
-                expression.annotate_with_type(typ, parent, annotation)
+            SrcExprVariants::TypeAnnotation { expression, typ } => annotate_with_type(
+                |parent| expression.to_document(parent, Annotation::Off),
+                typ,
+                parent,
+                annotation,
+            ),
+            SrcExprVariants::Unknown { typ } => {
+                annotate_with_type(|_| Document::text("_"), typ, parent, annotation)
             }
-            SrcExprVariants::Unknown { typ } => "_".annotate_with_type(typ, parent, annotation),
-        }
-    }
-
-    fn type_to_document(&self, parent: Option<(Operator, Side)>) -> Document {
-        match self.as_ref() {
-            SrcExprVariants::Known { expression } => expression.type_to_document(parent),
-            SrcExprVariants::TypeAnnotation { typ, .. } => typ.to_document(parent, Annotation::Off),
-            SrcExprVariants::Unknown { typ } => typ.to_document(parent, Annotation::Off),
-        }
-    }
-
-    fn is_known(&self) -> bool {
-        match self.as_ref() {
-            SrcExprVariants::Known { expression } => expression.is_known(),
-            SrcExprVariants::TypeAnnotation { expression, .. } => expression.is_known(),
-            SrcExprVariants::Unknown { .. } => false,
-        }
-    }
-
-    fn type_is_known(&self) -> bool {
-        match self.as_ref() {
-            SrcExprVariants::Known { expression } => expression.type_is_known(),
-            SrcExprVariants::TypeAnnotation { typ, .. } => typ.is_known(),
-            SrcExprVariants::Unknown { typ } => typ.is_known(),
         }
     }
 }
