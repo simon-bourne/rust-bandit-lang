@@ -111,11 +111,12 @@ impl<'src> InferenceExpression<'src> {
 
         // TODO: Application evaluation:
         //
-        // - If all types are known, and the expression is `Reducable::Maybe`:
+        // - If all types are known, and the expression is `Reducible::Maybe`:
         //      - Evaluate the expression as much as possible.
         // - Otherwise add to a list of deferred unifications.
-        // - Only unify applications if they're both `Reducable::No` (meaning we've
+        // - Only unify applications if they're both `Reducible::No` (meaning we've
         //   tried to evaluate the expression).
+        // - Reducible has another variant of `Reducible::PendingTypeCheck`
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
