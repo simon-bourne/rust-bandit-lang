@@ -3,7 +3,7 @@ use std::{cell::RefCell, fmt, rc::Rc, result};
 pub mod context;
 pub mod inference;
 mod pretty;
-pub mod source;
+pub mod sweet;
 
 pub use pretty::Pretty;
 
@@ -94,7 +94,7 @@ impl fmt::Debug for Variable<'_> {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::{context::Context, source::SourceExpression as Expr, Pretty};
+    use crate::{context::Context, sweet::SourceExpression as Expr, Pretty};
 
     #[test]
     fn infer_kinds() {

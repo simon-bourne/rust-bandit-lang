@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    inference::InferenceExpression, source::NamesResolvedExpression, DeBruijnIndex, InferenceError,
+    inference::InferenceExpression, sweet::NamesResolvedExpression, DeBruijnIndex, InferenceError,
     Result, Variable, VariableScope,
 };
 

@@ -1,4 +1,4 @@
-use bandit_types::source::SourceExpression;
+use bandit_types::sweet::SourceExpression;
 use winnow::{
     combinator::{alt, delimited, opt, preceded, repeat, separated_foldr1, separated_pair},
     error::ContextError,

@@ -4,7 +4,7 @@ use bandit_parser::{
     lex::{SrcToken, Token},
     parser::{expr, Expr},
 };
-use bandit_types::{context::Context, source::SourceExpression, Pretty};
+use bandit_types::{context::Context, sweet::SourceExpression, Pretty};
 use winnow::Parser;
 
 fn parse(input: &str) -> SourceExpression<'_> {
