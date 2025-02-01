@@ -1,17 +1,14 @@
 use std::{marker::PhantomData, rc::Rc};
 
-use context::VariableLookup;
-
-use super::{
-    context::Context,
-    pretty::{Annotation, Document, Operator, Side},
-};
-use crate::{
-    inference::InferenceExpression, pretty::TypeAnnotated, Expression, ExpressionReference, Pretty,
-    Result, Variable, VariableBinding,
-};
+use super::pretty::{Annotation, Document, Operator, Side};
+use crate::{pretty::TypeAnnotated, Expression, ExpressionReference, Pretty, VariableBinding};
 
 mod context;
+mod names_resolved;
+mod source;
+
+pub use names_resolved::NamesResolvedExpression;
+pub use source::SourceExpression;
 
 #[derive(Clone)]
 pub struct SweetExpression<'src, Var: Pretty + Clone>(
@@ -44,10 +41,6 @@ impl<Var: Pretty + Clone> Pretty for SweetExpression<'_, Var> {
         }
     }
 }
-
-pub type SourceExpression<'src> = SweetExpression<'src, &'src str>;
-
-pub type NamesResolvedExpression<'src> = SweetExpression<'src, Variable<'src>>;
 
 impl<'src, Var: Pretty + Clone> SweetExpression<'src, Var> {
     pub fn type_of_type() -> Self {
@@ -125,21 +118,6 @@ impl<'src, Var: Pretty + Clone> SweetExpression<'src, Var> {
     }
 }
 
-impl<'src> NamesResolvedExpression<'src> {
-    pub fn link(&self, ctx: &mut Context<'src>) -> Result<InferenceExpression<'src>> {
-        Ok(match self.0.as_ref() {
-            SrcExprVariants::Known { expression } => expression.link(ctx)?,
-            SrcExprVariants::TypeAnnotation { expression, typ } => {
-                let expression = expression.link(ctx)?;
-                let mut typ = typ.link(ctx)?;
-                InferenceExpression::unify(&mut expression.typ(), &mut typ)?;
-                expression
-            }
-            SrcExprVariants::Unknown { typ } => InferenceExpression::unknown(typ.link(ctx)?),
-        })
-    }
-}
-
 enum SrcExprVariants<'src, Expr: ExpressionReference<'src>> {
     Known { expression: Expression<'src, Expr> },
     TypeAnnotation { expression: Expr, typ: Expr },
@@ -165,131 +143,5 @@ impl<'src, Expr: ExpressionReference<'src>> SrcExprVariants<'src, Expr> {
             Self::TypeAnnotation { typ, .. } => typ.clone(),
             Self::Unknown { typ } => typ.clone(),
         }
-    }
-}
-
-impl<'src> SourceExpression<'src> {
-    pub fn variable(name: &'src str) -> Self {
-        Self::known(Expression::Variable(name))
-    }
-
-    pub fn resolve_names(&self) -> Result<NamesResolvedExpression<'src>> {
-        self.resolve_names_with_lookup(&mut VariableLookup::default())
-    }
-
-    pub fn link(&self, ctx: &mut Context<'src>) -> Result<InferenceExpression<'src>> {
-        self.resolve_names()?.link(ctx)
-    }
-
-    fn resolve_names_with_lookup(
-        &self,
-        lookup: &mut VariableLookup<'src>,
-    ) -> Result<NamesResolvedExpression<'src>> {
-        Ok(match self.0.as_ref() {
-            SrcExprVariants::Known { expression } => expression.resolve_names(lookup)?,
-            SrcExprVariants::TypeAnnotation { expression, typ } => {
-                let expression = expression.resolve_names_with_lookup(lookup)?;
-                let typ = typ.resolve_names_with_lookup(lookup)?;
-                NamesResolvedExpression::new(SrcExprVariants::TypeAnnotation { expression, typ })
-            }
-            SrcExprVariants::Unknown { typ } => {
-                let typ = typ.resolve_names_with_lookup(lookup)?;
-                NamesResolvedExpression::new(SrcExprVariants::Unknown { typ })
-            }
-        })
-    }
-}
-
-impl<'src> Expression<'src, SourceExpression<'src>> {
-    fn resolve_names(
-        &self,
-        lookup: &mut VariableLookup<'src>,
-    ) -> Result<NamesResolvedExpression<'src>> {
-        let expr = match self {
-            Self::TypeOfType => Expression::TypeOfType,
-            Self::Constant { name, typ } => Expression::Constant {
-                name,
-                typ: typ.resolve_names()?,
-            },
-            Self::Apply {
-                function,
-                argument,
-                typ,
-            } => Expression::Apply {
-                function: function.resolve_names_with_lookup(lookup)?,
-                argument: argument.resolve_names_with_lookup(lookup)?,
-                typ: typ.resolve_names_with_lookup(lookup)?,
-            },
-            Self::Let(binding) => Expression::Let(binding.resolve_names(lookup)?),
-            Self::FunctionType(binding) => Expression::FunctionType(binding.resolve_names(lookup)?),
-            Self::Lambda(binding) => Expression::Lambda(binding.resolve_names(lookup)?),
-            Self::Variable(name) => Expression::Variable(lookup.lookup(name)),
-        };
-
-        Ok(NamesResolvedExpression::new(SrcExprVariants::Known {
-            expression: expr,
-        }))
-    }
-}
-
-impl<'src> VariableBinding<'src, SourceExpression<'src>> {
-    fn resolve_names(
-        &self,
-        lookup: &mut VariableLookup<'src>,
-    ) -> Result<VariableBinding<'src, NamesResolvedExpression<'src>>> {
-        let variable_value = self.variable_value.resolve_names_with_lookup(lookup)?;
-
-        lookup.with_variable(self.name, |lookup| {
-            let in_expression = self.in_expression.resolve_names_with_lookup(lookup)?;
-            Ok(VariableBinding {
-                name: self.name,
-                variable_value,
-                in_expression,
-            })
-        })
-    }
-}
-
-impl<'src> Expression<'src, NamesResolvedExpression<'src>> {
-    fn link(&self, ctx: &mut Context<'src>) -> Result<InferenceExpression<'src>> {
-        Ok(InferenceExpression::new(match self {
-            Self::TypeOfType => Expression::TypeOfType,
-            Self::Constant { name, typ } => Expression::Constant {
-                name,
-                typ: typ.link(ctx)?,
-            },
-            Self::Apply {
-                function,
-                argument,
-                typ,
-            } => Expression::Apply {
-                function: function.link(ctx)?,
-                argument: argument.link(ctx)?,
-                typ: typ.link(ctx)?,
-            },
-            Self::Let(binding) => Expression::Let(binding.link(ctx)?),
-            Self::FunctionType(binding) => Expression::FunctionType(binding.link(ctx)?),
-            Self::Lambda(binding) => Expression::Lambda(binding.link(ctx)?),
-            Self::Variable(variable) => return ctx.lookup_value(*variable),
-        }))
-    }
-}
-
-impl<'src> VariableBinding<'src, NamesResolvedExpression<'src>> {
-    fn link(
-        &self,
-        ctx: &mut Context<'src>,
-    ) -> Result<VariableBinding<'src, InferenceExpression<'src>>> {
-        let name = self.name;
-        let variable_value = self.variable_value.link(ctx)?;
-        let in_expression = ctx.with_variable(name, variable_value.clone(), |ctx| {
-            self.in_expression.link(ctx)
-        })?;
-
-        Ok(VariableBinding {
-            name,
-            variable_value,
-            in_expression,
-        })
     }
 }
