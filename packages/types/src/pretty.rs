@@ -46,7 +46,8 @@ pub fn variable_to_document<'src>(
             Operator::HasType.to_document(
                 parent,
                 |_parent| Document::as_string(name),
-                |parent| typ.to_document(parent, Annotation::Off),
+                &typ,
+                Annotation::Off,
             )
         } else {
             Document::as_string(name)
@@ -54,9 +55,7 @@ pub fn variable_to_document<'src>(
     };
 
     if value.is_known() {
-        Operator::Equals.to_document(parent, variable, |parent| {
-            value.to_document(parent, annotation)
-        })
+        Operator::Equals.to_document(parent, variable, value, annotation)
     } else {
         variable(parent)
     }
@@ -78,7 +77,8 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for Expression<'src, Expr> {
                     Operator::Apply.to_document(
                         parent,
                         |parent| function.to_document(parent, annotation),
-                        |parent| argument.to_document(parent, annotation),
+                        argument,
+                        annotation,
                     )
                 },
                 typ,
@@ -110,7 +110,8 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for Expression<'src, Expr> {
                                 .typ()
                                 .to_document(parent, Annotation::Off)
                         },
-                        |parent| binding.in_expression.to_document(parent, Annotation::Off),
+                        &binding.in_expression,
+                        Annotation::Off,
                     )
                 }
             }
@@ -137,7 +138,7 @@ impl Pretty for &str {
 
 pub fn annotate_with_type(
     term: impl FnOnce(Option<(Operator, Side)>) -> Document,
-    typ: &(impl ?Sized + Pretty),
+    typ: &impl Pretty,
     parent: Option<(Operator, Side)>,
     annotation: Annotation,
 ) -> Document {
@@ -145,9 +146,7 @@ pub fn annotate_with_type(
         return term(parent);
     }
 
-    Operator::HasType.to_document(parent, term, |parent| {
-        typ.to_document(parent, Annotation::Off)
-    })
+    Operator::HasType.to_document(parent, term, typ, Annotation::Off)
 }
 
 fn parenthesize_if(condition: bool, docs: impl IntoIterator<Item = Document>) -> Document {
@@ -175,7 +174,8 @@ impl Operator {
         self,
         parent: Option<(Operator, Side)>,
         left: impl FnOnce(Option<(Operator, Side)>) -> Document,
-        right: impl FnOnce(Option<(Operator, Side)>) -> Document,
+        right: &impl Pretty,
+        right_annotation: Annotation,
     ) -> Document {
         parenthesize_if(
             self.parenthesize(parent),
@@ -187,7 +187,7 @@ impl Operator {
                     Self::Arrow => " → ",
                     Self::Apply => " ",
                 }),
-                right(Some((self, Side::Right))),
+                right.to_document(Some((self, Side::Right)), right_annotation),
             ],
         )
     }
