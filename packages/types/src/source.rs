@@ -7,8 +7,8 @@ use super::{
     pretty::{Annotation, Document, Operator, Side},
 };
 use crate::{
-    inference::InferenceExpression, pretty::annotate_with_type, Expression, ExpressionReference,
-    Pretty, Result, Variable, VariableBinding,
+    inference::InferenceExpression, pretty::TypeAnnotated, Expression, ExpressionReference, Pretty,
+    Result, Variable, VariableBinding,
 };
 
 mod context;
@@ -281,14 +281,11 @@ where
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
         match self.as_ref() {
             SrcExprVariants::Known { expression } => expression.to_document(parent, annotation),
-            SrcExprVariants::TypeAnnotation { expression, typ } => annotate_with_type(
-                |parent| expression.to_document(parent, Annotation::Off),
-                typ,
-                parent,
-                annotation,
-            ),
+            SrcExprVariants::TypeAnnotation { expression, typ } => {
+                TypeAnnotated::new(expression, typ).to_document(parent, annotation)
+            }
             SrcExprVariants::Unknown { typ } => {
-                annotate_with_type(|_| Document::text("_"), typ, parent, annotation)
+                TypeAnnotated::new("_", typ).to_document(parent, annotation)
             }
         }
     }

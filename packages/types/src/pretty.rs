@@ -13,6 +13,12 @@ pub trait Pretty {
     }
 }
 
+impl<T: Pretty> Pretty for &'_ T {
+    fn to_document(&self, parent: Option<(Operator, Side)>, annotations: Annotation) -> Document {
+        (*self).to_document(parent, annotations)
+    }
+}
+
 impl Pretty for Variable<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
         self.name.to_document(parent, annotation)
@@ -29,35 +35,54 @@ impl<'src, Expr: ExpressionReference<'src>> VariableBinding<'src, Expr> {
     }
 }
 
+pub struct TypeAnnotated<Value: Pretty, Type: Pretty> {
+    value: Value,
+    typ: Option<Type>,
+}
+
+impl<'a, 'src, Value, Type> TypeAnnotated<Value, &'a Type>
+where
+    Value: Pretty,
+    Type: ExpressionReference<'src> + 'a,
+{
+    pub fn new(value: Value, typ: &'a Type) -> Self {
+        Self {
+            value,
+            typ: typ.is_known().then_some(typ),
+        }
+    }
+}
+
+impl<Value: Pretty, Type: Pretty> Pretty for TypeAnnotated<Value, Type> {
+    fn to_document(&self, parent: Option<(Operator, Side)>, annotations: Annotation) -> Document {
+        if annotations == Annotation::On {
+            if let Some(typ) = self.typ.as_ref() {
+                return Operator::HasType.to_document(
+                    parent,
+                    &self.value,
+                    &typ,
+                    Annotation::On,
+                    Annotation::Off,
+                );
+            }
+        }
+        self.value.to_document(parent, annotations)
+    }
+}
+
 pub fn variable_to_document<'src>(
     name: &str,
     value: &impl ExpressionReference<'src>,
     parent: Option<(Operator, Side)>,
     annotation: Annotation,
 ) -> Document {
-    if annotation == Annotation::Off {
-        return Document::as_string(name);
-    }
-
-    let variable = |parent| {
-        let typ = value.typ();
-
-        if typ.is_known() {
-            Operator::HasType.to_document(
-                parent,
-                |_parent| Document::as_string(name),
-                &typ,
-                Annotation::Off,
-            )
-        } else {
-            Document::as_string(name)
-        }
-    };
+    let typ = &value.typ();
+    let type_annotated = TypeAnnotated::new(name, typ);
 
     if value.is_known() {
-        Operator::Equals.to_document(parent, variable, value, annotation)
+        Operator::Equals.to_document(parent, &type_annotated, value, annotation, Annotation::Off)
     } else {
-        variable(parent)
+        type_annotated.to_document(parent, annotation)
     }
 }
 
@@ -66,25 +91,14 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for Expression<'src, Expr> {
         match self {
             Self::TypeOfType => Document::text("Type"),
             Self::Constant { name, typ } => {
-                annotate_with_type(|_| Document::as_string(name), typ, parent, annotation)
+                TypeAnnotated::new(*name, typ).to_document(parent, annotation)
             }
             Self::Apply {
                 function,
                 argument,
                 typ,
-            } => annotate_with_type(
-                |parent| {
-                    Operator::Apply.to_document(
-                        parent,
-                        |parent| function.to_document(parent, annotation),
-                        argument,
-                        annotation,
-                    )
-                },
-                typ,
-                parent,
-                annotation,
-            ),
+            } => TypeAnnotated::new(BinaryOperator(function, Operator::Apply, argument), typ)
+                .to_document(parent, annotation),
             Self::Let(binding) => parenthesize_if(
                 parent.is_some(),
                 [
@@ -104,13 +118,9 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for Expression<'src, Expr> {
                 } else {
                     Operator::Arrow.to_document(
                         parent,
-                        |parent| {
-                            binding
-                                .variable_value
-                                .typ()
-                                .to_document(parent, Annotation::Off)
-                        },
+                        &binding.variable_value.typ(),
                         &binding.in_expression,
+                        Annotation::Off,
                         Annotation::Off,
                     )
                 }
@@ -136,19 +146,6 @@ impl Pretty for &str {
     }
 }
 
-pub fn annotate_with_type(
-    term: impl FnOnce(Option<(Operator, Side)>) -> Document,
-    typ: &impl Pretty,
-    parent: Option<(Operator, Side)>,
-    annotation: Annotation,
-) -> Document {
-    if annotation == Annotation::Off {
-        return term(parent);
-    }
-
-    Operator::HasType.to_document(parent, term, typ, Annotation::Off)
-}
-
 fn parenthesize_if(condition: bool, docs: impl IntoIterator<Item = Document>) -> Document {
     if condition {
         Document::concat([
@@ -161,6 +158,14 @@ fn parenthesize_if(condition: bool, docs: impl IntoIterator<Item = Document>) ->
     }
 }
 
+pub struct BinaryOperator<Left: Pretty, Right: Pretty>(pub Left, pub Operator, pub Right);
+
+impl<Left: Pretty, Right: Pretty> Pretty for BinaryOperator<Left, Right> {
+    fn to_document(&self, parent: Option<(Operator, Side)>, annotations: Annotation) -> Document {
+        self.1
+            .to_document(parent, &self.0, &self.2, annotations, annotations)
+    }
+}
 #[derive(Copy, Clone)]
 pub enum Operator {
     Equals,
@@ -173,14 +178,15 @@ impl Operator {
     pub fn to_document(
         self,
         parent: Option<(Operator, Side)>,
-        left: impl FnOnce(Option<(Operator, Side)>) -> Document,
+        left: &impl Pretty,
         right: &impl Pretty,
+        left_annotation: Annotation,
         right_annotation: Annotation,
     ) -> Document {
         parenthesize_if(
             self.parenthesize(parent),
             [
-                left(Some((self, Side::Left))),
+                left.to_document(Some((self, Side::Left)), left_annotation),
                 Document::text(match self {
                     Self::Equals => " = ",
                     Self::HasType => " : ",

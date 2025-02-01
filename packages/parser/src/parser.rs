@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn lambda() {
-        parse(r"(\x ⇒ x) Type", r"(\x ⇒ x) Type : _");
+        parse(r"(\x ⇒ x) Type", r"(\x ⇒ x) Type");
     }
 
     #[test]

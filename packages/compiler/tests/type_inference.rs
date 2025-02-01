@@ -70,7 +70,7 @@ fn partial_add() {
 fn simple_id() {
     test_with_ctx(
         "id Int one",
-        "((id : (∀a ⇒ Int → Int)) (Int : Type) : Int → Int) (one : Int) : Int",
+        "((id : (∀a = Int ⇒ Int → Int)) (Int : Type) : Int → Int) (one : Int) : Int",
     );
 }
 
@@ -78,6 +78,6 @@ fn simple_id() {
 fn multi_id() {
     test_with_ctx(
         "add (id Int one) (float_to_int (id Float pi))",
-        "((add : Int → Int → Int) (((id : (∀a ⇒ Int → Int)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a ⇒ Float → Float)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
+        "((add : Int → Int → Int) (((id : (∀a = Int ⇒ Int → Int)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a = Float ⇒ Float → Float)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
 }

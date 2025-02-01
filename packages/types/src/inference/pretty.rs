@@ -1,6 +1,6 @@
 use super::{ExprRefVariants, InferenceExpression, VariableReference};
 use crate::{
-    pretty::{annotate_with_type, variable_to_document, Annotation, Document, Operator, Side},
+    pretty::{variable_to_document, Annotation, Document, Operator, Side, TypeAnnotated},
     Pretty,
 };
 
@@ -9,7 +9,7 @@ impl Pretty for InferenceExpression<'_> {
         match &*self.0.borrow() {
             ExprRefVariants::Known { expression } => expression.to_document(parent, annotation),
             ExprRefVariants::Unknown { typ } => {
-                annotate_with_type(|_| Document::text("_"), typ, parent, annotation)
+                TypeAnnotated::new("_", typ).to_document(parent, annotation)
             }
             ExprRefVariants::Link { target } => target.to_document(parent, annotation),
         }
