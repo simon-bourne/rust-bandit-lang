@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 use crate::{
-    inference::InferenceExpression, sweet::NamesResolvedExpression, DeBruijnIndex, InferenceError,
-    Result, Variable, VariableScope,
+    inference::Expression, type_annotated::indexed_locals, DeBruijnIndex, InferenceError, Result,
+    Variable, VariableScope,
 };
 
-pub type GlobalValues<'a> = HashMap<&'a str, NamesResolvedExpression<'a>>;
+pub type GlobalValues<'a> = HashMap<&'a str, indexed_locals::Expression<'a>>;
 
 pub struct Context<'a> {
-    local_variables: Vec<InferenceExpression<'a>>,
+    local_variables: Vec<Expression<'a>>,
     global_variables: GlobalValues<'a>,
 }
 
@@ -23,33 +23,30 @@ impl<'a> Context<'a> {
     pub(crate) fn with_variable<Output>(
         &mut self,
         name: &'a str,
-        value: InferenceExpression<'a>,
+        value: Expression<'a>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Output {
         self.local_variables
-            .push(InferenceExpression::variable(name, value.clone()));
+            .push(Expression::variable(name, value.clone()));
         let output = f(self);
         self.local_variables.pop();
         output
     }
 
-    pub(crate) fn lookup_value(
-        &mut self,
-        variable: Variable<'a>,
-    ) -> Result<InferenceExpression<'a>> {
+    pub(crate) fn lookup_value(&mut self, variable: Variable<'a>) -> Result<Expression<'a>> {
         match variable.scope {
             VariableScope::Local(index) => Ok(self.local_value(index)),
             VariableScope::Global => self.global_value(variable.name),
         }
     }
 
-    fn local_value(&self, index: DeBruijnIndex) -> InferenceExpression<'a> {
+    fn local_value(&self, index: DeBruijnIndex) -> Expression<'a> {
         let len = self.local_variables.len();
         assert!(index.0 <= len);
         self.local_variables[len - index.0].clone()
     }
 
-    fn global_value(&mut self, name: &'a str) -> Result<InferenceExpression<'a>> {
+    fn global_value(&mut self, name: &'a str) -> Result<Expression<'a>> {
         let value = self
             .global_variables
             .get(name)

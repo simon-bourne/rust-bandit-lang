@@ -3,7 +3,7 @@ use std::{cell::RefCell, fmt, rc::Rc, result};
 pub mod context;
 pub mod inference;
 mod pretty;
-pub mod sweet;
+pub mod type_annotated;
 
 pub use pretty::Pretty;
 
@@ -22,7 +22,7 @@ pub trait ExpressionReference<'src>: Pretty + Clone + Sized {
     fn typ(&self) -> Self;
 }
 
-enum Expression<'src, Expr: ExpressionReference<'src>> {
+enum GenericExpression<'src, Expr: ExpressionReference<'src>> {
     TypeOfType,
     Constant {
         name: &'src str,
@@ -39,26 +39,26 @@ enum Expression<'src, Expr: ExpressionReference<'src>> {
     Variable(Expr::Variable),
 }
 
-impl<'src, Expr: ExpressionReference<'src>> Expression<'src, Expr> {
+impl<'src, Expr: ExpressionReference<'src>> GenericExpression<'src, Expr> {
     fn typ(
         &self,
         new: impl FnOnce(Self) -> Expr,
         variable_type: impl FnOnce(&Expr::Variable) -> Expr,
     ) -> Expr {
         match self {
-            Expression::TypeOfType => new(Expression::TypeOfType),
-            Expression::Constant { typ, .. } => typ.clone(),
-            Expression::Apply { typ, .. } => typ.clone(),
-            Expression::Let(variable_binding) => variable_binding.in_expression.typ(),
-            Expression::FunctionType(_) => new(Expression::TypeOfType),
-            Expression::Lambda(variable_binding) => {
-                new(Expression::FunctionType(VariableBinding {
+            GenericExpression::TypeOfType => new(GenericExpression::TypeOfType),
+            GenericExpression::Constant { typ, .. } => typ.clone(),
+            GenericExpression::Apply { typ, .. } => typ.clone(),
+            GenericExpression::Let(variable_binding) => variable_binding.in_expression.typ(),
+            GenericExpression::FunctionType(_) => new(GenericExpression::TypeOfType),
+            GenericExpression::Lambda(variable_binding) => {
+                new(GenericExpression::FunctionType(VariableBinding {
                     name: "_",
                     variable_value: variable_binding.variable_value.clone(),
                     in_expression: variable_binding.in_expression.typ(),
                 }))
             }
-            Expression::Variable(variable) => variable_type(variable),
+            GenericExpression::Variable(variable) => variable_type(variable),
         }
     }
 }

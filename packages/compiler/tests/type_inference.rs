@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use bandit_parser::{
     lex::{SrcToken, Token},
-    parse::{expr, Expression},
+    parse::expr,
 };
-use bandit_types::{context::Context, sweet::SourceExpression, Pretty};
+use bandit_types::{context::Context, type_annotated::named_locals::Expression, Pretty};
 use winnow::Parser;
 
-fn parse(input: &str) -> SourceExpression<'_> {
+fn parse(input: &str) -> Expression<'_> {
     let tokens: Vec<SrcToken> = Token::layout(input).collect();
     expr.parse(&tokens).unwrap()
 }

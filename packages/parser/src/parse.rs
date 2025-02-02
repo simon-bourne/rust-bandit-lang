@@ -1,4 +1,4 @@
-use bandit_types::sweet::SourceExpression;
+use bandit_types::type_annotated::named_locals::Expression;
 pub use grammar::expr;
 use winnow::{error::ContextError, token::one_of, PResult};
 
@@ -6,7 +6,6 @@ use crate::lex::{Keyword, NamedOperator, SrcToken, Token};
 
 mod grammar;
 
-pub type Expression<'a> = SourceExpression<'a>;
 pub type TokenList<'tok, 'src> = &'tok [SrcToken<'src>];
 
 pub trait Parser<'tok, 'src: 'tok, Out>:

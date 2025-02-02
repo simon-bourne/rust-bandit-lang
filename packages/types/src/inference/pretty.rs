@@ -1,10 +1,10 @@
-use super::{ExprRefVariants, InferenceExpression, VariableReference};
+use super::{ExprRefVariants, Expression, VariableReference};
 use crate::{
     pretty::{variable_to_document, Annotation, Document, Operator, Side, TypeAnnotated},
     Pretty,
 };
 
-impl Pretty for InferenceExpression<'_> {
+impl Pretty for Expression<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
         match &*self.0.borrow() {
             ExprRefVariants::Known { expression } => expression.to_document(parent, annotation),

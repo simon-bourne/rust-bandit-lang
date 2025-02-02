@@ -1,21 +1,17 @@
 use std::{marker::PhantomData, rc::Rc};
 
 use super::pretty::{Annotation, Document, Operator, Side};
-use crate::{pretty::TypeAnnotated, Expression, ExpressionReference, Pretty, VariableBinding};
+use crate::{
+    pretty::TypeAnnotated, ExpressionReference, GenericExpression, Pretty, VariableBinding,
+};
 
-mod names_resolved;
-mod source;
-
-pub use names_resolved::NamesResolvedExpression;
-pub use source::SourceExpression;
+pub mod indexed_locals;
+pub mod named_locals;
 
 #[derive(Clone)]
-pub struct SweetExpression<'src, Var: Pretty + Clone>(
-    Rc<SrcExprVariants<'src, Self>>,
-    PhantomData<Var>,
-);
+pub struct Expression<'src, Var: Pretty + Clone>(Rc<SrcExprVariants<'src, Self>>, PhantomData<Var>);
 
-impl<'src, Var: Pretty + Clone> ExpressionReference<'src> for SweetExpression<'src, Var> {
+impl<'src, Var: Pretty + Clone> ExpressionReference<'src> for Expression<'src, Var> {
     type Variable = Var;
 
     fn is_known(&self) -> bool {
@@ -27,7 +23,7 @@ impl<'src, Var: Pretty + Clone> ExpressionReference<'src> for SweetExpression<'s
     }
 }
 
-impl<Var: Pretty + Clone> Pretty for SweetExpression<'_, Var> {
+impl<Var: Pretty + Clone> Pretty for Expression<'_, Var> {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
         match self.0.as_ref() {
             SrcExprVariants::Known { expression } => expression.to_document(parent, annotation),
@@ -41,9 +37,9 @@ impl<Var: Pretty + Clone> Pretty for SweetExpression<'_, Var> {
     }
 }
 
-impl<'src, Var: Pretty + Clone> SweetExpression<'src, Var> {
+impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
     pub fn type_of_type() -> Self {
-        Self::known(Expression::TypeOfType)
+        Self::known(GenericExpression::TypeOfType)
     }
 
     pub fn unknown_type() -> Self {
@@ -55,18 +51,18 @@ impl<'src, Var: Pretty + Clone> SweetExpression<'src, Var> {
     }
 
     pub fn type_constant(name: &'src str) -> Self {
-        Self::known(Expression::Constant {
+        Self::known(GenericExpression::Constant {
             name,
             typ: Self::type_of_type(),
         })
     }
 
     pub fn constant(name: &'src str, typ: Self) -> Self {
-        Self::known(Expression::Constant { name, typ })
+        Self::known(GenericExpression::Constant { name, typ })
     }
 
     pub fn apply(self, argument: Self) -> Self {
-        Self::known(Expression::Apply {
+        Self::known(GenericExpression::Apply {
             function: self,
             argument,
             typ: Self::unknown_type(),
@@ -74,7 +70,7 @@ impl<'src, Var: Pretty + Clone> SweetExpression<'src, Var> {
     }
 
     pub fn let_binding(name: &'src str, variable_value: Self, in_expression: Self) -> Self {
-        Self::known(Expression::Let(VariableBinding {
+        Self::known(GenericExpression::Let(VariableBinding {
             name,
             variable_value,
             in_expression,
@@ -82,7 +78,7 @@ impl<'src, Var: Pretty + Clone> SweetExpression<'src, Var> {
     }
 
     pub fn function_type(name: &'src str, argument_type: Self, result_type: Self) -> Self {
-        Self::known(Expression::FunctionType(VariableBinding {
+        Self::known(GenericExpression::FunctionType(VariableBinding {
             name,
             variable_value: Self::unknown(argument_type),
             in_expression: result_type,
@@ -90,7 +86,7 @@ impl<'src, Var: Pretty + Clone> SweetExpression<'src, Var> {
     }
 
     pub fn lambda(name: &'src str, argument_type: Self, in_expression: Self) -> Self {
-        Self::known(Expression::Lambda(VariableBinding {
+        Self::known(GenericExpression::Lambda(VariableBinding {
             name,
             variable_value: Self::unknown(argument_type),
             in_expression,
@@ -108,7 +104,7 @@ impl<'src, Var: Pretty + Clone> SweetExpression<'src, Var> {
         Self(Rc::new(expr), PhantomData)
     }
 
-    fn known(expression: Expression<'src, Self>) -> Self {
+    fn known(expression: GenericExpression<'src, Self>) -> Self {
         Self(Rc::new(SrcExprVariants::Known { expression }), PhantomData)
     }
 
@@ -118,9 +114,16 @@ impl<'src, Var: Pretty + Clone> SweetExpression<'src, Var> {
 }
 
 enum SrcExprVariants<'src, Expr: ExpressionReference<'src>> {
-    Known { expression: Expression<'src, Expr> },
-    TypeAnnotation { expression: Expr, typ: Expr },
-    Unknown { typ: Expr },
+    Known {
+        expression: GenericExpression<'src, Expr>,
+    },
+    TypeAnnotation {
+        expression: Expr,
+        typ: Expr,
+    },
+    Unknown {
+        typ: Expr,
+    },
 }
 
 impl<'src, Expr: ExpressionReference<'src>> SrcExprVariants<'src, Expr> {
@@ -134,7 +137,7 @@ impl<'src, Expr: ExpressionReference<'src>> SrcExprVariants<'src, Expr> {
 
     fn typ(
         &self,
-        new: impl FnOnce(Expression<'src, Expr>) -> Expr,
+        new: impl FnOnce(GenericExpression<'src, Expr>) -> Expr,
         variable_type: impl FnOnce(&Expr::Variable) -> Expr,
     ) -> Expr {
         match self {

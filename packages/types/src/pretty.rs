@@ -1,6 +1,6 @@
 use pretty::RcDoc;
 
-use super::{Expression, ExpressionReference, VariableBinding};
+use super::{ExpressionReference, GenericExpression, VariableBinding};
 use crate::Variable;
 
 pub trait Pretty {
@@ -86,7 +86,7 @@ pub fn variable_to_document<'src>(
     }
 }
 
-impl<'src, Expr: ExpressionReference<'src>> Pretty for Expression<'src, Expr> {
+impl<'src, Expr: ExpressionReference<'src>> Pretty for GenericExpression<'src, Expr> {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
         match self {
             Self::TypeOfType => Document::text("Type"),

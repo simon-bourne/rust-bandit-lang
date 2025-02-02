@@ -6,37 +6,38 @@ use std::{
 };
 
 use crate::{
-    Expression, ExpressionReference, InferenceError, Pretty, Result, SharedMut, VariableBinding,
+    ExpressionReference, GenericExpression, InferenceError, Pretty, Result, SharedMut,
+    VariableBinding,
 };
 
 mod pretty;
 
 #[derive(Clone)]
-pub struct InferenceExpression<'src>(SharedMut<ExprRefVariants<'src>>);
+pub struct Expression<'src>(SharedMut<ExprRefVariants<'src>>);
 
 enum ExprRefVariants<'src> {
     Known {
-        expression: Expression<'src, InferenceExpression<'src>>,
+        expression: GenericExpression<'src, Expression<'src>>,
     },
     Unknown {
-        typ: InferenceExpression<'src>,
+        typ: Expression<'src>,
     },
     Link {
-        target: InferenceExpression<'src>,
+        target: Expression<'src>,
     },
 }
 
-impl<'src> InferenceExpression<'src> {
+impl<'src> Expression<'src> {
     pub fn unknown(typ: Self) -> Self {
         Self(Rc::new(RefCell::new(ExprRefVariants::Unknown { typ })))
     }
 
     fn type_of_type() -> Self {
-        Self::new(Expression::TypeOfType)
+        Self::new(GenericExpression::TypeOfType)
     }
 
     fn function_type(argument_value: Self, result_type: Self) -> Self {
-        Self::new(Expression::FunctionType(VariableBinding {
+        Self::new(GenericExpression::FunctionType(VariableBinding {
             name: "_",
             variable_value: argument_value,
             in_expression: result_type,
@@ -44,10 +45,13 @@ impl<'src> InferenceExpression<'src> {
     }
 
     pub fn variable(name: &'src str, value: Self) -> Self {
-        Self::new(Expression::Variable(VariableReference { name, value }))
+        Self::new(GenericExpression::Variable(VariableReference {
+            name,
+            value,
+        }))
     }
 
-    pub(crate) fn new(expression: Expression<'src, Self>) -> Self {
+    pub(crate) fn new(expression: GenericExpression<'src, Self>) -> Self {
         Self(Rc::new(RefCell::new(ExprRefVariants::Known { expression })))
     }
 
@@ -83,7 +87,7 @@ impl<'src> InferenceExpression<'src> {
                 Self::unify(typ, &mut other.typ())?;
             }
             ExprRefVariants::Known {
-                expression: Expression::Variable(var),
+                expression: GenericExpression::Variable(var),
             } => {
                 Self::unify(&mut var.value, other)?;
             }
@@ -120,24 +124,24 @@ impl<'src> InferenceExpression<'src> {
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
-            (Expression::TypeOfType, Expression::TypeOfType) => (),
+            (GenericExpression::TypeOfType, GenericExpression::TypeOfType) => (),
             (
-                Expression::Constant {
+                GenericExpression::Constant {
                     name: name0,
                     typ: typ0,
                 },
-                Expression::Constant {
+                GenericExpression::Constant {
                     name: name1,
                     typ: typ1,
                 },
             ) if name0 == name1 => Self::unify(typ0, typ1)?,
             (
-                Expression::Apply {
+                GenericExpression::Apply {
                     function,
                     argument,
                     typ,
                 },
-                Expression::Apply {
+                GenericExpression::Apply {
                     function: function1,
                     argument: argument1,
                     typ: typ1,
@@ -147,23 +151,24 @@ impl<'src> InferenceExpression<'src> {
                 Self::unify(argument, argument1)?;
                 Self::unify(typ, typ1)?;
             }
-            (Expression::Let(binding0), Expression::Let(binding1)) => {
+            (GenericExpression::Let(binding0), GenericExpression::Let(binding1)) => {
                 VariableBinding::unify(binding0, binding1)?
             }
-            (Expression::FunctionType(binding0), Expression::FunctionType(binding1)) => {
-                VariableBinding::unify(binding0, binding1)?
-            }
-            (Expression::Lambda(binding0), Expression::Lambda(binding1)) => {
+            (
+                GenericExpression::FunctionType(binding0),
+                GenericExpression::FunctionType(binding1),
+            ) => VariableBinding::unify(binding0, binding1)?,
+            (GenericExpression::Lambda(binding0), GenericExpression::Lambda(binding1)) => {
                 VariableBinding::unify(binding0, binding1)?
             }
             // It's safer to explicitly ignore each variant
-            (Expression::TypeOfType, _rhs)
-            | (Expression::Constant { .. }, _rhs)
-            | (Expression::Apply { .. }, _rhs)
-            | (Expression::Let { .. }, _rhs)
-            | (Expression::FunctionType(_), _rhs)
-            | (Expression::Lambda(_), _rhs)
-            | (Expression::Variable(_), _rhs) => Err(InferenceError)?,
+            (GenericExpression::TypeOfType, _rhs)
+            | (GenericExpression::Constant { .. }, _rhs)
+            | (GenericExpression::Apply { .. }, _rhs)
+            | (GenericExpression::Let { .. }, _rhs)
+            | (GenericExpression::FunctionType(_), _rhs)
+            | (GenericExpression::Lambda(_), _rhs)
+            | (GenericExpression::Variable(_), _rhs) => Err(InferenceError)?,
         }
 
         drop(x_ref);
@@ -183,7 +188,7 @@ impl<'src> InferenceExpression<'src> {
         *self = other.clone();
     }
 
-    fn known<'a>(&'a self) -> Option<RefMut<'a, Expression<'src, Self>>> {
+    fn known<'a>(&'a self) -> Option<RefMut<'a, GenericExpression<'src, Self>>> {
         RefMut::filter_map(self.0.borrow_mut(), |x| {
             if let ExprRefVariants::Known { expression } = x {
                 Some(expression)
@@ -195,13 +200,13 @@ impl<'src> InferenceExpression<'src> {
     }
 }
 
-impl fmt::Debug for InferenceExpression<'_> {
+impl fmt::Debug for Expression<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.to_pretty_string(80))
     }
 }
 
-impl<'src> ExpressionReference<'src> for InferenceExpression<'src> {
+impl<'src> ExpressionReference<'src> for Expression<'src> {
     type Variable = VariableReference<'src>;
 
     fn is_known(&self) -> bool {
@@ -225,7 +230,7 @@ impl<'src> ExpressionReference<'src> for InferenceExpression<'src> {
 
 pub struct VariableReference<'src> {
     name: &'src str,
-    value: InferenceExpression<'src>,
+    value: Expression<'src>,
 }
 
 impl fmt::Debug for VariableReference<'_> {
@@ -234,19 +239,19 @@ impl fmt::Debug for VariableReference<'_> {
     }
 }
 
-impl<'src> VariableBinding<'src, InferenceExpression<'src>> {
+impl<'src> VariableBinding<'src, Expression<'src>> {
     fn infer_types(&mut self) -> Result<()> {
         self.variable_value.infer_types()?;
         self.in_expression.infer_types()
     }
 
     fn unify(binding0: &mut Self, binding1: &mut Self) -> Result<()> {
-        InferenceExpression::unify(&mut binding0.variable_value, &mut binding1.variable_value)?;
-        InferenceExpression::unify(&mut binding0.in_expression, &mut binding1.in_expression)
+        Expression::unify(&mut binding0.variable_value, &mut binding1.variable_value)?;
+        Expression::unify(&mut binding0.in_expression, &mut binding1.in_expression)
     }
 }
 
-impl<'src> Expression<'src, InferenceExpression<'src>> {
+impl<'src> GenericExpression<'src, Expression<'src>> {
     fn infer_types(&mut self) -> Result<()> {
         match self {
             Self::TypeOfType => (),
@@ -257,13 +262,9 @@ impl<'src> Expression<'src, InferenceExpression<'src>> {
                 argument,
                 typ,
             } => {
-                InferenceExpression::unify(
-                    &mut typ.typ(),
-                    &mut InferenceExpression::type_of_type(),
-                )?;
-                let function_type =
-                    &mut InferenceExpression::function_type(argument.clone(), typ.clone());
-                InferenceExpression::unify(function_type, &mut function.typ())?;
+                Expression::unify(&mut typ.typ(), &mut Expression::type_of_type())?;
+                let function_type = &mut Expression::function_type(argument.clone(), typ.clone());
+                Expression::unify(function_type, &mut function.typ())?;
 
                 function.infer_types()?;
                 argument.infer_types()?;
