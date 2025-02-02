@@ -54,10 +54,6 @@ impl<'src, Var: Pretty + Clone> SweetExpression<'src, Var> {
         Self::unknown(Self::unknown_type())
     }
 
-    pub fn unknown(typ: Self) -> Self {
-        Self(Rc::new(SrcExprVariants::Unknown { typ }), PhantomData)
-    }
-
     pub fn type_constant(name: &'src str) -> Self {
         Self::known(Expression::Constant {
             name,
@@ -114,6 +110,10 @@ impl<'src, Var: Pretty + Clone> SweetExpression<'src, Var> {
 
     fn known(expression: Expression<'src, Self>) -> Self {
         Self(Rc::new(SrcExprVariants::Known { expression }), PhantomData)
+    }
+
+    fn unknown(typ: Self) -> Self {
+        Self(Rc::new(SrcExprVariants::Unknown { typ }), PhantomData)
     }
 }
 
