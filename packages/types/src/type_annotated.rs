@@ -9,7 +9,7 @@ pub mod indexed_locals;
 pub mod named_locals;
 
 #[derive(Clone)]
-pub struct Expression<'src, Var: Pretty + Clone>(Rc<SrcExprVariants<'src, Self>>, PhantomData<Var>);
+pub struct Expression<'src, Var: Pretty + Clone>(Rc<ExprVariants<'src, Self>>, PhantomData<Var>);
 
 impl<'src, Var: Pretty + Clone> ExpressionReference<'src> for Expression<'src, Var> {
     type Variable = Var;
@@ -26,11 +26,11 @@ impl<'src, Var: Pretty + Clone> ExpressionReference<'src> for Expression<'src, V
 impl<Var: Pretty + Clone> Pretty for Expression<'_, Var> {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
         match self.0.as_ref() {
-            SrcExprVariants::Known { expression } => expression.to_document(parent, annotation),
-            SrcExprVariants::TypeAnnotation { expression, typ } => {
+            ExprVariants::Known { expression } => expression.to_document(parent, annotation),
+            ExprVariants::TypeAnnotation { expression, typ } => {
                 TypeAnnotated::new(expression, typ).to_document(parent, annotation)
             }
-            SrcExprVariants::Unknown { typ } => {
+            ExprVariants::Unknown { typ } => {
                 TypeAnnotated::new("_", typ).to_document(parent, annotation)
             }
         }
@@ -94,26 +94,26 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
     }
 
     pub fn has_type(self, typ: Self) -> Self {
-        Self::new(SrcExprVariants::TypeAnnotation {
+        Self::new(ExprVariants::TypeAnnotation {
             expression: self,
             typ,
         })
     }
 
-    fn new(expr: SrcExprVariants<'src, Self>) -> Self {
+    fn new(expr: ExprVariants<'src, Self>) -> Self {
         Self(Rc::new(expr), PhantomData)
     }
 
     fn known(expression: GenericExpression<'src, Self>) -> Self {
-        Self(Rc::new(SrcExprVariants::Known { expression }), PhantomData)
+        Self(Rc::new(ExprVariants::Known { expression }), PhantomData)
     }
 
     fn unknown(typ: Self) -> Self {
-        Self(Rc::new(SrcExprVariants::Unknown { typ }), PhantomData)
+        Self(Rc::new(ExprVariants::Unknown { typ }), PhantomData)
     }
 }
 
-enum SrcExprVariants<'src, Expr: ExpressionReference<'src>> {
+enum ExprVariants<'src, Expr: ExpressionReference<'src>> {
     Known {
         expression: GenericExpression<'src, Expr>,
     },
@@ -126,7 +126,7 @@ enum SrcExprVariants<'src, Expr: ExpressionReference<'src>> {
     },
 }
 
-impl<'src, Expr: ExpressionReference<'src>> SrcExprVariants<'src, Expr> {
+impl<'src, Expr: ExpressionReference<'src>> ExprVariants<'src, Expr> {
     fn is_known(&self) -> bool {
         match self {
             Self::Known { .. } => true,

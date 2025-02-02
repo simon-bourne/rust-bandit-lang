@@ -13,9 +13,9 @@ use crate::{
 mod pretty;
 
 #[derive(Clone)]
-pub struct Expression<'src>(SharedMut<ExprRefVariants<'src>>);
+pub struct Expression<'src>(SharedMut<ExprVariants<'src>>);
 
-enum ExprRefVariants<'src> {
+enum ExprVariants<'src> {
     Known {
         expression: GenericExpression<'src, Expression<'src>>,
     },
@@ -29,7 +29,7 @@ enum ExprRefVariants<'src> {
 
 impl<'src> Expression<'src> {
     pub fn unknown(typ: Self) -> Self {
-        Self(Rc::new(RefCell::new(ExprRefVariants::Unknown { typ })))
+        Self(Rc::new(RefCell::new(ExprVariants::Unknown { typ })))
     }
 
     fn type_of_type() -> Self {
@@ -52,16 +52,16 @@ impl<'src> Expression<'src> {
     }
 
     pub(crate) fn new(expression: GenericExpression<'src, Self>) -> Self {
-        Self(Rc::new(RefCell::new(ExprRefVariants::Known { expression })))
+        Self(Rc::new(RefCell::new(ExprVariants::Known { expression })))
     }
 
     pub fn infer_types(&mut self) -> Result<()> {
         Self::unify(&mut self.typ().typ(), &mut Self::type_of_type())?;
 
         match &mut *self.0.borrow_mut() {
-            ExprRefVariants::Known { expression } => expression.infer_types(),
-            ExprRefVariants::Unknown { typ } => typ.infer_types(),
-            ExprRefVariants::Link { target } => target.infer_types(),
+            ExprVariants::Known { expression } => expression.infer_types(),
+            ExprVariants::Unknown { typ } => typ.infer_types(),
+            ExprVariants::Link { target } => target.infer_types(),
         }
     }
 
@@ -69,7 +69,7 @@ impl<'src> Expression<'src> {
         // Collapse links from the bottom up so they are also collapsed for other
         // expressions that reference this chain.
         let link = {
-            let ExprRefVariants::Link { target } = &mut *self.0.borrow_mut() else {
+            let ExprVariants::Link { target } = &mut *self.0.borrow_mut() else {
                 return;
             };
             target.follow_links();
@@ -83,10 +83,10 @@ impl<'src> Expression<'src> {
         let mut borrowed = self.0.borrow_mut();
 
         match &mut *borrowed {
-            ExprRefVariants::Unknown { typ } => {
+            ExprVariants::Unknown { typ } => {
                 Self::unify(typ, &mut other.typ())?;
             }
-            ExprRefVariants::Known {
+            ExprVariants::Known {
                 expression: GenericExpression::Variable(var),
             } => {
                 Self::unify(&mut var.value, other)?;
@@ -181,7 +181,7 @@ impl<'src> Expression<'src> {
     fn replace_with(&mut self, other: &Self) {
         RefCell::replace(
             &self.0,
-            ExprRefVariants::Link {
+            ExprVariants::Link {
                 target: other.clone(),
             },
         );
@@ -190,7 +190,7 @@ impl<'src> Expression<'src> {
 
     fn known<'a>(&'a self) -> Option<RefMut<'a, GenericExpression<'src, Self>>> {
         RefMut::filter_map(self.0.borrow_mut(), |x| {
-            if let ExprRefVariants::Known { expression } = x {
+            if let ExprVariants::Known { expression } = x {
                 Some(expression)
             } else {
                 None
@@ -211,19 +211,19 @@ impl<'src> ExpressionReference<'src> for Expression<'src> {
 
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
-            ExprRefVariants::Known { .. } => true,
-            ExprRefVariants::Unknown { .. } => false,
-            ExprRefVariants::Link { target } => target.is_known(),
+            ExprVariants::Known { .. } => true,
+            ExprVariants::Unknown { .. } => false,
+            ExprVariants::Link { target } => target.is_known(),
         }
     }
 
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            ExprRefVariants::Known { expression } => {
+            ExprVariants::Known { expression } => {
                 expression.typ(Self::new, |variable| variable.value.typ())
             }
-            ExprRefVariants::Unknown { typ } => typ.clone(),
-            ExprRefVariants::Link { target } => target.typ(),
+            ExprVariants::Unknown { typ } => typ.clone(),
+            ExprVariants::Link { target } => target.typ(),
         }
     }
 }

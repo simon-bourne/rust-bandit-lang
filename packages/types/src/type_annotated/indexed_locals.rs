@@ -1,4 +1,4 @@
-use super::SrcExprVariants;
+use super::ExprVariants;
 use crate::{
     context::Context, inference, type_annotated, ExpressionReference, GenericExpression, Result,
     Variable, VariableBinding,
@@ -9,14 +9,14 @@ pub type Expression<'src> = type_annotated::Expression<'src, Variable<'src>>;
 impl<'src> Expression<'src> {
     pub fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Expression<'src>> {
         Ok(match self.0.as_ref() {
-            SrcExprVariants::Known { expression } => expression.link(ctx)?,
-            SrcExprVariants::TypeAnnotation { expression, typ } => {
+            ExprVariants::Known { expression } => expression.link(ctx)?,
+            ExprVariants::TypeAnnotation { expression, typ } => {
                 let expression = expression.link(ctx)?;
                 let mut typ = typ.link(ctx)?;
                 inference::Expression::unify(&mut expression.typ(), &mut typ)?;
                 expression
             }
-            SrcExprVariants::Unknown { typ } => inference::Expression::unknown(typ.link(ctx)?),
+            ExprVariants::Unknown { typ } => inference::Expression::unknown(typ.link(ctx)?),
         })
     }
 }

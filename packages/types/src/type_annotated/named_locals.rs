@@ -1,6 +1,6 @@
 use context::VariableLookup;
 
-use super::SrcExprVariants;
+use super::ExprVariants;
 use crate::{
     context::Context, inference, type_annotated, type_annotated::indexed_locals, GenericExpression,
     Result, VariableBinding,
@@ -28,15 +28,15 @@ impl<'src> Expression<'src> {
         lookup: &mut VariableLookup<'src>,
     ) -> Result<indexed_locals::Expression<'src>> {
         Ok(match self.0.as_ref() {
-            SrcExprVariants::Known { expression } => expression.resolve_names(lookup)?,
-            SrcExprVariants::TypeAnnotation { expression, typ } => {
+            ExprVariants::Known { expression } => expression.resolve_names(lookup)?,
+            ExprVariants::TypeAnnotation { expression, typ } => {
                 let expression = expression.resolve_names_with_lookup(lookup)?;
                 let typ = typ.resolve_names_with_lookup(lookup)?;
-                indexed_locals::Expression::new(SrcExprVariants::TypeAnnotation { expression, typ })
+                indexed_locals::Expression::new(ExprVariants::TypeAnnotation { expression, typ })
             }
-            SrcExprVariants::Unknown { typ } => {
+            ExprVariants::Unknown { typ } => {
                 let typ = typ.resolve_names_with_lookup(lookup)?;
-                indexed_locals::Expression::new(SrcExprVariants::Unknown { typ })
+                indexed_locals::Expression::new(ExprVariants::Unknown { typ })
             }
         })
     }
@@ -70,7 +70,7 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
             Self::Variable(name) => GenericExpression::Variable(lookup.lookup(name)),
         };
 
-        Ok(indexed_locals::Expression::new(SrcExprVariants::Known {
+        Ok(indexed_locals::Expression::new(ExprVariants::Known {
             expression: expr,
         }))
     }

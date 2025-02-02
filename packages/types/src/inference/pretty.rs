@@ -1,4 +1,4 @@
-use super::{ExprRefVariants, Expression, VariableReference};
+use super::{ExprVariants, Expression, VariableReference};
 use crate::{
     pretty::{variable_to_document, Annotation, Document, Operator, Side, TypeAnnotated},
     Pretty,
@@ -7,11 +7,11 @@ use crate::{
 impl Pretty for Expression<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
         match &*self.0.borrow() {
-            ExprRefVariants::Known { expression } => expression.to_document(parent, annotation),
-            ExprRefVariants::Unknown { typ } => {
+            ExprVariants::Known { expression } => expression.to_document(parent, annotation),
+            ExprVariants::Unknown { typ } => {
                 TypeAnnotated::new("_", typ).to_document(parent, annotation)
             }
-            ExprRefVariants::Link { target } => target.to_document(parent, annotation),
+            ExprVariants::Link { target } => target.to_document(parent, annotation),
         }
     }
 }
