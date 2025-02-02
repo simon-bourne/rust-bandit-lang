@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use bandit_parser::{
     lex::{SrcToken, Token},
-    parser::{expr, Expression},
+    parse::{expr, Expression},
 };
 use bandit_types::{context::Context, sweet::SourceExpression, Pretty};
 use winnow::Parser;

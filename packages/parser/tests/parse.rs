@@ -1,6 +1,6 @@
 use bandit_parser::{
     lex::{SrcToken, Token},
-    parser::expr,
+    parse::expr,
 };
 use bandit_types::Pretty;
 use winnow::Parser;
