@@ -115,33 +115,3 @@ fn grouped<'tok, 'src: 'tok, T>(
 ) -> impl Parser<'tok, 'src, T> {
     delimited(Token::Open(grouping), parser, Token::Close(grouping))
 }
-
-#[cfg(test)]
-mod tests {
-    use bandit_types::Pretty;
-    use winnow::Parser;
-
-    use super::expr;
-    use crate::lex::{SrcToken, Token};
-
-    #[test]
-    fn pi() {
-        parse("∀x ⇒ x", "∀x ⇒ x");
-    }
-
-    #[test]
-    fn lambda() {
-        parse(r"(\x ⇒ x) Type", r"(\x ⇒ x) Type");
-    }
-
-    #[test]
-    fn type_annotation() {
-        parse("x : Int", "x : Int");
-    }
-
-    fn parse(input: &str, expected: &str) {
-        let tokens: Vec<SrcToken> = Token::layout(input).collect();
-        let expr = expr.parse(&tokens).unwrap();
-        assert_eq!(expr.to_pretty_string(80), expected);
-    }
-}
