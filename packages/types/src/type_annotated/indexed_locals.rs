@@ -39,7 +39,7 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
                 typ: typ.link(ctx)?,
             },
             Self::Let(binding) => GenericExpression::Let(binding.link(ctx)?),
-            Self::FunctionType(binding) => GenericExpression::FunctionType(binding.link(ctx)?),
+            Self::Pi(binding) => GenericExpression::Pi(binding.link(ctx)?),
             Self::Lambda(binding) => GenericExpression::Lambda(binding.link(ctx)?),
             Self::Variable(variable) => return ctx.lookup_value(*variable),
         }))

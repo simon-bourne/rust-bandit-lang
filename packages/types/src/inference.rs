@@ -37,7 +37,7 @@ impl<'src> Expression<'src> {
     }
 
     fn function_type(argument_value: Self, result_type: Self) -> Self {
-        Self::new(GenericExpression::FunctionType(VariableBinding {
+        Self::new(GenericExpression::Pi(VariableBinding {
             name: "_",
             variable_value: argument_value,
             in_expression: result_type,
@@ -154,10 +154,9 @@ impl<'src> Expression<'src> {
             (GenericExpression::Let(binding0), GenericExpression::Let(binding1)) => {
                 VariableBinding::unify(binding0, binding1)?
             }
-            (
-                GenericExpression::FunctionType(binding0),
-                GenericExpression::FunctionType(binding1),
-            ) => VariableBinding::unify(binding0, binding1)?,
+            (GenericExpression::Pi(binding0), GenericExpression::Pi(binding1)) => {
+                VariableBinding::unify(binding0, binding1)?
+            }
             (GenericExpression::Lambda(binding0), GenericExpression::Lambda(binding1)) => {
                 VariableBinding::unify(binding0, binding1)?
             }
@@ -166,7 +165,7 @@ impl<'src> Expression<'src> {
             | (GenericExpression::Constant { .. }, _rhs)
             | (GenericExpression::Apply { .. }, _rhs)
             | (GenericExpression::Let { .. }, _rhs)
-            | (GenericExpression::FunctionType(_), _rhs)
+            | (GenericExpression::Pi(_), _rhs)
             | (GenericExpression::Lambda(_), _rhs)
             | (GenericExpression::Variable(_), _rhs) => Err(InferenceError)?,
         }
@@ -271,7 +270,7 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
                 typ.infer_types()?;
             }
             Self::Let(binding) => binding.infer_types()?,
-            Self::FunctionType(binding) => binding.infer_types()?,
+            Self::Pi(binding) => binding.infer_types()?,
             Self::Lambda(binding) => binding.infer_types()?,
         }
 

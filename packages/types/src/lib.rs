@@ -34,7 +34,7 @@ enum GenericExpression<'src, Expr: ExpressionReference<'src>> {
         typ: Expr,
     },
     Let(VariableBinding<'src, Expr>),
-    FunctionType(VariableBinding<'src, Expr>),
+    Pi(VariableBinding<'src, Expr>),
     Lambda(VariableBinding<'src, Expr>),
     Variable(Expr::Variable),
 }
@@ -50,9 +50,9 @@ impl<'src, Expr: ExpressionReference<'src>> GenericExpression<'src, Expr> {
             GenericExpression::Constant { typ, .. } => typ.clone(),
             GenericExpression::Apply { typ, .. } => typ.clone(),
             GenericExpression::Let(variable_binding) => variable_binding.in_expression.typ(),
-            GenericExpression::FunctionType(_) => new(GenericExpression::TypeOfType),
+            GenericExpression::Pi(_) => new(GenericExpression::TypeOfType),
             GenericExpression::Lambda(variable_binding) => {
-                new(GenericExpression::FunctionType(VariableBinding {
+                new(GenericExpression::Pi(VariableBinding {
                     name: "_",
                     variable_value: variable_binding.variable_value.clone(),
                     in_expression: variable_binding.in_expression.typ(),

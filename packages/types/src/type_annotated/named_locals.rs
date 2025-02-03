@@ -63,9 +63,7 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
                 typ: typ.resolve_names_with_lookup(lookup)?,
             },
             Self::Let(binding) => GenericExpression::Let(binding.resolve_names(lookup)?),
-            Self::FunctionType(binding) => {
-                GenericExpression::FunctionType(binding.resolve_names(lookup)?)
-            }
+            Self::Pi(binding) => GenericExpression::Pi(binding.resolve_names(lookup)?),
             Self::Lambda(binding) => GenericExpression::Lambda(binding.resolve_names(lookup)?),
             Self::Variable(name) => GenericExpression::Variable(lookup.lookup(name)),
         };

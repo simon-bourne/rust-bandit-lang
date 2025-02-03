@@ -78,7 +78,7 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
     }
 
     pub fn function_type(name: &'src str, argument_type: Self, result_type: Self) -> Self {
-        Self::known(GenericExpression::FunctionType(VariableBinding {
+        Self::known(GenericExpression::Pi(VariableBinding {
             name,
             variable_value: Self::unknown(argument_type),
             in_expression: result_type,

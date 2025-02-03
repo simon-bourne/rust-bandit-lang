@@ -107,7 +107,7 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for GenericExpression<'src, E
                     binding.to_document(annotation),
                 ],
             ),
-            Self::FunctionType(binding) => {
+            Self::Pi(binding) => {
                 let variable_name = binding.name;
 
                 if variable_name != "_" {
