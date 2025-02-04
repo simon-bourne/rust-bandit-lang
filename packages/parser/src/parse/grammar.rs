@@ -33,6 +33,7 @@ fn function_applications<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expressi
 
 fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
     alt((
+        unknown(),
         typ(),
         variable(),
         forall(),
@@ -87,6 +88,10 @@ fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, E
         opt(preceded(NamedOperator::HasType, expr))
             .map(|typ| typ.unwrap_or_else(Expression::unknown_type)),
     )
+}
+
+fn unknown<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
+    Token::Unknown.map(|_| Expression::unknown_term())
 }
 
 fn variable<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {

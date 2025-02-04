@@ -71,7 +71,7 @@ fn partial_add() {
 #[test]
 fn simple_id() {
     test_with_ctx(
-        "id Int one",
+        "id _ one",
         "((id : (∀a = Int ⇒ Int → Int)) (Int : Type) : Int → Int) (one : Int) : Int",
     );
 }
