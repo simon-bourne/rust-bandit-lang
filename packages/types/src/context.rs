@@ -52,6 +52,7 @@ impl<'a> Context<'a> {
             .get(name)
             .cloned()
             .ok_or(InferenceError)?
+            // TODO: This should use local context only
             .link(self)?;
 
         Ok(value)
