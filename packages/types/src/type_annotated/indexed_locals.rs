@@ -16,7 +16,11 @@ impl<'src> Expression<'src> {
                 inference::Expression::unify(&mut expression.typ(), &mut typ)?;
                 expression
             }
-            ExprVariants::Unknown { typ } => inference::Expression::unknown(typ.link(ctx)?),
+            ExprVariants::LinkedUnknown { expression, typ } => {
+                inference::Expression::unify(&mut expression.typ(), &mut typ.link(ctx)?)?;
+                expression.clone()
+            }
+            ExprVariants::FreshUnknown { typ } => inference::Expression::unknown(typ.link(ctx)?),
         })
     }
 }

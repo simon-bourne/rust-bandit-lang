@@ -34,9 +34,15 @@ impl<'src> Expression<'src> {
                 let typ = typ.resolve_names_with_lookup(lookup)?;
                 indexed_locals::Expression::new(ExprVariants::TypeAnnotation { expression, typ })
             }
-            ExprVariants::Unknown { typ } => {
+            ExprVariants::LinkedUnknown { expression, typ } => {
+                indexed_locals::Expression::new(ExprVariants::LinkedUnknown {
+                    expression: expression.clone(),
+                    typ: typ.resolve_names_with_lookup(lookup)?,
+                })
+            }
+            ExprVariants::FreshUnknown { typ } => {
                 let typ = typ.resolve_names_with_lookup(lookup)?;
-                indexed_locals::Expression::new(ExprVariants::Unknown { typ })
+                indexed_locals::Expression::new(ExprVariants::FreshUnknown { typ })
             }
         })
     }

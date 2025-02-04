@@ -2,7 +2,8 @@ use std::{marker::PhantomData, rc::Rc};
 
 use super::pretty::{Annotation, Document, Operator, Side};
 use crate::{
-    pretty::TypeAnnotated, ExpressionReference, GenericExpression, Pretty, VariableBinding,
+    inference, pretty::TypeAnnotated, ExpressionReference, GenericExpression, Pretty,
+    VariableBinding,
 };
 
 pub mod indexed_locals;
@@ -19,7 +20,8 @@ impl<'src, Var: Pretty + Clone> ExpressionReference<'src> for Expression<'src, V
     }
 
     fn typ(&self) -> Self {
-        self.0.typ(Self::known, |_| Self::unknown_type())
+        self.0
+            .typ(Self::known, |_| Self::linked_unknown(Self::type_of_type()))
     }
 }
 
@@ -30,7 +32,7 @@ impl<Var: Pretty + Clone> Pretty for Expression<'_, Var> {
             ExprVariants::TypeAnnotation { expression, typ } => {
                 TypeAnnotated::new(expression, typ).to_document(parent, annotation)
             }
-            ExprVariants::Unknown { typ } => {
+            ExprVariants::LinkedUnknown { typ, .. } | ExprVariants::FreshUnknown { typ } => {
                 TypeAnnotated::new("_", typ).to_document(parent, annotation)
             }
         }
@@ -42,12 +44,15 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
         Self::known(GenericExpression::TypeOfType)
     }
 
-    pub fn unknown_type() -> Self {
-        Self::unknown(Self::type_of_type())
+    pub fn linked_unknown(typ: Self) -> Self {
+        Self::new(ExprVariants::LinkedUnknown {
+            expression: inference::Expression::unknown_value(),
+            typ,
+        })
     }
 
-    pub fn unknown_term() -> Self {
-        Self::unknown(Self::unknown_type())
+    pub fn fresh_unknown(typ: Self) -> Self {
+        Self::new(ExprVariants::FreshUnknown { typ })
     }
 
     pub fn type_constant(name: &'src str) -> Self {
@@ -65,7 +70,7 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
         Self::known(GenericExpression::Apply {
             function: self,
             argument,
-            typ: Self::unknown_type(),
+            typ: Self::linked_unknown(Self::type_of_type()),
         })
     }
 
@@ -80,7 +85,7 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
     pub fn function_type(name: &'src str, argument_type: Self, result_type: Self) -> Self {
         Self::known(GenericExpression::Pi(VariableBinding {
             name,
-            variable_value: Self::unknown(argument_type),
+            variable_value: Self::fresh_unknown(argument_type),
             in_expression: result_type,
         }))
     }
@@ -88,7 +93,7 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
     pub fn lambda(name: &'src str, argument_type: Self, in_expression: Self) -> Self {
         Self::known(GenericExpression::Lambda(VariableBinding {
             name,
-            variable_value: Self::unknown(argument_type),
+            variable_value: Self::fresh_unknown(argument_type),
             in_expression,
         }))
     }
@@ -105,11 +110,7 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
     }
 
     fn known(expression: GenericExpression<'src, Self>) -> Self {
-        Self(Rc::new(ExprVariants::Known { expression }), PhantomData)
-    }
-
-    fn unknown(typ: Self) -> Self {
-        Self(Rc::new(ExprVariants::Unknown { typ }), PhantomData)
+        Self::new(ExprVariants::Known { expression })
     }
 }
 
@@ -121,7 +122,11 @@ enum ExprVariants<'src, Expr: ExpressionReference<'src>> {
         expression: Expr,
         typ: Expr,
     },
-    Unknown {
+    LinkedUnknown {
+        expression: inference::Expression<'src>,
+        typ: Expr,
+    },
+    FreshUnknown {
         typ: Expr,
     },
 }
@@ -131,7 +136,7 @@ impl<'src, Expr: ExpressionReference<'src>> ExprVariants<'src, Expr> {
         match self {
             Self::Known { .. } => true,
             Self::TypeAnnotation { expression, .. } => expression.is_known(),
-            Self::Unknown { .. } => false,
+            Self::LinkedUnknown { .. } | Self::FreshUnknown { .. } => false,
         }
     }
 
@@ -142,8 +147,9 @@ impl<'src, Expr: ExpressionReference<'src>> ExprVariants<'src, Expr> {
     ) -> Expr {
         match self {
             Self::Known { expression } => expression.typ(new, variable_type),
-            Self::TypeAnnotation { typ, .. } => typ.clone(),
-            Self::Unknown { typ } => typ.clone(),
+            Self::TypeAnnotation { typ, .. }
+            | Self::LinkedUnknown { typ, .. }
+            | Self::FreshUnknown { typ, .. } => typ.clone(),
         }
     }
 }

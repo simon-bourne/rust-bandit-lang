@@ -32,6 +32,14 @@ impl<'src> Expression<'src> {
         Self(Rc::new(RefCell::new(ExprVariants::Unknown { typ })))
     }
 
+    pub fn unknown_value() -> Self {
+        Self::unknown(Self::unknown(Self::type_of_type()))
+    }
+
+    pub fn unknown_type() -> Self {
+        Self::unknown(Self::type_of_type())
+    }
+
     fn type_of_type() -> Self {
         Self::new(GenericExpression::TypeOfType)
     }

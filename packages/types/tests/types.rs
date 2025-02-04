@@ -10,8 +10,12 @@ fn infer_kinds() {
     let ctx = &mut Context::new(HashMap::new());
     let mut constructor_type = Expr::lambda(
         "m",
-        Expr::unknown_type(),
-        Expr::lambda("a", Expr::unknown_type(), Expr::apply(m, a)),
+        Expr::linked_unknown(Expr::type_of_type()),
+        Expr::lambda(
+            "a",
+            Expr::linked_unknown(Expr::type_of_type()),
+            Expr::apply(m, a),
+        ),
     )
     .link(ctx)
     .unwrap();
