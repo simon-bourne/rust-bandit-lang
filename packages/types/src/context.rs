@@ -12,7 +12,10 @@ pub struct Context<'a> {
     global_variables: GlobalValues<'a>,
 }
 
-// TODO: We should eagerly `link` each variable (local and global) so unknowns
+// TODO: At each variable use site, we want fresh variables, but not fresh
+// unknowns:
+//
+// We should eagerly `link` each variable (local and global) so unknowns
 // are linked between all references to a variable. We should have fresh child
 // variables for each variable reference. This allows:
 //
@@ -20,7 +23,7 @@ pub struct Context<'a> {
 //
 // But not:
 //
-// `let id1 : (_ -> _) = id => (id1 Int an_int, id1 Float a_float)`
+// `let id1 : (_ -> _ -> _) = id => (id1 Int an_int, id1 Float a_float)`
 impl<'a> Context<'a> {
     pub fn new(global_variables: GlobalValues<'a>) -> Self {
         Self {
@@ -28,6 +31,7 @@ impl<'a> Context<'a> {
             global_variables,
         }
     }
+
     pub(crate) fn with_variable<Output>(
         &mut self,
         name: &'a str,
