@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     ExpressionReference, GenericExpression, InferenceError, Pretty, Result, SharedMut,
-    VariableBinding,
+    VariableBinding, VariableReference,
 };
 
 mod pretty;
@@ -206,7 +206,7 @@ impl fmt::Debug for Expression<'_> {
 }
 
 impl<'src> ExpressionReference<'src> for Expression<'src> {
-    type Variable = VariableReference<'src>;
+    type Variable = VariableReference<'src, Self>;
 
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
@@ -224,17 +224,6 @@ impl<'src> ExpressionReference<'src> for Expression<'src> {
             ExprVariants::Unknown { typ } => typ.clone(),
             ExprVariants::Link { target } => target.typ(),
         }
-    }
-}
-
-pub struct VariableReference<'src> {
-    name: &'src str,
-    value: Expression<'src>,
-}
-
-impl fmt::Debug for VariableReference<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_pretty_string(80))
     }
 }
 

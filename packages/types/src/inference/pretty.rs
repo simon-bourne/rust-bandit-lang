@@ -1,6 +1,6 @@
-use super::{ExprVariants, Expression, VariableReference};
+use super::{ExprVariants, Expression};
 use crate::{
-    pretty::{variable_to_document, Annotation, Document, Operator, Side, TypeAnnotated},
+    pretty::{Annotation, Document, Operator, Side, TypeAnnotated},
     Pretty,
 };
 
@@ -13,11 +13,5 @@ impl Pretty for Expression<'_> {
             }
             ExprVariants::Link { target } => target.to_document(parent, annotation),
         }
-    }
-}
-
-impl Pretty for VariableReference<'_> {
-    fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
-        variable_to_document(self.name, &self.value, parent, annotation)
     }
 }

@@ -4,6 +4,7 @@ pub mod context;
 pub mod inference;
 mod pretty;
 pub mod type_annotated;
+pub mod well_typed;
 
 pub use pretty::Pretty;
 
@@ -33,6 +34,9 @@ enum GenericExpression<'src, Expr: ExpressionReference<'src>> {
         argument: Expr,
         typ: Expr,
     },
+    /// `Let` is included so we can generalize explicitly using type
+    /// annotations. Otherwise, we could replace `let x = y in z` with `(\x =>
+    /// z) y`.
     Let(VariableBinding<'src, Expr>),
     Pi(VariableBinding<'src, Expr>),
     Lambda(VariableBinding<'src, Expr>),
@@ -85,6 +89,17 @@ pub struct Variable<'src> {
 }
 
 impl fmt::Debug for Variable<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.to_pretty_string(80))
+    }
+}
+
+pub struct VariableReference<'src, Value> {
+    name: &'src str,
+    value: Value,
+}
+
+impl<'src, Value: ExpressionReference<'src>> fmt::Debug for VariableReference<'src, Value> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.to_pretty_string(80))
     }
