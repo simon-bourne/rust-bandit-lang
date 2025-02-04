@@ -61,7 +61,7 @@ fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> 
             variable_binding(),
             NamedOperator::Assign,
             expr,
-            Token::LineEnd,
+            Token::SuchThat,
             expr,
         ),
     )
