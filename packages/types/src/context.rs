@@ -62,7 +62,7 @@ impl<'a> Context<'a> {
             .ok_or(InferenceError)?
             // TODO: We need to be careful that the type of the global is fully known. Otherwise we
             // end up with a soundness hole where each use of the global can have a different type.
-            // TODO: This should use local context only
+            // TODO: This should use global context only
             .link(self)?;
 
         Ok(value)
