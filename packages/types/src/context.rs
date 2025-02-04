@@ -8,6 +8,7 @@ use crate::{
 pub type GlobalValues<'a> = HashMap<&'a str, indexed_locals::Expression<'a>>;
 
 pub struct Context<'a> {
+    // TODO: Local variables with a fully known type annotation should be `link`ed at each lookup.
     local_variables: Vec<Expression<'a>>,
     global_variables: GlobalValues<'a>,
 }
@@ -20,6 +21,13 @@ impl<'a> Context<'a> {
         }
     }
 
+    // TODO: We need to determine whether we're inferring the type, or checking
+    // against it. We can only check against the type if it's fully known, but this
+    // allows us to have a different type at each use site. For example, `id1` in
+    // `let id1 : (∀a => a -> a) = id => (id1 Int an_int, id1 Float a_float)` can
+    // be checked against, and each usage site can infer a different constraint for
+    // `a`. `let id1 : (_ -> _) = id => (id1 Int an_int, id1 Float a_float)` must
+    // have the unknowns inferred, to make sure this doesn't typecheck.
     pub(crate) fn with_variable<Output>(
         &mut self,
         name: &'a str,
@@ -52,6 +60,8 @@ impl<'a> Context<'a> {
             .get(name)
             .cloned()
             .ok_or(InferenceError)?
+            // TODO: We need to be careful that the type of the global is fully known. Otherwise we
+            // end up with a soundness hole where each use of the global can have a different type.
             // TODO: This should use local context only
             .link(self)?;
 
