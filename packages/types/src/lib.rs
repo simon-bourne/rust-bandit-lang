@@ -82,6 +82,13 @@ enum VariableScope {
     Global,
 }
 
+// TODO: Remove `Variable` and `VariableReference`:
+//
+// - Change `GenericExpression::Variable` to store a `name` and reference
+// - `ExpressionReference::Variable` should change to
+//   `ExpressionReference::VariableReference` and store either `VariableScope`
+//   or an `Expression`.
+// - Rename `ExpressionReference`?
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct Variable<'src> {
     name: &'src str,
