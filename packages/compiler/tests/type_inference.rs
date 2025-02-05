@@ -98,7 +98,8 @@ fn multi_id() {
     );
 }
 
-// TODO: This should fail
+// TODO: This should fail. The value of the first argument is inferred to be
+// always `Int : Type`, so we'd just need to check all values are unknown.
 #[test]
 fn unsoundness() {
     test_with_ctx(

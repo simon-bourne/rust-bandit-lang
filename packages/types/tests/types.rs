@@ -10,7 +10,6 @@ fn infer_kinds() {
     let ctx = &mut Context::new(HashMap::new());
     let mut constructor_type = Expr::lambda(
         "m",
-        // TODO: Tidy up the naming, and have an unknown_value, and infer_value function
         Expr::inferred_value(),
         Expr::lambda("a", Expr::inferred_value(), Expr::apply(m, a)),
     )
