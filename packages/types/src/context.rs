@@ -77,19 +77,13 @@ impl<'a> Context<'a> {
                 let name = *name;
                 let value = value.clone();
 
-                let linked_value = if index.0 == 1 {
-                    value.link(self)?
-                } else {
-                    let mut local_ctx = Self {
-                        // TODO: Do we have the correct length here?
-                        local_variables: self.local_variables[..=debruijn_index].to_vec(),
-                        global_variables: self.global_variables.clone(),
-                    };
-
-                    value.link(&mut local_ctx)?
+                // This is what the context looked like when we added the variable binding.
+                let mut local_ctx = Self {
+                    local_variables: self.local_variables[..debruijn_index].to_vec(),
+                    global_variables: self.global_variables.clone(),
                 };
 
-                inference::Expression::variable(name, linked_value)
+                inference::Expression::variable(name, value.link(&mut local_ctx)?)
             }
         })
     }
