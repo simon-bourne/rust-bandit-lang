@@ -45,6 +45,7 @@ fn test_with_ctx(input: &str, expected: &str) {
             ("add", "Int → Int → Int"),
             ("id", "∀a ⇒ a → a"),
             ("float_to_int", "Float → Int"),
+            ("polymorphic", "∀a => a"),
         ],
     );
 
@@ -116,6 +117,13 @@ fn polymorphic_let() {
         "let id2 : (∀a ⇒ a → a) = id ⇒ add (id2 Int one) (float_to_int (id2 Float pi))",
         "let id2 : (∀a ⇒ a → a) = id ⇒ ((add : Int → Int → Int) (((id2 : (∀a = Int ⇒ Int → Int) = id) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a = Float ⇒ Float → Float) = id) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
+}
+
+#[test]
+// TODO: This shouldn't panic
+#[should_panic]
+fn simple_polymorphic_let() {
+    test_with_ctx("let x : (∀b ⇒ b) = polymorphic ⇒ x", "");
 }
 
 #[test]
