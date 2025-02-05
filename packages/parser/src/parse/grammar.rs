@@ -86,7 +86,7 @@ fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, E
     (
         identifier(),
         opt(preceded(NamedOperator::HasType, expr)).map(|typ| {
-            typ.unwrap_or_else(|| Expression::linked_unknown(Expression::type_of_type()))
+            typ.unwrap_or_else(|| Expression::fresh_unknown(Expression::type_of_type()))
         }),
     )
 }

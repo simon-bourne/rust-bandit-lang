@@ -21,7 +21,7 @@ impl<'src, Var: Pretty + Clone> ExpressionReference<'src> for Expression<'src, V
 
     fn typ(&self) -> Self {
         self.0
-            .typ(Self::known, |_| Self::linked_unknown(Self::type_of_type()))
+            .typ(Self::known, |_| Self::fresh_unknown(Self::type_of_type()))
     }
 }
 
@@ -70,7 +70,7 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
         Self::known(GenericExpression::Apply {
             function: self,
             argument,
-            typ: Self::linked_unknown(Self::type_of_type()),
+            typ: Self::fresh_unknown(Self::type_of_type()),
         })
     }
 
