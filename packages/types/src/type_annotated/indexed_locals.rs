@@ -1,8 +1,7 @@
 use super::ExprVariants;
 use crate::{
-    context::{Context, Link},
-    inference, type_annotated, ExpressionReference, GenericExpression, Result, Variable,
-    VariableBinding,
+    context::Context, inference, type_annotated, ExpressionReference, GenericExpression, Result,
+    Variable, VariableBinding,
 };
 
 pub type Expression<'src> = type_annotated::Expression<'src, Variable<'src>>;
@@ -43,9 +42,9 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
                 argument: argument.link(ctx)?,
                 typ: typ.link(ctx)?,
             },
-            Self::Let(binding) => GenericExpression::Let(binding.link(ctx, Link::OnLookup)?),
-            Self::Pi(binding) => GenericExpression::Pi(binding.link(ctx, Link::Now)?),
-            Self::Lambda(binding) => GenericExpression::Lambda(binding.link(ctx, Link::OnLookup)?),
+            Self::Let(binding) => GenericExpression::Let(binding.link(ctx)?),
+            Self::Pi(binding) => GenericExpression::Pi(binding.link(ctx)?),
+            Self::Lambda(binding) => GenericExpression::Lambda(binding.link(ctx)?),
             Self::Variable(variable) => return ctx.lookup_value(*variable),
         }))
     }
@@ -55,21 +54,15 @@ impl<'src> VariableBinding<'src, Expression<'src>> {
     fn link(
         &self,
         ctx: &mut Context<'src>,
-        link: Link,
     ) -> Result<VariableBinding<'src, inference::Expression<'src>>> {
         let name = self.name;
 
-        ctx.with_variable(
-            name,
-            self.variable_value.clone(),
-            link,
-            |ctx, variable_value| {
-                Ok(VariableBinding {
-                    name,
-                    variable_value,
-                    in_expression: self.in_expression.link(ctx)?,
-                })
-            },
-        )?
+        ctx.with_variable(name, self.variable_value.clone(), |ctx, variable_value| {
+            Ok(VariableBinding {
+                name,
+                variable_value,
+                in_expression: self.in_expression.link(ctx)?,
+            })
+        })?
     }
 }

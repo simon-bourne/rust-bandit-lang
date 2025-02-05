@@ -23,7 +23,13 @@ fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src
     separated_foldr1(
         function_applications(),
         NamedOperator::To,
-        |input_type, _, output_type| Expression::function_type("_", input_type, output_type),
+        |input_type, _, output_type| {
+            Expression::function_type(
+                "_",
+                Expression::inferred_value().has_type(input_type),
+                output_type,
+            )
+        },
     )
 }
 
@@ -52,14 +58,15 @@ fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
         Keyword::Forall,
         separated_pair(variable_binding(), Token::SuchThat, expr),
     )
-    .map(|((var, typ), expr)| Expression::function_type(var, typ, expr))
+    .map(|((var, value), expr)| Expression::function_type(var, value, expr))
 }
 
 fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
     preceded(
         Keyword::Let,
         (
-            variable_binding(),
+            identifier(),
+            opt(preceded(NamedOperator::HasType, expr)),
             NamedOperator::Assign,
             expr,
             Token::SuchThat,
@@ -67,8 +74,16 @@ fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> 
         ),
     )
     .map(
-        |((var, typ), _assign, variable_value, _linend, in_expression)| {
-            Expression::let_binding(var, variable_value.has_type(typ), in_expression)
+        |(var, typ, _assign, variable_value, _linend, in_expression)| {
+            Expression::let_binding(
+                var,
+                if let Some(typ) = typ {
+                    variable_value.has_type(typ)
+                } else {
+                    variable_value
+                },
+                in_expression,
+            )
         },
     )
 }
@@ -78,7 +93,7 @@ fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
         Token::Lambda,
         separated_pair(variable_binding(), Token::SuchThat, expr),
     )
-    .map(|((var, typ), expr)| Expression::lambda(var, typ, expr))
+    .map(|((var, value), expr)| Expression::lambda(var, value, expr))
 }
 
 // TODO: Multiple variable bindings
@@ -86,14 +101,19 @@ fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, E
     (
         identifier(),
         opt(preceded(NamedOperator::HasType, expr)).map(|typ| {
-            typ.unwrap_or_else(|| Expression::fresh_unknown(Expression::type_of_type()))
+            let value = Expression::inferred_value();
+
+            if let Some(typ) = typ {
+                value.has_type(typ)
+            } else {
+                value
+            }
         }),
     )
 }
 
 fn unknown<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
-    Token::Unknown
-        .map(|_| Expression::linked_unknown(Expression::linked_unknown(Expression::type_of_type())))
+    Token::Unknown.map(|_| Expression::unknown_value())
 }
 
 fn variable<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {

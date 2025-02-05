@@ -33,7 +33,7 @@ impl<'src> Expression<'src> {
     }
 
     pub fn unknown_value() -> Self {
-        Self::unknown(Self::unknown(Self::type_of_type()))
+        Self::unknown(Self::unknown_type())
     }
 
     pub fn unknown_type() -> Self {

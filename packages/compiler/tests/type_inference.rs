@@ -64,6 +64,20 @@ fn simple_apply() {
 }
 
 #[test]
+fn simple_lambda() {
+    // TODO: Why isn't this `(\x : Int ⇒ x : Int) : Int → Int`
+    test_with_ctx(r"\x => x : Int", r"\x : Int ⇒ x : Int");
+}
+
+#[test]
+#[should_panic]
+fn weird_lambda() {
+    // TODO: This should return an `InferenceError` or infer the type of `x` to be
+    // `Type`, rather than borrow error.
+    test_with_ctx(r"\x => x : x", r"");
+}
+
+#[test]
 fn partial_add() {
     test_with_ctx("add one", "(add : Int → Int → Int) (one : Int) : Int → Int");
 }
@@ -81,5 +95,32 @@ fn multi_id() {
     test_with_ctx(
         "add (id Int one) (float_to_int (id Float pi))",
         "((add : Int → Int → Int) (((id : (∀a = Int ⇒ Int → Int)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a = Float ⇒ Float → Float)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
+    );
+}
+
+// TODO: This should fail
+#[test]
+fn unsoundness() {
+    test_with_ctx(
+        "let id2 = id ⇒ (id2 : Type -> Int -> Int)",
+        "let id2 : Type → Int → Int = id ⇒ id2 : Type → Int → Int = id",
+    )
+}
+
+#[test]
+// TODO: This shouldn't fail
+#[should_panic]
+fn polymorphic_let() {
+    test_with_ctx(
+        "let id2 : (∀a ⇒ a → a) = id ⇒ add (id2 Int one) (float_to_int (id2 Float pi))",
+        "let id2 : (∀a ⇒ a → a) = id ⇒ ((add : Int → Int → Int) (((id2 : (∀a = Int ⇒ Int → Int) = id) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a = Float ⇒ Float → Float) = id) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
+    );
+}
+
+#[test]
+fn polymorphic_lambda() {
+    test_with_ctx(
+        r"\id2 : (∀a ⇒ a → a) ⇒ add (id2 Int one) (float_to_int (id2 Float pi))",
+        r"\id2 : (∀a ⇒ a → a) ⇒ ((add : Int → Int → Int) (((id2 : (∀a = Int ⇒ Int → Int)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a = Float ⇒ Float → Float)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int",
     );
 }
