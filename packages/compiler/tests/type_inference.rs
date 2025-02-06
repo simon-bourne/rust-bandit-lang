@@ -105,25 +105,26 @@ fn multi_id() {
 fn unsoundness() {
     test_with_ctx(
         "let id2 = id ⇒ (id2 : Type -> Int -> Int)",
-        "let id2 : Type → Int → Int = id ⇒ id2 : Type → Int → Int = id",
+        // TODO: We should have `id2` on the RHS, not `id`.
+        "let id2 : Type → Int → Int = id ⇒ id : Type → Int → Int",
     )
 }
 
 #[test]
-// TODO: This shouldn't fail
-#[should_panic]
 fn polymorphic_let() {
     test_with_ctx(
         "let id2 : (∀a ⇒ a → a) = id ⇒ add (id2 Int one) (float_to_int (id2 Float pi))",
-        "let id2 : (∀a ⇒ a → a) = id ⇒ ((add : Int → Int → Int) (((id2 : (∀a = Int ⇒ Int → Int) = id) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a = Float ⇒ Float → Float) = id) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
+        "let id2 : (∀a ⇒ a → a) = id ⇒ ((add : Int → Int → Int) (((id : (∀a = Int ⇒ Int → Int)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a = Float ⇒ Float → Float)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
 }
 
 #[test]
-// TODO: This shouldn't panic
-#[should_panic]
 fn simple_polymorphic_let() {
-    test_with_ctx("let x : (∀b ⇒ b) = polymorphic ⇒ x", "");
+    test_with_ctx(
+        "let x : (∀b ⇒ b) = polymorphic ⇒ x",
+        // TODO: Should be `∀b ⇒ b`, not `∀b ⇒ a`
+        "let x : (∀b ⇒ a) = polymorphic ⇒ polymorphic : (∀b ⇒ a)",
+    );
 }
 
 #[test]

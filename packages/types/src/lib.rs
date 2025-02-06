@@ -16,8 +16,6 @@ pub type Result<T> = result::Result<T, InferenceError>;
 pub struct InferenceError;
 
 pub trait ExpressionReference<'src>: Pretty + Clone + Sized {
-    type Variable: Pretty;
-
     fn is_known(&self) -> bool;
 
     fn typ(&self) -> Self;
@@ -40,14 +38,12 @@ enum GenericExpression<'src, Expr: ExpressionReference<'src>> {
     Let(VariableBinding<'src, Expr>),
     Pi(VariableBinding<'src, Expr>),
     Lambda(VariableBinding<'src, Expr>),
-    Variable(Expr::Variable),
 }
 
 impl<'src, Expr: ExpressionReference<'src>> GenericExpression<'src, Expr> {
     fn typ(
         &self,
         new: impl FnOnce(Self) -> Expr,
-        variable_type: impl FnOnce(&Expr::Variable) -> Expr,
     ) -> Expr {
         match self {
             GenericExpression::TypeOfType => new(GenericExpression::TypeOfType),
@@ -62,12 +58,11 @@ impl<'src, Expr: ExpressionReference<'src>> GenericExpression<'src, Expr> {
                     in_expression: variable_binding.in_expression.typ(),
                 }))
             }
-            GenericExpression::Variable(variable) => variable_type(variable),
         }
     }
 }
 
-struct VariableBinding<'src, Expr: ExpressionReference<'src>> {
+struct VariableBinding<'src, Expr> {
     name: &'src str,
     variable_value: Expr,
     in_expression: Expr,

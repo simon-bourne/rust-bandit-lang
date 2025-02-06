@@ -12,7 +12,7 @@ pub type Expression<'src> = type_annotated::Expression<'src, &'src str>;
 
 impl<'src> Expression<'src> {
     pub fn variable(name: &'src str) -> Self {
-        Self::known(GenericExpression::Variable(name))
+        Self::new(ExprVariants::Variable(name))
     }
 
     pub fn resolve_names(&self) -> Result<indexed_locals::Expression<'src>> {
@@ -29,6 +29,9 @@ impl<'src> Expression<'src> {
     ) -> Result<indexed_locals::Expression<'src>> {
         Ok(match self.0.as_ref() {
             ExprVariants::Known { expression } => expression.resolve_names(lookup)?,
+            ExprVariants::Variable(name) => {
+                indexed_locals::Expression::new(ExprVariants::Variable(lookup.lookup(name)))
+            }
             ExprVariants::TypeAnnotation { expression, typ } => {
                 let expression = expression.resolve_names_with_lookup(lookup)?;
                 let typ = typ.resolve_names_with_lookup(lookup)?;
@@ -71,7 +74,6 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
             Self::Let(binding) => GenericExpression::Let(binding.resolve_names(lookup)?),
             Self::Pi(binding) => GenericExpression::Pi(binding.resolve_names(lookup)?),
             Self::Lambda(binding) => GenericExpression::Lambda(binding.resolve_names(lookup)?),
-            Self::Variable(name) => GenericExpression::Variable(lookup.lookup(name)),
         };
 
         Ok(indexed_locals::Expression::new(ExprVariants::Known {

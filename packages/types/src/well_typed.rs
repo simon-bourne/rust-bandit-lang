@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    ExpressionReference, GenericExpression, SharedMut, VariableBinding, VariableReference,
+    ExpressionReference, GenericExpression, SharedMut, VariableBinding,
 };
 
 mod pretty;
@@ -38,12 +38,6 @@ impl<'src> Expression<'src> {
                 variable_binding.variable_value.reduce();
                 variable_binding.in_expression.reduce();
             }
-            GenericExpression::Variable(variable) => {
-                variable.value.reduce();
-                let value = variable.value.clone();
-                drop(borrowed);
-                *self = value;
-            }
         };
     }
 
@@ -59,7 +53,6 @@ impl<'src> Expression<'src> {
             GenericExpression::Lambda(_variable_binding) => {
                 todo!()
             }
-            GenericExpression::Variable(_) => {}
         }
     }
 
@@ -69,8 +62,6 @@ impl<'src> Expression<'src> {
 }
 
 impl<'src> ExpressionReference<'src> for Expression<'src> {
-    type Variable = VariableReference<'src, Self>;
-
     fn is_known(&self) -> bool {
         true
     }
@@ -78,7 +69,7 @@ impl<'src> ExpressionReference<'src> for Expression<'src> {
     fn typ(&self) -> Self {
         self.0
             .borrow()
-            .typ(Self::new, |variable| variable.value.typ())
+            .typ(Self::new)
     }
 }
 

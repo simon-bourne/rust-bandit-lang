@@ -129,7 +129,6 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for GenericExpression<'src, E
                 parent.is_some(),
                 [Document::text("\\"), binding.to_document(annotation)],
             ),
-            Self::Variable(var) => var.to_document(parent, annotation),
         }
     }
 }

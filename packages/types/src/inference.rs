@@ -1,5 +1,6 @@
 use std::{
     cell::{RefCell, RefMut},
+    collections::BTreeSet,
     fmt,
     ops::ControlFlow,
     rc::Rc,
@@ -7,7 +8,7 @@ use std::{
 
 use crate::{
     ExpressionReference, GenericExpression, InferenceError, Pretty, Result, SharedMut,
-    VariableBinding, VariableReference,
+    VariableBinding,
 };
 
 mod pretty;
@@ -15,11 +16,26 @@ mod pretty;
 #[derive(Clone)]
 pub struct Expression<'src>(SharedMut<ExprVariants<'src>>);
 
+#[derive(Default)]
+struct Names<'src>(BTreeSet<&'src str>);
+
+impl<'src> Names<'src> {
+    fn add(&mut self, name: &'src str) {
+        self.0.insert(name);
+    }
+
+    fn merge(&mut self, other: &Self) {
+        self.0.extend(&other.0);
+    }
+}
+
 enum ExprVariants<'src> {
     Known {
+        names: Names<'src>,
         expression: GenericExpression<'src, Expression<'src>>,
     },
     Unknown {
+        names: Names<'src>,
         typ: Expression<'src>,
     },
     Link {
@@ -27,9 +43,22 @@ enum ExprVariants<'src> {
     },
 }
 
+impl<'src> ExprVariants<'src> {
+    fn add_name(&mut self, name: &'src str) {
+        match self {
+            ExprVariants::Known { names, .. } => names.add(name),
+            ExprVariants::Unknown { names, .. } => names.add(name),
+            ExprVariants::Link { target } => target.0.borrow_mut().add_name(name),
+        }
+    }
+}
+
 impl<'src> Expression<'src> {
     pub fn unknown(typ: Self) -> Self {
-        Self(Rc::new(RefCell::new(ExprVariants::Unknown { typ })))
+        Self(Rc::new(RefCell::new(ExprVariants::Unknown {
+            names: Names::default(),
+            typ,
+        })))
     }
 
     pub fn unknown_value() -> Self {
@@ -53,22 +82,23 @@ impl<'src> Expression<'src> {
     }
 
     pub fn variable(name: &'src str, value: Self) -> Self {
-        Self::new(GenericExpression::Variable(VariableReference {
-            name,
-            value,
-        }))
+        value.0.borrow_mut().add_name(name);
+        value
     }
 
     pub(crate) fn new(expression: GenericExpression<'src, Self>) -> Self {
-        Self(Rc::new(RefCell::new(ExprVariants::Known { expression })))
+        Self(Rc::new(RefCell::new(ExprVariants::Known {
+            names: Names::default(),
+            expression,
+        })))
     }
 
     pub fn infer_types(&mut self) -> Result<()> {
         Self::unify(&mut self.typ().typ(), &mut Self::type_of_type())?;
 
         match &mut *self.0.borrow_mut() {
-            ExprVariants::Known { expression } => expression.infer_types(),
-            ExprVariants::Unknown { typ } => typ.infer_types(),
+            ExprVariants::Known { expression, .. } => expression.infer_types(),
+            ExprVariants::Unknown { typ, .. } => typ.infer_types(),
             ExprVariants::Link { target } => target.infer_types(),
         }
     }
@@ -87,31 +117,11 @@ impl<'src> Expression<'src> {
 
     fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
         {
-            let ExprVariants::Unknown { typ } = &mut *self.0.borrow_mut() else {
+            let ExprVariants::Unknown { typ, .. } = &mut *self.0.borrow_mut() else {
                 return Ok(ControlFlow::Continue(()));
             };
 
             Self::unify(typ, &mut other.typ())?;
-        }
-
-        self.replace_with(other);
-
-        Ok(ControlFlow::Break(()))
-    }
-
-    fn unify_variable(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
-        assert!(self.is_known());
-        assert!(other.is_known());
-
-        {
-            let ExprVariants::Known {
-                expression: GenericExpression::Variable(variable),
-            } = &mut *self.0.borrow_mut()
-            else {
-                return Ok(ControlFlow::Continue(()));
-            };
-
-            Self::unify(&mut variable.value, other)?;
         }
 
         self.replace_with(other);
@@ -126,8 +136,6 @@ impl<'src> Expression<'src> {
         if Rc::ptr_eq(&x.0, &y.0)
             || x.unify_unknown(y)?.is_break()
             || y.unify_unknown(x)?.is_break()
-            || x.unify_variable(y)?.is_break()
-            || y.unify_variable(x)?.is_break()
         {
             return Ok(());
         }
@@ -188,8 +196,7 @@ impl<'src> Expression<'src> {
             | (GenericExpression::Apply { .. }, _rhs)
             | (GenericExpression::Let { .. }, _rhs)
             | (GenericExpression::Pi(_), _rhs)
-            | (GenericExpression::Lambda(_), _rhs)
-            | (GenericExpression::Variable(_), _rhs) => Err(InferenceError)?,
+            | (GenericExpression::Lambda(_), _rhs) => Err(InferenceError)?,
         }
 
         drop(x_ref);
@@ -200,6 +207,10 @@ impl<'src> Expression<'src> {
     }
 
     fn replace_with(&mut self, other: &Self) {
+        if let (Some(mut other_names), Some(names)) = (other.names(), self.names()) {
+            other_names.merge(&names);
+        }
+
         RefCell::replace(
             &self.0,
             ExprVariants::Link {
@@ -211,11 +222,19 @@ impl<'src> Expression<'src> {
 
     fn known<'a>(&'a self) -> Option<RefMut<'a, GenericExpression<'src, Self>>> {
         RefMut::filter_map(self.0.borrow_mut(), |x| {
-            if let ExprVariants::Known { expression } = x {
+            if let ExprVariants::Known { expression, .. } = x {
                 Some(expression)
             } else {
                 None
             }
+        })
+        .ok()
+    }
+
+    fn names<'a>(&'a self) -> Option<RefMut<'a, Names<'src>>> {
+        RefMut::filter_map(self.0.borrow_mut(), |x| match x {
+            ExprVariants::Known { names, .. } | ExprVariants::Unknown { names, .. } => Some(names),
+            ExprVariants::Link { .. } => None,
         })
         .ok()
     }
@@ -228,8 +247,6 @@ impl fmt::Debug for Expression<'_> {
 }
 
 impl<'src> ExpressionReference<'src> for Expression<'src> {
-    type Variable = VariableReference<'src, Self>;
-
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
             ExprVariants::Known { .. } => true,
@@ -240,10 +257,8 @@ impl<'src> ExpressionReference<'src> for Expression<'src> {
 
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            ExprVariants::Known { expression } => {
-                expression.typ(Self::new, |variable| variable.value.typ())
-            }
-            ExprVariants::Unknown { typ } => typ.clone(),
+            ExprVariants::Known { expression, .. } => expression.typ(Self::new),
+            ExprVariants::Unknown { typ, .. } => typ.clone(),
             ExprVariants::Link { target } => target.typ(),
         }
     }
@@ -266,7 +281,6 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
         match self {
             Self::TypeOfType => (),
             Self::Constant { typ, .. } => typ.infer_types()?,
-            Self::Variable(var) => var.value.infer_types()?,
             Self::Apply {
                 function,
                 argument,

@@ -10,6 +10,7 @@ impl<'src> Expression<'src> {
     pub fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Expression<'src>> {
         Ok(match self.0.as_ref() {
             ExprVariants::Known { expression } => expression.link(ctx)?,
+            ExprVariants::Variable(variable) => ctx.lookup_value(*variable)?,
             ExprVariants::TypeAnnotation { expression, typ } => {
                 let expression = expression.link(ctx)?;
                 let mut typ = typ.link(ctx)?;
@@ -45,7 +46,6 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
             Self::Let(binding) => GenericExpression::Let(binding.link(ctx)?),
             Self::Pi(binding) => GenericExpression::Pi(binding.link(ctx)?),
             Self::Lambda(binding) => GenericExpression::Lambda(binding.link(ctx)?),
-            Self::Variable(variable) => return ctx.lookup_value(*variable),
         }))
     }
 }
