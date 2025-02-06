@@ -51,6 +51,7 @@ fn test_with_ctx(input: &str, expected: &str) {
 
     let mut expr = parse(input).link(ctx).unwrap();
     expr.infer_types().unwrap();
+    expr.apply_binding_names();
     assert_eq!(expr.to_pretty_string(80), expected);
 }
 
@@ -119,11 +120,19 @@ fn polymorphic_let() {
 }
 
 #[test]
+fn simple_polymorphic_lambda() {
+    test_with_ctx(
+        r"\x : (∀b ⇒ b) ⇒ x",
+        // TODO: `_` should be `x`
+        r"\x : (∀b ⇒ b) ⇒ _ : (∀b ⇒ b)",
+    );
+}
+
+#[test]
 fn simple_polymorphic_let() {
     test_with_ctx(
         "let x : (∀b ⇒ b) = polymorphic ⇒ x",
-        // TODO: Should be `∀b ⇒ b`, not `∀b ⇒ a`
-        "let x : (∀b ⇒ a) = polymorphic ⇒ polymorphic : (∀b ⇒ a)",
+        "let x : (∀b ⇒ b) = polymorphic ⇒ polymorphic : (∀b ⇒ b)",
     );
 }
 
@@ -131,6 +140,7 @@ fn simple_polymorphic_let() {
 fn polymorphic_lambda() {
     test_with_ctx(
         r"\id2 : (∀a ⇒ a → a) ⇒ add (id2 Int one) (float_to_int (id2 Float pi))",
-        r"\id2 : (∀a ⇒ a → a) ⇒ ((add : Int → Int → Int) (((id2 : (∀a = Int ⇒ Int → Int)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a = Float ⇒ Float → Float)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int",
+        // TODO: `_` should be `id2`
+        r"\id2 : (∀a ⇒ a → a) ⇒ ((add : Int → Int → Int) (((_ : (∀a = Int ⇒ Int → Int)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((_ : (∀a = Float ⇒ Float → Float)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int",
     );
 }

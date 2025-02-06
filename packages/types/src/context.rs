@@ -10,10 +10,12 @@ pub type GlobalValues<'a> = HashMap<&'a str, indexed_locals::Expression<'a>>;
 #[derive(Clone)]
 enum LocalValue<'a> {
     Now(inference::Expression<'a>),
-    OnLookup {
-        name: &'a str,
-        value: indexed_locals::Expression<'a>,
-    },
+    OnLookup(indexed_locals::Expression<'a>),
+}
+
+pub enum Link {
+    Now,
+    OnLookup,
 }
 
 pub struct Context<'a> {
@@ -31,19 +33,15 @@ impl<'a> Context<'a> {
 
     pub(crate) fn with_variable<Output>(
         &mut self,
-        name: &'a str,
         value: indexed_locals::Expression<'a>,
+        link: Link,
         f: impl FnOnce(&mut Self, inference::Expression<'a>) -> Output,
     ) -> Result<Output> {
         let variable_value = value.link(self)?;
 
-        let lookup_value = if value.is_type_annotated() {
-            LocalValue::OnLookup { name, value }
-        } else {
-            LocalValue::Now(inference::Expression::variable(
-                name,
-                variable_value.clone(),
-            ))
+        let lookup_value = match link {
+            Link::Now => LocalValue::Now(variable_value.clone()),
+            Link::OnLookup => LocalValue::OnLookup(value),
         };
 
         self.local_variables.push(lookup_value);
@@ -69,8 +67,7 @@ impl<'a> Context<'a> {
 
         Ok(match &self.local_variables[debruijn_index] {
             LocalValue::Now(value) => value.clone(),
-            LocalValue::OnLookup { name, value } => {
-                let name = *name;
+            LocalValue::OnLookup(value) => {
                 let value = value.clone();
 
                 // This is what the context looked like when we added the variable binding.
@@ -79,7 +76,7 @@ impl<'a> Context<'a> {
                     global_variables: self.global_variables.clone(),
                 };
 
-                inference::Expression::variable(name, value.link(&mut local_ctx)?)
+                value.link(&mut local_ctx)?
             }
         })
     }
