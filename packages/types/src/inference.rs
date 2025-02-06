@@ -73,14 +73,14 @@ impl<'src> Expression<'src> {
         }
     }
 
-    fn follow_links(&mut self) {
+    fn collapse_links(&mut self) {
         // Collapse links from the bottom up so they are also collapsed for other
         // expressions that reference this chain.
         *self = {
             let ExprVariants::Link { target } = &mut *self.0.borrow_mut() else {
                 return;
             };
-            target.follow_links();
+            target.collapse_links();
             target.clone()
         };
     }
@@ -120,8 +120,8 @@ impl<'src> Expression<'src> {
     }
 
     pub fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
-        x.follow_links();
-        y.follow_links();
+        x.collapse_links();
+        y.collapse_links();
 
         if Rc::ptr_eq(&x.0, &y.0)
             || x.unify_unknown(y)?.is_break()
