@@ -76,34 +76,46 @@ impl<'src> Expression<'src> {
     fn follow_links(&mut self) {
         // Collapse links from the bottom up so they are also collapsed for other
         // expressions that reference this chain.
-        let link = {
+        *self = {
             let ExprVariants::Link { target } = &mut *self.0.borrow_mut() else {
                 return;
             };
             target.follow_links();
             target.clone()
         };
-
-        *self = link;
     }
 
-    fn unify_non_equal(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
-        let mut borrowed = self.0.borrow_mut();
+    fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
+        {
+            let ExprVariants::Unknown { typ } = &mut *self.0.borrow_mut() else {
+                return Ok(ControlFlow::Continue(()));
+            };
 
-        match &mut *borrowed {
-            ExprVariants::Unknown { typ } => {
-                Self::unify(typ, &mut other.typ())?;
-            }
-            ExprVariants::Known {
-                expression: GenericExpression::Variable(var),
-            } => {
-                Self::unify(&mut var.value, other)?;
-            }
-            _ => return Ok(ControlFlow::Continue(())),
+            Self::unify(typ, &mut other.typ())?;
         }
 
-        drop(borrowed);
         self.replace_with(other);
+
+        Ok(ControlFlow::Break(()))
+    }
+
+    fn unify_variable(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
+        assert!(self.is_known());
+        assert!(other.is_known());
+
+        {
+            let ExprVariants::Known {
+                expression: GenericExpression::Variable(variable),
+            } = &mut *self.0.borrow_mut()
+            else {
+                return Ok(ControlFlow::Continue(()));
+            };
+
+            Self::unify(&mut variable.value, other)?;
+        }
+
+        self.replace_with(other);
+
         Ok(ControlFlow::Break(()))
     }
 
@@ -112,8 +124,10 @@ impl<'src> Expression<'src> {
         y.follow_links();
 
         if Rc::ptr_eq(&x.0, &y.0)
-            || x.unify_non_equal(y)?.is_break()
-            || y.unify_non_equal(x)?.is_break()
+            || x.unify_unknown(y)?.is_break()
+            || y.unify_unknown(x)?.is_break()
+            || x.unify_variable(y)?.is_break()
+            || y.unify_variable(x)?.is_break()
         {
             return Ok(());
         }
