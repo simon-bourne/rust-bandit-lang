@@ -41,10 +41,7 @@ enum GenericExpression<'src, Expr: ExpressionReference<'src>> {
 }
 
 impl<'src, Expr: ExpressionReference<'src>> GenericExpression<'src, Expr> {
-    fn typ(
-        &self,
-        new: impl FnOnce(Self) -> Expr,
-    ) -> Expr {
+    fn typ(&self, new: impl FnOnce(Self) -> Expr) -> Expr {
         match self {
             GenericExpression::TypeOfType => new(GenericExpression::TypeOfType),
             GenericExpression::Constant { typ, .. } => typ.clone(),

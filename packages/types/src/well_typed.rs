@@ -1,8 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{
-    ExpressionReference, GenericExpression, SharedMut, VariableBinding,
-};
+use crate::{ExpressionReference, GenericExpression, SharedMut, VariableBinding};
 
 mod pretty;
 
@@ -67,9 +65,7 @@ impl<'src> ExpressionReference<'src> for Expression<'src> {
     }
 
     fn typ(&self) -> Self {
-        self.0
-            .borrow()
-            .typ(Self::new)
+        self.0.borrow().typ(Self::new)
     }
 }
 
