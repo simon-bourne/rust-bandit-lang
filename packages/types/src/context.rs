@@ -13,11 +13,6 @@ enum LocalValue<'a> {
     OnLookup(indexed_locals::Expression<'a>),
 }
 
-pub enum Link {
-    Now,
-    OnLookup,
-}
-
 pub struct Context<'a> {
     local_variables: Vec<LocalValue<'a>>,
     global_variables: Rc<GlobalValues<'a>>,
@@ -34,14 +29,14 @@ impl<'a> Context<'a> {
     pub(crate) fn with_variable<Output>(
         &mut self,
         value: indexed_locals::Expression<'a>,
-        link: Link,
         f: impl FnOnce(&mut Self, inference::Expression<'a>) -> Output,
     ) -> Result<Output> {
         let variable_value = value.link(self)?;
 
-        let lookup_value = match link {
-            Link::Now => LocalValue::Now(variable_value.clone()),
-            Link::OnLookup => LocalValue::OnLookup(value),
+        let lookup_value = if value.is_type_annotated() {
+            LocalValue::OnLookup(value)
+        } else {
+            LocalValue::Now(variable_value.clone())
         };
 
         self.local_variables.push(lookup_value);

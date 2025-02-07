@@ -1,8 +1,7 @@
 use super::ExprVariants;
 use crate::{
-    context::{Context, Link},
-    inference, type_annotated, ExpressionReference, GenericExpression, Result, Variable,
-    VariableBinding,
+    context::Context, inference, type_annotated, ExpressionReference, GenericExpression, Result,
+    Variable, VariableBinding,
 };
 
 pub type Expression<'src> = type_annotated::Expression<'src, Variable<'src>>;
@@ -44,9 +43,9 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
                 argument: argument.link(ctx)?,
                 typ: typ.link(ctx)?,
             },
-            Self::Let(binding) => GenericExpression::Let(binding.link(ctx, None)?),
-            Self::Pi(binding) => GenericExpression::Pi(binding.link(ctx, Some(Link::Now))?),
-            Self::Lambda(binding) => GenericExpression::Lambda(binding.link(ctx, None)?),
+            Self::Let(binding) => GenericExpression::Let(binding.link(ctx)?),
+            Self::Pi(binding) => GenericExpression::Pi(binding.link(ctx)?),
+            Self::Lambda(binding) => GenericExpression::Lambda(binding.link(ctx)?),
         }))
     }
 }
@@ -55,18 +54,8 @@ impl<'src> VariableBinding<'src, Expression<'src>> {
     fn link(
         &self,
         ctx: &mut Context<'src>,
-        link: Option<Link>,
     ) -> Result<VariableBinding<'src, inference::Expression<'src>>> {
-        // TODO: Not sure about this `Link` stuff
-        let link = link.unwrap_or_else(|| {
-            if self.variable_value.is_type_annotated() {
-                Link::OnLookup
-            } else {
-                Link::Now
-            }
-        });
-
-        ctx.with_variable(self.variable_value.clone(), link, |ctx, variable_value| {
+        ctx.with_variable(self.variable_value.clone(), |ctx, variable_value| {
             Ok(VariableBinding {
                 name: self.name,
                 variable_value,
