@@ -67,7 +67,6 @@ fn simple_apply() {
 
 #[test]
 fn simple_lambda() {
-    // TODO: Why isn't this `(\x : Int ⇒ x : Int) : Int → Int`
     test_with_ctx(r"\x => x : Int", r"\x : Int ⇒ x : Int");
 }
 
