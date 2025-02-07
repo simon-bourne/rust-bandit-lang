@@ -84,6 +84,7 @@ impl<'src> Expression<'src> {
     pub fn infer_types(&mut self) -> Result<()> {
         Self::unify(&mut self.typ().typ(), &mut Self::type_of_type())?;
 
+        // TODO: We need a way to stop repeatedly recursing down shared values.
         match &mut *self.0.borrow_mut() {
             ExprVariants::Known { expression, .. } => expression.infer_types(),
             ExprVariants::Unknown { typ, .. } => typ.infer_types(),
