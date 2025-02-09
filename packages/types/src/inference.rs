@@ -1,5 +1,6 @@
 use std::{
     cell::{RefCell, RefMut},
+    collections::{HashMap, HashSet},
     fmt,
     ops::ControlFlow,
     rc::Rc,
@@ -31,10 +32,7 @@ enum ExprVariants<'src> {
 
 impl<'src> Expression<'src> {
     pub fn unknown(typ: Self) -> Self {
-        Self(Rc::new(RefCell::new(ExprVariants::Unknown {
-            name: None,
-            typ,
-        })))
+        Self::new(ExprVariants::Unknown { name: None, typ })
     }
 
     pub fn unknown_value() -> Self {
@@ -53,6 +51,72 @@ impl<'src> Expression<'src> {
         }
     }
 
+    // TODO: The implementation of this is ugly and inefficient.
+    pub fn fresh_variables(&self) -> Self {
+        self.make_fresh_variables(&mut HashSet::new(), &mut HashMap::new())
+    }
+
+    fn make_fresh_variables(
+        &self,
+        bound_variables: &mut HashSet<*mut ExprVariants<'src>>,
+        unknowns: &mut HashMap<*mut ExprVariants<'src>, Self>,
+    ) -> Self {
+        let key = &self.0.as_ptr();
+
+        if bound_variables.contains(key) {
+            self.deep_copy(unknowns)
+        } else {
+            match &*self.0.borrow() {
+                ExprVariants::Known { name, expression } => {
+                    match expression {
+                        GenericExpression::Let(variable_binding)
+                        | GenericExpression::Pi(variable_binding)
+                        | GenericExpression::Lambda(variable_binding) => {
+                            bound_variables.insert(variable_binding.variable_value.0.as_ptr());
+                        }
+                        _ => (),
+                    }
+
+                    Self::new(ExprVariants::Known {
+                        name: *name,
+                        expression: expression.map_expression(|expr| {
+                            expr.make_fresh_variables(bound_variables, unknowns)
+                        }),
+                    })
+                }
+                ExprVariants::Unknown { .. } => self.clone(),
+                ExprVariants::Link { target } => {
+                    target.make_fresh_variables(bound_variables, unknowns)
+                }
+            }
+        }
+    }
+
+    fn deep_copy(&self, unknowns: &mut HashMap<*mut ExprVariants<'src>, Self>) -> Self {
+        match &*self.0.borrow() {
+            ExprVariants::Known { name, expression } => Self::new(ExprVariants::Known {
+                name: *name,
+                expression: expression.map_expression(|expr| expr.deep_copy(unknowns)),
+            }),
+            ExprVariants::Unknown { name, typ } => {
+                let key = self.0.as_ptr();
+
+                if let Some(unknown) = unknowns.get(&key) {
+                    unknown.clone()
+                } else {
+                    let new_unknown = Self::new(ExprVariants::Unknown {
+                        name: *name,
+                        typ: typ.deep_copy(unknowns),
+                    });
+                    unknowns.insert(key, new_unknown.clone());
+
+                    new_unknown
+                }
+            }
+            ExprVariants::Link { target } => target.deep_copy(unknowns),
+        }
+    }
+
     fn set_name(&mut self, new_name: &'src str) {
         match &mut *self.0.borrow_mut() {
             ExprVariants::Known { name, .. } | ExprVariants::Unknown { name, .. } => {
@@ -63,26 +127,33 @@ impl<'src> Expression<'src> {
     }
 
     fn type_of_type() -> Self {
-        Self::new(GenericExpression::TypeOfType)
+        Self::new_known(GenericExpression::TypeOfType)
     }
 
     fn function_type(argument_value: Self, result_type: Self) -> Self {
-        Self::new(GenericExpression::Pi(VariableBinding {
+        Self::new_known(GenericExpression::Pi(VariableBinding {
             name: "_",
             variable_value: argument_value,
             in_expression: result_type,
         }))
     }
 
-    pub(crate) fn new(expression: GenericExpression<'src, Self>) -> Self {
+    pub(crate) fn new_known(expression: GenericExpression<'src, Self>) -> Self {
         Self(Rc::new(RefCell::new(ExprVariants::Known {
             name: None,
             expression,
         })))
     }
 
+    fn new(expression: ExprVariants<'src>) -> Self {
+        Self(Rc::new(RefCell::new(expression)))
+    }
+
     pub fn infer_types(&mut self) -> Result<()> {
-        Self::unify(&mut self.typ().typ(), &mut Self::type_of_type())?;
+        Self::unify(
+            &mut self.typ().typ().fresh_variables(),
+            &mut Self::type_of_type(),
+        )?;
 
         // TODO: We need a way to stop repeatedly recursing down shared values.
         match &mut *self.0.borrow_mut() {
@@ -234,7 +305,7 @@ impl<'src> ExpressionReference<'src> for Expression<'src> {
 
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            ExprVariants::Known { expression, .. } => expression.typ(Self::new),
+            ExprVariants::Known { expression, .. } => expression.typ(Self::new_known),
             ExprVariants::Unknown { typ, .. } => typ.clone(),
             ExprVariants::Link { target } => target.typ(),
         }
@@ -282,9 +353,13 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
                 argument,
                 typ,
             } => {
-                Expression::unify(&mut typ.typ(), &mut Expression::type_of_type())?;
+                Expression::unify(
+                    &mut typ.typ().fresh_variables(),
+                    &mut Expression::type_of_type(),
+                )?;
+                // TODO: Do we need `fresh_variables` on `typ` or `function_type`?
                 let function_type = &mut Expression::function_type(argument.clone(), typ.clone());
-                Expression::unify(function_type, &mut function.typ())?;
+                Expression::unify(function_type, &mut function.typ().fresh_variables())?;
 
                 function.infer_types()?;
                 argument.infer_types()?;

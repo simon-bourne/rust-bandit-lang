@@ -7,14 +7,8 @@ use crate::{
 
 pub type GlobalValues<'a> = HashMap<&'a str, indexed_locals::Expression<'a>>;
 
-#[derive(Clone)]
-enum LocalValue<'a> {
-    Now(inference::Expression<'a>),
-    OnLookup(indexed_locals::Expression<'a>),
-}
-
 pub struct Context<'a> {
-    local_variables: Vec<LocalValue<'a>>,
+    local_variables: Vec<inference::Expression<'a>>,
     global_variables: Rc<GlobalValues<'a>>,
 }
 
@@ -28,19 +22,11 @@ impl<'a> Context<'a> {
 
     pub(crate) fn with_variable<Output>(
         &mut self,
-        value: indexed_locals::Expression<'a>,
-        f: impl FnOnce(&mut Self, inference::Expression<'a>) -> Output,
+        variable_value: inference::Expression<'a>,
+        f: impl FnOnce(&mut Self) -> Output,
     ) -> Result<Output> {
-        let variable_value = value.link(self)?;
-
-        let lookup_value = if value.is_type_annotated() {
-            LocalValue::OnLookup(value)
-        } else {
-            LocalValue::Now(variable_value.clone())
-        };
-
-        self.local_variables.push(lookup_value);
-        let output = f(self, variable_value);
+        self.local_variables.push(variable_value);
+        let output = f(self);
         self.local_variables.pop();
         Ok(output)
     }
@@ -50,30 +36,17 @@ impl<'a> Context<'a> {
         variable: Variable<'a>,
     ) -> Result<inference::Expression<'a>> {
         match variable.scope {
-            VariableScope::Local(index) => self.local_value(index),
+            VariableScope::Local(index) => Ok(self.local_value(index)),
             VariableScope::Global => self.global_value(variable.name),
         }
     }
 
-    fn local_value(&mut self, index: DeBruijnIndex) -> Result<inference::Expression<'a>> {
+    fn local_value(&mut self, index: DeBruijnIndex) -> inference::Expression<'a> {
         let len = self.local_variables.len();
         assert!(index.0 <= len);
         let debruijn_index = len - index.0;
 
-        Ok(match &self.local_variables[debruijn_index] {
-            LocalValue::Now(value) => value.clone(),
-            LocalValue::OnLookup(value) => {
-                let value = value.clone();
-
-                // This is what the context looked like when we added the variable binding.
-                let mut local_ctx = Self {
-                    local_variables: self.local_variables[..debruijn_index].to_vec(),
-                    global_variables: self.global_variables.clone(),
-                };
-
-                value.link(&mut local_ctx)?
-            }
-        })
+        self.local_variables[debruijn_index].clone()
     }
 
     fn global_value(&mut self, name: &'a str) -> Result<inference::Expression<'a>> {

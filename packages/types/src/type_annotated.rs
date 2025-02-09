@@ -121,10 +121,6 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
         })
     }
 
-    pub fn is_type_annotated(&self) -> bool {
-        matches!(self.0.as_ref(), ExprVariants::TypeAnnotation { .. })
-    }
-
     fn new(expr: ExprVariants<'src, Self, Var>) -> Self {
         Self(Rc::new(expr), PhantomData)
     }

@@ -28,7 +28,7 @@ impl<'src> Expression<'src> {
 
 impl<'src> GenericExpression<'src, Expression<'src>> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Expression<'src>> {
-        Ok(inference::Expression::new(match self {
+        Ok(inference::Expression::new_known(match self {
             Self::TypeOfType => GenericExpression::TypeOfType,
             Self::Constant { name, typ } => GenericExpression::Constant {
                 name,
@@ -55,7 +55,9 @@ impl<'src> VariableBinding<'src, Expression<'src>> {
         &self,
         ctx: &mut Context<'src>,
     ) -> Result<VariableBinding<'src, inference::Expression<'src>>> {
-        ctx.with_variable(self.variable_value.clone(), |ctx, variable_value| {
+        let variable_value = self.variable_value.link(ctx)?;
+
+        ctx.with_variable(variable_value.clone(), |ctx| {
             Ok(VariableBinding {
                 name: self.name,
                 variable_value,

@@ -87,7 +87,7 @@ fn partial_add() {
 fn simple_id() {
     test_with_ctx(
         "id _ one",
-        "((id : (∀a = Int ⇒ Int → Int)) (Int : Type) : Int → Int) (one : Int) : Int",
+        "((id : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int",
     );
 }
 
@@ -95,7 +95,7 @@ fn simple_id() {
 fn multi_id() {
     test_with_ctx(
         "add (id Int one) (float_to_int (id Float pi))",
-        "((add : Int → Int → Int) (((id : (∀a = Int ⇒ Int → Int)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a = Float ⇒ Float → Float)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
+        "((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a ⇒ a → a)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
 }
 
@@ -105,7 +105,6 @@ fn multi_id() {
 fn unsoundness() {
     test_with_ctx(
         "let id2 = id ⇒ (id2 : Type -> Int -> Int)",
-        // TODO: We should have `id2` on the RHS, not `id`.
         "let id2 : Type → Int → Int = id ⇒ id : Type → Int → Int",
     )
 }
@@ -114,23 +113,20 @@ fn unsoundness() {
 fn polymorphic_let() {
     test_with_ctx(
         "let id2 : (∀a ⇒ a → a) = id ⇒ add (id2 Int one) (float_to_int (id2 Float pi))",
-        "let id2 : (∀a ⇒ a → a) = id ⇒ ((add : Int → Int → Int) (((id : (∀a = Int ⇒ Int → Int)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a = Float ⇒ Float → Float)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
+        "let id2 : (∀a ⇒ a → a) = id ⇒ ((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a ⇒ a → a)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
 }
 
 #[test]
 fn simple_polymorphic_lambda() {
-    test_with_ctx(
-        r"\x : (∀b ⇒ b) ⇒ x",
-        // TODO: `_` should be `x`
-        r"\x : (∀b ⇒ b) ⇒ _ : (∀b ⇒ b)",
-    );
+    test_with_ctx(r"\x : (∀b ⇒ b) ⇒ x", r"\x : (∀b ⇒ b) ⇒ x : (∀b ⇒ b)");
 }
 
 #[test]
 fn simple_polymorphic_let() {
     test_with_ctx(
         "let x : (∀b ⇒ b) = polymorphic ⇒ x",
+        // TODO: We should have `x` on the RHS, not `polymorphic`.
         "let x : (∀b ⇒ b) = polymorphic ⇒ polymorphic : (∀b ⇒ b)",
     );
 }
@@ -139,7 +135,6 @@ fn simple_polymorphic_let() {
 fn polymorphic_lambda() {
     test_with_ctx(
         r"\id2 : (∀a ⇒ a → a) ⇒ add (id2 Int one) (float_to_int (id2 Float pi))",
-        // TODO: `_` should be `id2`
-        r"\id2 : (∀a ⇒ a → a) ⇒ ((add : Int → Int → Int) (((_ : (∀a = Int ⇒ Int → Int)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((_ : (∀a = Float ⇒ Float → Float)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int",
+        r"\id2 : (∀a ⇒ a → a) ⇒ ((add : Int → Int → Int) (((id2 : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a ⇒ a → a)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int",
     );
 }
