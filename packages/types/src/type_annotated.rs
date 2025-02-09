@@ -2,8 +2,7 @@ use std::{marker::PhantomData, rc::Rc};
 
 use super::pretty::{Annotation, Document, Operator, Side};
 use crate::{
-    inference, pretty::TypeAnnotated, ExpressionReference, GenericExpression, Pretty,
-    VariableBinding,
+    pretty::TypeAnnotated, ExpressionReference, GenericExpression, Pretty, VariableBinding,
 };
 
 pub mod indexed_locals;
@@ -21,7 +20,7 @@ impl<'src, Var: Pretty + Clone> ExpressionReference<'src> for Expression<'src, V
     }
 
     fn typ(&self) -> Self {
-        self.0.typ(Self::known, |_| Self::inferred_type())
+        self.0.typ(Self::known, |_| Self::unknown_type())
     }
 }
 
@@ -33,7 +32,7 @@ impl<Var: Pretty + Clone> Pretty for Expression<'_, Var> {
             ExprVariants::TypeAnnotation { expression, typ } => {
                 TypeAnnotated::new(expression, typ).to_document(parent, annotation)
             }
-            ExprVariants::LinkedUnknown { typ, .. } | ExprVariants::FreshUnknown { typ } => {
+            ExprVariants::Unknown { typ } => {
                 TypeAnnotated::new("_", typ).to_document(parent, annotation)
             }
         }
@@ -46,27 +45,13 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
     }
 
     pub fn unknown_value() -> Self {
-        Self::new(ExprVariants::LinkedUnknown {
-            expression: inference::Expression::unknown_value(),
+        Self::new(ExprVariants::Unknown {
             typ: Self::unknown_type(),
         })
     }
 
     pub fn unknown_type() -> Self {
-        Self::new(ExprVariants::LinkedUnknown {
-            expression: inference::Expression::unknown_type(),
-            typ: Self::type_of_type(),
-        })
-    }
-
-    pub fn inferred_value() -> Self {
-        Self::new(ExprVariants::FreshUnknown {
-            typ: Self::inferred_type(),
-        })
-    }
-
-    pub fn inferred_type() -> Self {
-        Self::new(ExprVariants::FreshUnknown {
+        Self::new(ExprVariants::Unknown {
             typ: Self::type_of_type(),
         })
     }
@@ -86,7 +71,7 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
         Self::known(GenericExpression::Apply {
             function: self,
             argument,
-            typ: Self::inferred_type(),
+            typ: Self::unknown_type(),
         })
     }
 
@@ -138,11 +123,7 @@ enum ExprVariants<'src, Expr: ExpressionReference<'src>, Var> {
         expression: Expr,
         typ: Expr,
     },
-    LinkedUnknown {
-        expression: inference::Expression<'src>,
-        typ: Expr,
-    },
-    FreshUnknown {
+    Unknown {
         typ: Expr,
     },
     Variable(Var),
@@ -153,7 +134,7 @@ impl<'src, Expr: ExpressionReference<'src>, Var> ExprVariants<'src, Expr, Var> {
         match self {
             Self::Known { .. } | Self::Variable(_) => true,
             Self::TypeAnnotation { expression, .. } => expression.is_known(),
-            Self::LinkedUnknown { .. } | Self::FreshUnknown { .. } => false,
+            Self::Unknown { .. } => false,
         }
     }
 
@@ -165,9 +146,7 @@ impl<'src, Expr: ExpressionReference<'src>, Var> ExprVariants<'src, Expr, Var> {
         match self {
             Self::Known { expression } => expression.typ(new),
             Self::Variable(variable) => variable_type(variable),
-            Self::TypeAnnotation { typ, .. }
-            | Self::LinkedUnknown { typ, .. }
-            | Self::FreshUnknown { typ, .. } => typ.clone(),
+            Self::TypeAnnotation { typ, .. } | Self::Unknown { typ, .. } => typ.clone(),
         }
     }
 }

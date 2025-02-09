@@ -26,7 +26,7 @@ fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src
         |input_type, _, output_type| {
             Expression::function_type(
                 "_",
-                Expression::inferred_value().has_type(input_type),
+                Expression::unknown_value().has_type(input_type),
                 output_type,
             )
         },
@@ -101,7 +101,7 @@ fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, E
     (
         identifier(),
         opt(preceded(NamedOperator::HasType, expr)).map(|typ| {
-            let value = Expression::inferred_value();
+            let value = Expression::unknown_value();
 
             if let Some(typ) = typ {
                 value.has_type(typ)
