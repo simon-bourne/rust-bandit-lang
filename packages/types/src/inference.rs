@@ -337,8 +337,14 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
                     &mut typ.typ().fresh_variables(),
                     &mut Expression::type_of_type(),
                 )?;
-                // TODO: Do we need `fresh_variables` on `typ` or `function_type`?
-                let function_type = &mut Expression::function_type(argument.clone(), typ.clone());
+                // TODO: Is this reasoning sound?
+                // We're creating a new bound variable (`argument`) here. If it's unknown, we
+                // want to infer it, so we create fresh variables at the `argument` and `typ`
+                // level, not `function_type`.
+                let function_type = &mut Expression::function_type(
+                    argument.fresh_variables(),
+                    typ.fresh_variables(),
+                );
                 Expression::unify(function_type, &mut function.typ().fresh_variables())?;
 
                 function.infer_types()?;
