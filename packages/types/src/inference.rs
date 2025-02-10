@@ -1,6 +1,6 @@
 use std::{
     cell::{RefCell, RefMut},
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt,
     ops::ControlFlow,
     rc::Rc,
@@ -53,42 +53,36 @@ impl<'src> Expression<'src> {
 
     // TODO: The implementation of this is ugly and inefficient.
     pub fn fresh_variables(&self) -> Self {
-        self.make_fresh_variables(&mut HashSet::new(), &mut HashMap::new())
+        self.make_fresh_variables(&mut HashMap::new())
     }
 
     fn make_fresh_variables(
         &self,
-        bound_variables: &mut HashSet<*mut ExprVariants<'src>>,
-        unknowns: &mut HashMap<*mut ExprVariants<'src>, Self>,
+        bound_variables: &mut HashMap<*mut ExprVariants<'src>, Self>,
     ) -> Self {
-        let key = &self.0.as_ptr();
+        if let Some(bound_variable) = bound_variables.get(&self.0.as_ptr()) {
+            return bound_variable.clone();
+        }
 
-        if bound_variables.contains(key) {
-            self.deep_copy(unknowns)
-        } else {
-            match &*self.0.borrow() {
-                ExprVariants::Known { name, expression } => {
-                    match expression {
-                        GenericExpression::Let(variable_binding)
-                        | GenericExpression::Pi(variable_binding)
-                        | GenericExpression::Lambda(variable_binding) => {
-                            bound_variables.insert(variable_binding.variable_value.0.as_ptr());
-                        }
-                        _ => (),
-                    }
+        match &*self.0.borrow() {
+            ExprVariants::Known { name, expression } => {
+                if let GenericExpression::Let(variable_binding)
+                | GenericExpression::Pi(variable_binding)
+                | GenericExpression::Lambda(variable_binding) = expression
+                {
+                    // TODO: We should pass a `HashMap::new` here.
+                    let copy = variable_binding.variable_value.deep_copy(bound_variables);
+                    bound_variables.insert(variable_binding.variable_value.0.as_ptr(), copy);
+                }
 
-                    Self::new(ExprVariants::Known {
-                        name: *name,
-                        expression: expression.map_expression(|expr| {
-                            expr.make_fresh_variables(bound_variables, unknowns)
-                        }),
-                    })
-                }
-                ExprVariants::Unknown { .. } => self.clone(),
-                ExprVariants::Link { target } => {
-                    target.make_fresh_variables(bound_variables, unknowns)
-                }
+                Self::new(ExprVariants::Known {
+                    name: *name,
+                    expression: expression
+                        .map_expression(|expr| expr.make_fresh_variables(bound_variables)),
+                })
             }
+            ExprVariants::Unknown { .. } => self.clone(),
+            ExprVariants::Link { target } => target.make_fresh_variables(bound_variables),
         }
     }
 
