@@ -51,7 +51,11 @@ impl<'src> VariableBinding<'src, Expression<'src>> {
         &self,
         ctx: &mut Context<'src>,
     ) -> Result<VariableBinding<'src, inference::Expression<'src>>> {
-        let variable_value = self.variable_value.link(ctx)?;
+        let mut variable_value = self.variable_value.link(ctx)?;
+
+        if self.name != "_" {
+            variable_value.set_name(self.name);
+        }
 
         ctx.with_variable(variable_value.clone(), |ctx| {
             Ok(VariableBinding {

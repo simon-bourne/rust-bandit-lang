@@ -43,14 +43,6 @@ impl<'src> Expression<'src> {
         Self::unknown(Self::type_of_type())
     }
 
-    pub fn apply_binding_names(&mut self) {
-        match &mut *self.0.borrow_mut() {
-            ExprVariants::Known { expression, .. } => expression.apply_binding_names(),
-            ExprVariants::Unknown { typ, .. } => typ.apply_binding_names(),
-            ExprVariants::Link { target } => target.apply_binding_names(),
-        }
-    }
-
     // TODO: The implementation of this is ugly and inefficient.
     pub fn fresh_variables(&self) -> Self {
         self.make_fresh_variables(&mut HashMap::new())
@@ -111,7 +103,14 @@ impl<'src> Expression<'src> {
         }
     }
 
-    fn set_name(&mut self, new_name: &'src str) {
+    fn name(&self) -> Option<&'src str> {
+        match &*self.0.borrow() {
+            ExprVariants::Known { name, .. } | ExprVariants::Unknown { name, .. } => *name,
+            ExprVariants::Link { target } => target.name(),
+        }
+    }
+
+    pub fn set_name(&mut self, new_name: &'src str) {
         match &mut *self.0.borrow_mut() {
             ExprVariants::Known { name, .. } | ExprVariants::Unknown { name, .. } => {
                 *name = Some(new_name)
@@ -261,6 +260,8 @@ impl<'src> Expression<'src> {
     }
 
     fn replace_with(&mut self, other: &Self) {
+        let name = other.name().or_else(|| self.name());
+
         RefCell::replace(
             &self.0,
             ExprVariants::Link {
@@ -268,6 +269,10 @@ impl<'src> Expression<'src> {
             },
         );
         *self = other.clone();
+
+        if let Some(name) = name {
+            self.set_name(name);
+        }
     }
 
     fn known<'a>(&'a self) -> Option<RefMut<'a, GenericExpression<'src, Self>>> {
@@ -316,25 +321,6 @@ impl<'src> VariableBinding<'src, Expression<'src>> {
         Expression::unify(&mut binding0.variable_value, &mut binding1.variable_value)?;
         Expression::unify(&mut binding0.in_expression, &mut binding1.in_expression)
     }
-
-    fn apply_binding_names(&mut self) {
-        match &mut *self.variable_value.0.borrow_mut() {
-            ExprVariants::Known { name, expression } => {
-                *name = Some(self.name);
-                expression.apply_binding_names();
-            }
-            ExprVariants::Unknown { name, typ } => {
-                *name = Some(self.name);
-                typ.apply_binding_names();
-            }
-            ExprVariants::Link { target } => {
-                target.set_name(self.name);
-                target.apply_binding_names();
-            }
-        }
-
-        self.in_expression.apply_binding_names();
-    }
 }
 
 impl<'src> GenericExpression<'src, Expression<'src>> {
@@ -365,24 +351,5 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
         }
 
         Ok(())
-    }
-
-    fn apply_binding_names(&mut self) {
-        match self {
-            GenericExpression::TypeOfType => (),
-            GenericExpression::Constant { typ, .. } => typ.apply_binding_names(),
-            GenericExpression::Apply {
-                function,
-                argument,
-                typ,
-            } => {
-                function.apply_binding_names();
-                argument.apply_binding_names();
-                typ.apply_binding_names();
-            }
-            GenericExpression::Let(variable_binding)
-            | GenericExpression::Pi(variable_binding)
-            | GenericExpression::Lambda(variable_binding) => variable_binding.apply_binding_names(),
-        }
     }
 }

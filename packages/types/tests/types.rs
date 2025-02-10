@@ -17,11 +17,9 @@ fn infer_kinds() {
     .unwrap();
 
     constructor_type.infer_types().unwrap();
-    constructor_type.apply_binding_names();
     assert_eq!(
         constructor_type.to_pretty_string(80),
-        // TODO: Last `_` should be `a`
-        r"\m : _ → _ ⇒ \a ⇒ (m : _ → _) _"
+        r"\m : _ → _ ⇒ \a ⇒ (m : _ → _) a"
     );
 }
 

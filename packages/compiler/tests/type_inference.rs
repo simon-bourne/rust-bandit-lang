@@ -51,7 +51,6 @@ fn test_with_ctx(input: &str, expected: &str) {
 
     let mut expr = parse(input).link(ctx).unwrap();
     expr.infer_types().unwrap();
-    expr.apply_binding_names();
     assert_eq!(expr.to_pretty_string(80), expected);
 }
 
