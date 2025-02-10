@@ -69,7 +69,7 @@ impl<'src, Expr: ExpressionReference<'src>> GenericExpression<'src, Expr> {
             GenericExpression::Pi(_) => new(GenericExpression::TypeOfType),
             GenericExpression::Lambda(variable_binding) => {
                 new(GenericExpression::Pi(VariableBinding {
-                    name: "_",
+                    name: None,
                     variable_value: variable_binding.variable_value.clone(),
                     in_expression: variable_binding.in_expression.typ(),
                 }))
@@ -79,7 +79,7 @@ impl<'src, Expr: ExpressionReference<'src>> GenericExpression<'src, Expr> {
 }
 
 struct VariableBinding<'src, Expr> {
-    name: &'src str,
+    name: Option<&'src str>,
     variable_value: Expr,
     in_expression: Expr,
 }

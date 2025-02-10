@@ -25,7 +25,7 @@ fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src
         NamedOperator::To,
         |input_type, _, output_type| {
             Expression::function_type(
-                "_",
+                None,
                 Expression::unknown_value().has_type(input_type),
                 output_type,
             )
@@ -58,7 +58,7 @@ fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
         Keyword::Forall,
         separated_pair(variable_binding(), Token::SuchThat, expr),
     )
-    .map(|((var, value), expr)| Expression::function_type(var, value, expr))
+    .map(|((var, value), expr)| Expression::function_type(Some(var), value, expr))
 }
 
 fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {

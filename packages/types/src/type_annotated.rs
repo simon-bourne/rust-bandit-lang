@@ -33,7 +33,7 @@ impl<Var: Pretty + Clone> Pretty for Expression<'_, Var> {
                 TypeAnnotated::new(expression, typ).to_document(parent, annotation)
             }
             ExprVariants::Unknown { typ } => {
-                TypeAnnotated::new("_", typ).to_document(parent, annotation)
+                TypeAnnotated::new(None, typ).to_document(parent, annotation)
             }
         }
     }
@@ -77,13 +77,13 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
 
     pub fn let_binding(name: &'src str, variable_value: Self, in_expression: Self) -> Self {
         Self::known(GenericExpression::Let(VariableBinding {
-            name,
+            name: Some(name),
             variable_value,
             in_expression,
         }))
     }
 
-    pub fn function_type(name: &'src str, variable_value: Self, result_type: Self) -> Self {
+    pub fn function_type(name: Option<&'src str>, variable_value: Self, result_type: Self) -> Self {
         Self::known(GenericExpression::Pi(VariableBinding {
             name,
             variable_value,
@@ -93,7 +93,7 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
 
     pub fn lambda(name: &'src str, variable_value: Self, in_expression: Self) -> Self {
         Self::known(GenericExpression::Lambda(VariableBinding {
-            name,
+            name: Some(name),
             variable_value,
             in_expression,
         }))

@@ -125,7 +125,7 @@ impl<'src> Expression<'src> {
 
     fn function_type(argument_value: Self, result_type: Self) -> Self {
         Self::new_known(GenericExpression::Pi(VariableBinding {
-            name: "_",
+            name: None,
             variable_value: argument_value,
             in_expression: result_type,
         }))

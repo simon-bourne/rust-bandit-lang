@@ -71,7 +71,7 @@ impl<Value: Pretty, Type: Pretty> Pretty for TypeAnnotated<Value, Type> {
 }
 
 pub fn variable_to_document<'src>(
-    name: &str,
+    name: Option<&str>,
     value: &impl ExpressionReference<'src>,
     parent: Option<(Operator, Side)>,
     annotation: Annotation,
@@ -110,7 +110,7 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for GenericExpression<'src, E
             Self::Pi(binding) => {
                 let variable_name = binding.name;
 
-                if variable_name != "_" {
+                if variable_name.is_some() {
                     parenthesize_if(
                         parent.is_some(),
                         [Document::text("∀"), binding.to_document(annotation)],
@@ -145,9 +145,15 @@ impl Pretty for &str {
     }
 }
 
+impl Pretty for Option<&str> {
+    fn to_document(&self, parent: Option<(Operator, Side)>, annotations: Annotation) -> Document {
+        self.unwrap_or("_").to_document(parent, annotations)
+    }
+}
+
 impl<'src, Value: ExpressionReference<'src>> Pretty for VariableReference<'src, Value> {
     fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
-        variable_to_document(self.name, &self.value, parent, annotation)
+        variable_to_document(Some(self.name), &self.value, parent, annotation)
     }
 }
 

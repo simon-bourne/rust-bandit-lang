@@ -9,7 +9,7 @@ impl Pretty for Expression<'_> {
         match &*self.0.borrow() {
             ExprVariants::Known { expression, .. } => expression.to_document(parent, annotation),
             ExprVariants::Unknown { name, typ } => {
-                TypeAnnotated::new(name.unwrap_or("_"), typ).to_document(parent, annotation)
+                TypeAnnotated::new(name, typ).to_document(parent, annotation)
             }
             ExprVariants::Link { target } => target.to_document(parent, annotation),
         }

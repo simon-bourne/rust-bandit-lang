@@ -83,13 +83,18 @@ impl<'src> VariableBinding<'src, Expression<'src>> {
     ) -> Result<VariableBinding<'src, indexed_locals::Expression<'src>>> {
         let variable_value = self.variable_value.resolve_names_with_lookup(lookup)?;
 
-        lookup.with_variable(self.name, |lookup| {
-            let in_expression = self.in_expression.resolve_names_with_lookup(lookup)?;
-            Ok(VariableBinding {
-                name: self.name,
-                variable_value,
-                in_expression,
+        let in_expression = if let Some(name) = self.name {
+            lookup.with_variable(name, |lookup| {
+                self.in_expression.resolve_names_with_lookup(lookup)
             })
+        } else {
+            self.in_expression.resolve_names_with_lookup(lookup)
+        }?;
+
+        Ok(VariableBinding {
+            name: self.name,
+            variable_value,
+            in_expression,
         })
     }
 }
