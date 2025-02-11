@@ -50,9 +50,9 @@ impl<'src> Expression<'src> {
 
     fn make_fresh_variables(
         &self,
-        bound_variables: &mut HashMap<*mut ExprVariants<'src>, Self>,
+        new_variables: &mut HashMap<*mut ExprVariants<'src>, Self>,
     ) -> Self {
-        if let Some(bound_variable) = bound_variables.get(&self.0.as_ptr()) {
+        if let Some(bound_variable) = new_variables.get(&self.0.as_ptr()) {
             return bound_variable.clone();
         }
 
@@ -62,44 +62,43 @@ impl<'src> Expression<'src> {
                 | GenericExpression::Pi(variable_binding)
                 | GenericExpression::Lambda(variable_binding) = expression
                 {
-                    // TODO: We should pass a `HashMap::new` here.
-                    let copy = variable_binding.variable_value.deep_copy(bound_variables);
-                    bound_variables.insert(variable_binding.variable_value.0.as_ptr(), copy);
+                    let copy = variable_binding.variable_value.deep_copy(new_variables);
+                    new_variables.insert(variable_binding.variable_value.0.as_ptr(), copy);
                 }
 
                 Self::new(ExprVariants::Known {
                     name: *name,
                     expression: expression
-                        .map_expression(|expr| expr.make_fresh_variables(bound_variables)),
+                        .map_expression(|expr| expr.make_fresh_variables(new_variables)),
                 })
             }
             ExprVariants::Unknown { .. } => self.clone(),
-            ExprVariants::Link { target } => target.make_fresh_variables(bound_variables),
+            ExprVariants::Link { target } => target.make_fresh_variables(new_variables),
         }
     }
 
-    fn deep_copy(&self, unknowns: &mut HashMap<*mut ExprVariants<'src>, Self>) -> Self {
+    fn deep_copy(&self, new_variables: &mut HashMap<*mut ExprVariants<'src>, Self>) -> Self {
         match &*self.0.borrow() {
             ExprVariants::Known { name, expression } => Self::new(ExprVariants::Known {
                 name: *name,
-                expression: expression.map_expression(|expr| expr.deep_copy(unknowns)),
+                expression: expression.map_expression(|expr| expr.deep_copy(new_variables)),
             }),
             ExprVariants::Unknown { name, typ } => {
                 let key = self.0.as_ptr();
 
-                if let Some(unknown) = unknowns.get(&key) {
+                if let Some(unknown) = new_variables.get(&key) {
                     unknown.clone()
                 } else {
                     let new_unknown = Self::new(ExprVariants::Unknown {
                         name: *name,
-                        typ: typ.deep_copy(unknowns),
+                        typ: typ.deep_copy(new_variables),
                     });
-                    unknowns.insert(key, new_unknown.clone());
+                    new_variables.insert(key, new_unknown.clone());
 
                     new_unknown
                 }
             }
-            ExprVariants::Link { target } => target.deep_copy(unknowns),
+            ExprVariants::Link { target } => target.deep_copy(new_variables),
         }
     }
 
