@@ -111,7 +111,7 @@ pub struct Variable<'src> {
 
 impl fmt::Debug for Variable<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_pretty_string(80))
+        f.write_str(&self.debug())
     }
 }
 

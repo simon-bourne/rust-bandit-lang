@@ -17,6 +17,13 @@ pub trait Pretty {
             .pretty(width)
             .to_string()
     }
+
+    fn debug(&self) -> String {
+        let width = 80;
+        let terse = self.to_pretty_string(width);
+        let verbose = self.to_verbose_string(width);
+        format!("{terse} {{-- {verbose} --}}")
+    }
 }
 
 impl<T: Pretty> Pretty for &'_ T {
@@ -32,8 +39,9 @@ impl Pretty for Variable<'_> {
 }
 
 impl<'src, Expr: ExpressionReference<'src>> VariableBinding<'src, Expr> {
-    fn to_document(&self, layout: Layout) -> Document {
+    fn to_document(&self, kind: Document, layout: Layout) -> Document {
         Document::concat([
+            kind,
             variable_to_document(self.name, &self.variable_value, None, layout),
             Document::text(" ⇒ "),
             self.in_expression.to_document(None, layout),
@@ -113,11 +121,10 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for GenericExpression<'src, E
                 .to_document(parent, layout),
             Self::Let(binding) => parenthesize_if(
                 parent.is_some(),
-                [
-                    Document::text("let"),
-                    Document::space(),
-                    binding.to_document(layout),
-                ],
+                binding.to_document(
+                    Document::concat([Document::text("let"), Document::space()]),
+                    layout,
+                ),
             ),
             Self::Pi(binding) => {
                 let variable_name = binding.name;
@@ -125,7 +132,7 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for GenericExpression<'src, E
                 if variable_name.is_some() {
                     parenthesize_if(
                         parent.is_some(),
-                        [Document::text("∀"), binding.to_document(layout)],
+                        binding.to_document(Document::text("∀"), layout),
                     )
                 } else {
                     let layout = Layout::default().without_types();
@@ -140,7 +147,7 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for GenericExpression<'src, E
             }
             Self::Lambda(binding) => parenthesize_if(
                 parent.is_some(),
-                [Document::text("\\"), binding.to_document(layout)],
+                binding.to_document(Document::text("\\"), layout),
             ),
         }
     }
@@ -170,15 +177,11 @@ impl<'src, Value: ExpressionReference<'src>> Pretty for VariableReference<'src, 
     }
 }
 
-fn parenthesize_if(condition: bool, docs: impl IntoIterator<Item = Document>) -> Document {
+fn parenthesize_if(condition: bool, docs: Document) -> Document {
     if condition {
-        Document::concat([
-            Document::text("("),
-            Document::concat(docs),
-            Document::text(")"),
-        ])
+        Document::concat([Document::text("("), docs, Document::text(")")])
     } else {
-        Document::concat(docs)
+        docs
     }
 }
 
@@ -208,7 +211,7 @@ impl Operator {
     ) -> Document {
         parenthesize_if(
             self.parenthesize(parent),
-            [
+            Document::concat([
                 left.to_document(Some((self, Side::Left)), left_layout),
                 Document::text(match self {
                     Self::Equals => " = ",
@@ -217,7 +220,7 @@ impl Operator {
                     Self::Apply => " ",
                 }),
                 right.to_document(Some((self, Side::Right)), right_layout),
-            ],
+            ]),
         )
     }
 
