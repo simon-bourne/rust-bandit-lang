@@ -85,7 +85,7 @@ pub fn variable_to_document<'src>(
     let typ = &value.typ();
     let type_annotated = TypeAnnotated::new(name, typ);
 
-    if value.is_known() {
+    if value.is_known() || layout.show_unknowns {
         Operator::Equals.to_document(
             parent,
             &type_annotated,
@@ -280,6 +280,7 @@ pub type Document = RcDoc<'static>;
 pub struct Layout {
     pub annotate_types: bool,
     pub unknown_ids: bool,
+    pub show_unknowns: bool,
 }
 
 impl Layout {
@@ -287,6 +288,7 @@ impl Layout {
         Self {
             annotate_types: true,
             unknown_ids: true,
+            show_unknowns: true,
         }
     }
 
@@ -303,6 +305,7 @@ impl Default for Layout {
         Self {
             annotate_types: true,
             unknown_ids: false,
+            show_unknowns: false,
         }
     }
 }
