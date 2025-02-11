@@ -4,33 +4,39 @@ use super::{ExpressionReference, GenericExpression, VariableBinding};
 use crate::{Variable, VariableReference};
 
 pub trait Pretty {
-    fn to_document(&self, parent: Option<(Operator, Side)>, annotations: Annotation) -> Document;
+    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document;
 
     fn to_pretty_string(&self, width: usize) -> String {
-        self.to_document(None, Annotation::On)
+        self.to_document(None, Layout::default())
+            .pretty(width)
+            .to_string()
+    }
+
+    fn to_verbose_string(&self, width: usize) -> String {
+        self.to_document(None, Layout::verbose())
             .pretty(width)
             .to_string()
     }
 }
 
 impl<T: Pretty> Pretty for &'_ T {
-    fn to_document(&self, parent: Option<(Operator, Side)>, annotations: Annotation) -> Document {
-        (*self).to_document(parent, annotations)
+    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
+        (*self).to_document(parent, layout)
     }
 }
 
 impl Pretty for Variable<'_> {
-    fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
-        self.name.to_document(parent, annotation)
+    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
+        self.name.to_document(parent, layout)
     }
 }
 
 impl<'src, Expr: ExpressionReference<'src>> VariableBinding<'src, Expr> {
-    fn to_document(&self, annotation: Annotation) -> Document {
+    fn to_document(&self, layout: Layout) -> Document {
         Document::concat([
-            variable_to_document(self.name, &self.variable_value, None, annotation),
+            variable_to_document(self.name, &self.variable_value, None, layout),
             Document::text(" ⇒ "),
-            self.in_expression.to_document(None, annotation),
+            self.in_expression.to_document(None, layout),
         ])
     }
 }
@@ -54,19 +60,19 @@ where
 }
 
 impl<Value: Pretty, Type: Pretty> Pretty for TypeAnnotated<Value, Type> {
-    fn to_document(&self, parent: Option<(Operator, Side)>, annotations: Annotation) -> Document {
-        if annotations == Annotation::On {
+    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
+        if layout.annotate_types {
             if let Some(typ) = self.typ.as_ref() {
                 return Operator::HasType.to_document(
                     parent,
                     &self.value,
                     &typ,
-                    Annotation::On,
-                    Annotation::Off,
+                    layout,
+                    layout.without_types(),
                 );
             }
         }
-        self.value.to_document(parent, annotations)
+        self.value.to_document(parent, layout)
     }
 }
 
@@ -74,37 +80,43 @@ pub fn variable_to_document<'src>(
     name: Option<&str>,
     value: &impl ExpressionReference<'src>,
     parent: Option<(Operator, Side)>,
-    annotation: Annotation,
+    layout: Layout,
 ) -> Document {
     let typ = &value.typ();
     let type_annotated = TypeAnnotated::new(name, typ);
 
     if value.is_known() {
-        Operator::Equals.to_document(parent, &type_annotated, value, annotation, Annotation::Off)
+        Operator::Equals.to_document(
+            parent,
+            &type_annotated,
+            value,
+            layout,
+            layout.without_types(),
+        )
     } else {
-        type_annotated.to_document(parent, annotation)
+        type_annotated.to_document(parent, layout)
     }
 }
 
 impl<'src, Expr: ExpressionReference<'src>> Pretty for GenericExpression<'src, Expr> {
-    fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
+    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self {
             Self::TypeOfType => Document::text("Type"),
             Self::Constant { name, typ } => {
-                TypeAnnotated::new(*name, typ).to_document(parent, annotation)
+                TypeAnnotated::new(*name, typ).to_document(parent, layout)
             }
             Self::Apply {
                 function,
                 argument,
                 typ,
             } => TypeAnnotated::new(BinaryOperator(function, Operator::Apply, argument), typ)
-                .to_document(parent, annotation),
+                .to_document(parent, layout),
             Self::Let(binding) => parenthesize_if(
                 parent.is_some(),
                 [
                     Document::text("let"),
                     Document::space(),
-                    binding.to_document(annotation),
+                    binding.to_document(layout),
                 ],
             ),
             Self::Pi(binding) => {
@@ -113,47 +125,48 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for GenericExpression<'src, E
                 if variable_name.is_some() {
                     parenthesize_if(
                         parent.is_some(),
-                        [Document::text("∀"), binding.to_document(annotation)],
+                        [Document::text("∀"), binding.to_document(layout)],
                     )
                 } else {
+                    let layout = Layout::default().without_types();
                     Operator::Arrow.to_document(
                         parent,
                         &binding.variable_value.typ(),
                         &binding.in_expression,
-                        Annotation::Off,
-                        Annotation::Off,
+                        layout,
+                        layout,
                     )
                 }
             }
             Self::Lambda(binding) => parenthesize_if(
                 parent.is_some(),
-                [Document::text("\\"), binding.to_document(annotation)],
+                [Document::text("\\"), binding.to_document(layout)],
             ),
         }
     }
 }
 
 impl Pretty for str {
-    fn to_document(&self, _parent: Option<(Operator, Side)>, _annotation: Annotation) -> Document {
+    fn to_document(&self, _parent: Option<(Operator, Side)>, _layout: Layout) -> Document {
         Document::as_string(self)
     }
 }
 
 impl Pretty for &str {
-    fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
-        (*self).to_document(parent, annotation)
+    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
+        (*self).to_document(parent, layout)
     }
 }
 
 impl Pretty for Option<&str> {
-    fn to_document(&self, parent: Option<(Operator, Side)>, annotations: Annotation) -> Document {
-        self.unwrap_or("_").to_document(parent, annotations)
+    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
+        self.unwrap_or("_").to_document(parent, layout)
     }
 }
 
 impl<'src, Value: ExpressionReference<'src>> Pretty for VariableReference<'src, Value> {
-    fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
-        variable_to_document(Some(self.name), &self.value, parent, annotation)
+    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
+        variable_to_document(Some(self.name), &self.value, parent, layout)
     }
 }
 
@@ -172,9 +185,8 @@ fn parenthesize_if(condition: bool, docs: impl IntoIterator<Item = Document>) ->
 pub struct BinaryOperator<Left: Pretty, Right: Pretty>(pub Left, pub Operator, pub Right);
 
 impl<Left: Pretty, Right: Pretty> Pretty for BinaryOperator<Left, Right> {
-    fn to_document(&self, parent: Option<(Operator, Side)>, annotations: Annotation) -> Document {
-        self.1
-            .to_document(parent, &self.0, &self.2, annotations, annotations)
+    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
+        self.1.to_document(parent, &self.0, &self.2, layout, layout)
     }
 }
 #[derive(Copy, Clone)]
@@ -191,20 +203,20 @@ impl Operator {
         parent: Option<(Operator, Side)>,
         left: &impl Pretty,
         right: &impl Pretty,
-        left_annotation: Annotation,
-        right_annotation: Annotation,
+        left_layout: Layout,
+        right_layout: Layout,
     ) -> Document {
         parenthesize_if(
             self.parenthesize(parent),
             [
-                left.to_document(Some((self, Side::Left)), left_annotation),
+                left.to_document(Some((self, Side::Left)), left_layout),
                 Document::text(match self {
                     Self::Equals => " = ",
                     Self::HasType => " : ",
                     Self::Arrow => " → ",
                     Self::Apply => " ",
                 }),
-                right.to_document(Some((self, Side::Right)), right_annotation),
+                right.to_document(Some((self, Side::Right)), right_layout),
             ],
         )
     }
@@ -265,7 +277,32 @@ pub enum Side {
 pub type Document = RcDoc<'static>;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub enum Annotation {
-    On,
-    Off,
+pub struct Layout {
+    pub annotate_types: bool,
+    pub unknown_ids: bool,
+}
+
+impl Layout {
+    fn verbose() -> Self {
+        Self {
+            annotate_types: true,
+            unknown_ids: true,
+        }
+    }
+
+    fn without_types(self) -> Self {
+        Self {
+            annotate_types: false,
+            ..self
+        }
+    }
+}
+
+impl Default for Layout {
+    fn default() -> Self {
+        Self {
+            annotate_types: true,
+            unknown_ids: false,
+        }
+    }
 }

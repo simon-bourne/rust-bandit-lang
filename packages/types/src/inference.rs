@@ -300,7 +300,7 @@ impl<'src> Expression<'src> {
 
 impl fmt::Debug for Expression<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_pretty_string(80))
+        f.write_str(&self.to_verbose_string(80))
     }
 }
 

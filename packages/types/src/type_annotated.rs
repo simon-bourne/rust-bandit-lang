@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, rc::Rc};
 
-use super::pretty::{Annotation, Document, Operator, Side};
+use super::pretty::{Document, Layout, Operator, Side};
 use crate::{
     pretty::TypeAnnotated, ExpressionReference, GenericExpression, Pretty, VariableBinding,
 };
@@ -25,15 +25,15 @@ impl<'src, Var: Pretty + Clone> ExpressionReference<'src> for Expression<'src, V
 }
 
 impl<Var: Pretty + Clone> Pretty for Expression<'_, Var> {
-    fn to_document(&self, parent: Option<(Operator, Side)>, annotation: Annotation) -> Document {
+    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self.0.as_ref() {
-            ExprVariants::Known { expression } => expression.to_document(parent, annotation),
-            ExprVariants::Variable(variable) => variable.to_document(parent, annotation),
+            ExprVariants::Known { expression } => expression.to_document(parent, layout),
+            ExprVariants::Variable(variable) => variable.to_document(parent, layout),
             ExprVariants::TypeAnnotation { expression, typ } => {
-                TypeAnnotated::new(expression, typ).to_document(parent, annotation)
+                TypeAnnotated::new(expression, typ).to_document(parent, layout)
             }
             ExprVariants::Unknown { typ } => {
-                TypeAnnotated::new(None, typ).to_document(parent, annotation)
+                TypeAnnotated::new(None, typ).to_document(parent, layout)
             }
         }
     }
