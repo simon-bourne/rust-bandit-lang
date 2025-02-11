@@ -142,13 +142,25 @@ impl<'src> Expression<'src> {
         Self(Rc::new(RefCell::new(expression)))
     }
 
+    /// Infer types, unless `self` is a bound variable, in which case do
+    /// nothing.
     pub fn infer_types(&mut self) -> Result<()> {
+        // We want to return early if this is a bound name, unless this is the binding
+        // site. For example, in `let x = y in x`, the second `x` will just be a
+        // reference to `y` and we want to return early.
+        if self.name().is_some() {
+            Ok(())
+        } else {
+            self.always_infer_types()
+        }
+    }
+
+    fn always_infer_types(&mut self) -> Result<()> {
         Self::unify(
             &mut self.typ().typ().fresh_variables(),
             &mut Self::type_of_type(),
         )?;
 
-        // TODO: We need a way to stop repeatedly recursing down shared values.
         match &mut *self.0.borrow_mut() {
             ExprVariants::Known { expression, .. } => expression.infer_types(),
             ExprVariants::Unknown { typ, .. } => typ.infer_types(),
@@ -313,7 +325,7 @@ impl<'src> ExpressionReference<'src> for Expression<'src> {
 
 impl<'src> VariableBinding<'src, Expression<'src>> {
     fn infer_types(&mut self) -> Result<()> {
-        self.variable_value.infer_types()?;
+        self.variable_value.always_infer_types()?;
         self.in_expression.infer_types()
     }
 
