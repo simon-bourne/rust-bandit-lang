@@ -339,8 +339,8 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
                 )?;
                 // TODO: Is this reasoning sound?
                 // We're creating a new bound variable (`argument`) here. If it's unknown, we
-                // want to infer it, so we create fresh variables at the `argument` and `typ`
-                // level, not `function_type`.
+                // want to infer it, so we don't want it to be fresh. Therefore we create fresh
+                // variables for `argument` and `typ`, not `function_type`.
                 let function_type = &mut Expression::function_type(
                     argument.fresh_variables(),
                     typ.fresh_variables(),
