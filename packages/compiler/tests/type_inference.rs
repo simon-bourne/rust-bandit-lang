@@ -45,7 +45,8 @@ fn test_with_ctx(input: &str, expected: &str) {
             ("add", "Int → Int → Int"),
             ("id", "∀a ⇒ a → a"),
             ("float_to_int", "Float → Int"),
-            ("polymorphic", "∀a => a"),
+            ("polymorphic", "∀a ⇒ a"),
+            ("scoped", "∀a ⇒ (∀s ⇒ s -> a) -> a"),
         ],
     );
 
@@ -66,7 +67,7 @@ fn simple_apply() {
 
 #[test]
 fn simple_lambda() {
-    test_with_ctx(r"(\x => x : Int) : Int -> Int", r"\x : Int ⇒ x : Int");
+    test_with_ctx(r"(\x ⇒ x : Int) : Int -> Int", r"\x : Int ⇒ x : Int");
 }
 
 #[test]
@@ -74,7 +75,7 @@ fn simple_lambda() {
 fn weird_lambda() {
     // TODO: This should return an `InferenceError` or infer the type of `x` to be
     // `Type`, rather than borrow error.
-    test_with_ctx(r"\x => x : x", r"");
+    test_with_ctx(r"\x ⇒ x : x", r"");
 }
 
 #[test]
@@ -88,6 +89,15 @@ fn simple_id() {
         "id _ one",
         "((id : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int",
     );
+}
+
+// TODO: This should fail
+#[test]
+fn scope_escape() {
+    test_with_ctx(
+        "scoped _ id",
+        "((scoped : (∀a ⇒ (∀s ⇒ s → a) → a)) (a : Type) : (∀a ⇒ a → a) → a) (id : (∀a ⇒ a → a))",
+    )
 }
 
 #[test]
