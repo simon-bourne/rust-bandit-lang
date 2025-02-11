@@ -34,7 +34,7 @@ fn context<'src>(
     Context::new(global_items)
 }
 
-fn test_with_ctx(input: &str, expected: &str) {
+fn expect_inferred(input: &str, expected: &str) {
     let ctx = &mut context(
         ["Bool", "Int", "Float"],
         [
@@ -57,17 +57,17 @@ fn test_with_ctx(input: &str, expected: &str) {
 
 #[test]
 fn one() {
-    test_with_ctx("one", "one : Int");
+    expect_inferred("one", "one : Int");
 }
 
 #[test]
 fn simple_apply() {
-    test_with_ctx("abs one", "(abs : Int → Int) (one : Int) : Int");
+    expect_inferred("abs one", "(abs : Int → Int) (one : Int) : Int");
 }
 
 #[test]
 fn simple_lambda() {
-    test_with_ctx(r"(\x ⇒ x : Int) : Int -> Int", r"\x : Int ⇒ x : Int");
+    expect_inferred(r"(\x ⇒ x : Int) : Int -> Int", r"\x : Int ⇒ x : Int");
 }
 
 #[test]
@@ -75,17 +75,17 @@ fn simple_lambda() {
 fn weird_lambda() {
     // TODO: This should return an `InferenceError` or infer the type of `x` to be
     // `Type`, rather than borrow error.
-    test_with_ctx(r"\x ⇒ x : x", r"");
+    expect_inferred(r"\x ⇒ x : x", r"");
 }
 
 #[test]
 fn partial_add() {
-    test_with_ctx("add one", "(add : Int → Int → Int) (one : Int) : Int → Int");
+    expect_inferred("add one", "(add : Int → Int → Int) (one : Int) : Int → Int");
 }
 
 #[test]
 fn simple_id() {
-    test_with_ctx(
+    expect_inferred(
         "id _ one",
         "((id : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int",
     );
@@ -94,7 +94,7 @@ fn simple_id() {
 // TODO: This should fail
 #[test]
 fn scope_escape() {
-    test_with_ctx(
+    expect_inferred(
         "scoped _ id",
         "((scoped : (∀a ⇒ (∀s ⇒ s → a) → a)) (a : Type) : (∀a ⇒ a → a) → a) (id : (∀a ⇒ a → a))",
     )
@@ -102,7 +102,7 @@ fn scope_escape() {
 
 #[test]
 fn multi_id() {
-    test_with_ctx(
+    expect_inferred(
         "add (id Int one) (float_to_int (id Float pi))",
         "((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a ⇒ a → a)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
@@ -112,7 +112,7 @@ fn multi_id() {
 // always `Int : Type`, so we'd just need to check all values are unknown.
 #[test]
 fn unsoundness() {
-    test_with_ctx(
+    expect_inferred(
         "let id2 = id ⇒ (id2 : Type -> Int -> Int)",
         "let id2 : Type → Int → Int = id ⇒ id : Type → Int → Int",
     )
@@ -120,7 +120,7 @@ fn unsoundness() {
 
 #[test]
 fn polymorphic_let() {
-    test_with_ctx(
+    expect_inferred(
         "let id2 : (∀a ⇒ a → a) = id ⇒ add (id2 Int one) (float_to_int (id2 Float pi))",
         "let id2 : (∀a ⇒ a → a) = id ⇒ ((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a ⇒ a → a)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
@@ -128,12 +128,12 @@ fn polymorphic_let() {
 
 #[test]
 fn simple_polymorphic_lambda() {
-    test_with_ctx(r"\x : (∀b ⇒ b) ⇒ x", r"\x : (∀b ⇒ b) ⇒ x : (∀b ⇒ b)");
+    expect_inferred(r"\x : (∀b ⇒ b) ⇒ x", r"\x : (∀b ⇒ b) ⇒ x : (∀b ⇒ b)");
 }
 
 #[test]
 fn simple_polymorphic_let() {
-    test_with_ctx(
+    expect_inferred(
         "let x : (∀b ⇒ b) = polymorphic ⇒ x",
         // TODO: We should have `x` on the RHS, not `polymorphic`.
         "let x : (∀b ⇒ b) = polymorphic ⇒ polymorphic : (∀b ⇒ b)",
@@ -142,7 +142,7 @@ fn simple_polymorphic_let() {
 
 #[test]
 fn polymorphic_lambda() {
-    test_with_ctx(
+    expect_inferred(
         r"\id2 : (∀a ⇒ a → a) ⇒ add (id2 Int one) (float_to_int (id2 Float pi))",
         r"\id2 : (∀a ⇒ a → a) ⇒ ((add : Int → Int → Int) (((id2 : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a ⇒ a → a)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int",
     );
