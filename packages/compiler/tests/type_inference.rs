@@ -71,10 +71,10 @@ fn simple_lambda() {
 }
 
 #[test]
+// TODO: This should return an `InferenceError` or infer the type of `x` to be
+// `Type`, rather than borrow error.
 #[should_panic]
 fn weird_lambda() {
-    // TODO: This should return an `InferenceError` or infer the type of `x` to be
-    // `Type`, rather than borrow error.
     expect_inferred(r"\x ⇒ x : x", r"");
 }
 
@@ -108,10 +108,8 @@ fn multi_id() {
     );
 }
 
-// TODO: This should fail. The value of the first argument is inferred to be
-// always `Int : Type`, so we'd just need to check all values are unknown.
 #[test]
-fn unsoundness() {
+fn restrict_type() {
     expect_inferred(
         "let id2 = id ⇒ (id2 : Type -> Int -> Int)",
         "let id2 : Type → Int → Int = id ⇒ id : Type → Int → Int",
