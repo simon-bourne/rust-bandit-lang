@@ -78,25 +78,25 @@ impl<'src> Expression<'src> {
     }
 
     fn deep_copy(&self, new_variables: &mut HashMap<*mut ExprVariants<'src>, Self>) -> Self {
+        let key = self.0.as_ptr();
+
+        if let Some(variable) = new_variables.get(&key) {
+            return variable.clone();
+        }
+
         match &*self.0.borrow() {
             ExprVariants::Known { name, expression } => Self::new(ExprVariants::Known {
                 name: *name,
                 expression: expression.map_expression(|expr| expr.deep_copy(new_variables)),
             }),
             ExprVariants::Unknown { name, typ } => {
-                let key = self.0.as_ptr();
+                let new_unknown = Self::new(ExprVariants::Unknown {
+                    name: *name,
+                    typ: typ.deep_copy(new_variables),
+                });
+                new_variables.insert(key, new_unknown.clone());
 
-                if let Some(unknown) = new_variables.get(&key) {
-                    unknown.clone()
-                } else {
-                    let new_unknown = Self::new(ExprVariants::Unknown {
-                        name: *name,
-                        typ: typ.deep_copy(new_variables),
-                    });
-                    new_variables.insert(key, new_unknown.clone());
-
-                    new_unknown
-                }
+                new_unknown
             }
             ExprVariants::Link { target } => target.deep_copy(new_variables),
         }
