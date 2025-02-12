@@ -1,8 +1,8 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crate::{inference, type_annotated, InferenceError, Result};
+use crate::{inference, source, InferenceError, Result};
 
-pub type GlobalValues<'a> = HashMap<&'a str, type_annotated::Expression<'a>>;
+pub type GlobalValues<'a> = HashMap<&'a str, source::Expression<'a>>;
 
 pub struct Context<'a> {
     local_variables: HashMap<&'a str, Vec<inference::Expression<'a>>>,

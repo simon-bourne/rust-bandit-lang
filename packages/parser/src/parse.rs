@@ -1,4 +1,4 @@
-use bandit_types::type_annotated::Expression;
+use bandit_types::source::Expression;
 pub use grammar::expr;
 use winnow::{error::ContextError, token::one_of, PResult};
 

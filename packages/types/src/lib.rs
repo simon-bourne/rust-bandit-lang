@@ -3,7 +3,7 @@ use std::{cell::RefCell, fmt, rc::Rc, result};
 pub mod context;
 pub mod inference;
 mod pretty;
-pub mod type_annotated;
+pub mod source;
 pub mod well_typed;
 
 pub use pretty::Pretty;
