@@ -32,12 +32,7 @@ enum GenericExpression<'src, Expr: ExpressionReference<'src>> {
         argument: Expr,
         typ: Expr,
     },
-    /// `Let` is included so we can generalize explicitly using type
-    /// annotations. Otherwise, we could replace `let x = y in z` with `(\x =>
-    /// z) y`.
-    Let(VariableBinding<'src, Expr>),
-    Pi(VariableBinding<'src, Expr>),
-    Lambda(VariableBinding<'src, Expr>),
+    VariableBinding(VariableBinding<'src, Expr>),
 }
 
 impl<'src, Expr: ExpressionReference<'src>> GenericExpression<'src, Expr> {
@@ -54,10 +49,19 @@ impl<'src, Expr: ExpressionReference<'src>> GenericExpression<'src, Expr> {
                 argument: f(argument),
                 typ: f(typ),
             },
-            Self::Let(variable_binding) => Self::Let(variable_binding.map_expression(f)),
-            Self::Pi(variable_binding) => Self::Pi(variable_binding.map_expression(f)),
-            Self::Lambda(variable_binding) => Self::Lambda(variable_binding.map_expression(f)),
+            Self::VariableBinding(variable_binding) => {
+                Self::VariableBinding(variable_binding.map_expression(f))
+            }
         }
+    }
+
+    fn pi(name: Option<&'src str>, variable_value: Expr, in_expression: Expr) -> Self {
+        Self::VariableBinding(VariableBinding {
+            name,
+            binder: Binder::Pi,
+            variable_value,
+            in_expression,
+        })
     }
 
     fn typ(&self, new: impl FnOnce(Self) -> Expr) -> Expr {
@@ -65,21 +69,32 @@ impl<'src, Expr: ExpressionReference<'src>> GenericExpression<'src, Expr> {
             GenericExpression::TypeOfType => new(GenericExpression::TypeOfType),
             GenericExpression::Constant { typ, .. } => typ.clone(),
             GenericExpression::Apply { typ, .. } => typ.clone(),
-            GenericExpression::Let(variable_binding) => variable_binding.in_expression.typ(),
-            GenericExpression::Pi(_) => new(GenericExpression::TypeOfType),
-            GenericExpression::Lambda(variable_binding) => {
-                new(GenericExpression::Pi(VariableBinding {
-                    name: None,
-                    variable_value: variable_binding.variable_value.clone(),
-                    in_expression: variable_binding.in_expression.typ(),
-                }))
-            }
+            GenericExpression::VariableBinding(binding) => match binding.binder {
+                Binder::Let => binding.in_expression.typ(),
+                Binder::Pi => new(GenericExpression::TypeOfType),
+                Binder::Lambda => new(GenericExpression::pi(
+                    None,
+                    binding.variable_value.clone(),
+                    binding.in_expression.typ(),
+                )),
+            },
         }
     }
 }
 
+#[derive(Copy, Clone)]
+enum Binder {
+    /// `Let` is included so we can generalize explicitly using type
+    /// annotations. Otherwise, we could replace `let x = y in z` with `(\x =>
+    /// z) y`.
+    Let,
+    Pi,
+    Lambda,
+}
+
 struct VariableBinding<'src, Expr> {
     name: Option<&'src str>,
+    binder: Binder,
     variable_value: Expr,
     in_expression: Expr,
 }
@@ -88,6 +103,7 @@ impl<Expr> VariableBinding<'_, Expr> {
     fn map_expression(&self, mut f: impl FnMut(&Expr) -> Expr) -> Self {
         Self {
             name: self.name,
+            binder: self.binder,
             variable_value: f(&self.variable_value),
             in_expression: f(&self.in_expression),
         }

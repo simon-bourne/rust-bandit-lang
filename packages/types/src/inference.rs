@@ -58,14 +58,8 @@ impl<'src> Expression<'src> {
         match &*self.0.borrow() {
             ExprVariants::Known { name, expression } => {
                 let generic_expression = match expression {
-                    GenericExpression::Let(binding) => {
-                        GenericExpression::Let(binding.fresh_variables(new_variables))
-                    }
-                    GenericExpression::Pi(binding) => {
-                        GenericExpression::Pi(binding.fresh_variables(new_variables))
-                    }
-                    GenericExpression::Lambda(binding) => {
-                        GenericExpression::Lambda(binding.fresh_variables(new_variables))
+                    GenericExpression::VariableBinding(binding) => {
+                        GenericExpression::VariableBinding(binding.fresh_variables(new_variables))
                     }
                     GenericExpression::TypeOfType => GenericExpression::TypeOfType,
                     GenericExpression::Constant { name, typ } => GenericExpression::Constant {
@@ -139,11 +133,7 @@ impl<'src> Expression<'src> {
     }
 
     fn function_type(argument_value: Self, result_type: Self) -> Self {
-        Self::new_known(GenericExpression::Pi(VariableBinding {
-            name: None,
-            variable_value: argument_value,
-            in_expression: result_type,
-        }))
+        Self::new_known(GenericExpression::pi(None, argument_value, result_type))
     }
 
     pub(crate) fn new_known(expression: GenericExpression<'src, Self>) -> Self {
@@ -261,22 +251,15 @@ impl<'src> Expression<'src> {
                 Self::unify(argument, argument1)?;
                 Self::unify(typ, typ1)?;
             }
-            (GenericExpression::Let(binding0), GenericExpression::Let(binding1)) => {
-                VariableBinding::unify(binding0, binding1)?
-            }
-            (GenericExpression::Pi(binding0), GenericExpression::Pi(binding1)) => {
-                VariableBinding::unify(binding0, binding1)?
-            }
-            (GenericExpression::Lambda(binding0), GenericExpression::Lambda(binding1)) => {
-                VariableBinding::unify(binding0, binding1)?
-            }
+            (
+                GenericExpression::VariableBinding(binding0),
+                GenericExpression::VariableBinding(binding1),
+            ) => VariableBinding::unify(binding0, binding1)?,
             // It's safer to explicitly ignore each variant
             (GenericExpression::TypeOfType, _rhs)
             | (GenericExpression::Constant { .. }, _rhs)
             | (GenericExpression::Apply { .. }, _rhs)
-            | (GenericExpression::Let { .. }, _rhs)
-            | (GenericExpression::Pi(_), _rhs)
-            | (GenericExpression::Lambda(_), _rhs) => Err(InferenceError)?,
+            | (GenericExpression::VariableBinding(_), _rhs) => Err(InferenceError)?,
         }
 
         drop(x_ref);
@@ -350,6 +333,7 @@ impl<'src> VariableBinding<'src, Expression<'src>> {
 
         Self {
             name: self.name,
+            binder: self.binder,
             variable_value,
             in_expression,
         }
@@ -389,9 +373,7 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
                 argument.infer_types()?;
                 typ.infer_types()?;
             }
-            Self::Let(binding) => binding.infer_types()?,
-            Self::Pi(binding) => binding.infer_types()?,
-            Self::Lambda(binding) => binding.infer_types()?,
+            Self::VariableBinding(binding) => binding.infer_types()?,
         }
 
         Ok(())

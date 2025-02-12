@@ -1,7 +1,7 @@
 use pretty::RcDoc;
 
 use super::{ExpressionReference, GenericExpression, VariableBinding};
-use crate::{Variable, VariableReference};
+use crate::{Binder, Variable, VariableReference};
 
 pub trait Pretty {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document;
@@ -38,14 +38,38 @@ impl Pretty for Variable<'_> {
     }
 }
 
-impl<'src, Expr: ExpressionReference<'src>> VariableBinding<'src, Expr> {
-    fn to_document(&self, kind: Document, layout: Layout) -> Document {
-        Document::concat([
-            kind,
-            variable_to_document(self.name, &self.variable_value, None, layout),
-            Document::text(" ⇒ "),
-            self.in_expression.to_document(None, layout),
-        ])
+impl<'src, Expr: ExpressionReference<'src>> Pretty for VariableBinding<'src, Expr> {
+    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
+        let to_doc = |kind| {
+            Document::concat([
+                kind,
+                variable_to_document(self.name, &self.variable_value, None, layout),
+                Document::text(" ⇒ "),
+                self.in_expression.to_document(None, layout),
+            ])
+        };
+
+        match self.binder {
+            Binder::Let => parenthesize_if(
+                parent.is_some(),
+                to_doc(Document::concat([Document::text("let"), Document::space()])),
+            ),
+            Binder::Pi => {
+                if self.name.is_some() {
+                    parenthesize_if(parent.is_some(), to_doc(Document::text("∀")))
+                } else {
+                    let layout = Layout::default().without_types();
+                    Operator::Arrow.to_document(
+                        parent,
+                        &self.variable_value.typ(),
+                        &self.in_expression,
+                        layout,
+                        layout,
+                    )
+                }
+            }
+            Binder::Lambda => parenthesize_if(parent.is_some(), to_doc(Document::text("\\"))),
+        }
     }
 }
 
@@ -119,36 +143,7 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for GenericExpression<'src, E
                 typ,
             } => TypeAnnotated::new(BinaryOperator(function, Operator::Apply, argument), typ)
                 .to_document(parent, layout),
-            Self::Let(binding) => parenthesize_if(
-                parent.is_some(),
-                binding.to_document(
-                    Document::concat([Document::text("let"), Document::space()]),
-                    layout,
-                ),
-            ),
-            Self::Pi(binding) => {
-                let variable_name = binding.name;
-
-                if variable_name.is_some() {
-                    parenthesize_if(
-                        parent.is_some(),
-                        binding.to_document(Document::text("∀"), layout),
-                    )
-                } else {
-                    let layout = Layout::default().without_types();
-                    Operator::Arrow.to_document(
-                        parent,
-                        &binding.variable_value.typ(),
-                        &binding.in_expression,
-                        layout,
-                        layout,
-                    )
-                }
-            }
-            Self::Lambda(binding) => parenthesize_if(
-                parent.is_some(),
-                binding.to_document(Document::text("\\"), layout),
-            ),
+            Self::VariableBinding(binding) => binding.to_document(parent, layout),
         }
     }
 }

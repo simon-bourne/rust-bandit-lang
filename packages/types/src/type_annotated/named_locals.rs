@@ -65,9 +65,9 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
                 argument: argument.resolve_names_with_lookup(lookup)?,
                 typ: typ.resolve_names_with_lookup(lookup)?,
             },
-            Self::Let(binding) => GenericExpression::Let(binding.resolve_names(lookup)?),
-            Self::Pi(binding) => GenericExpression::Pi(binding.resolve_names(lookup)?),
-            Self::Lambda(binding) => GenericExpression::Lambda(binding.resolve_names(lookup)?),
+            Self::VariableBinding(binding) => {
+                GenericExpression::VariableBinding(binding.resolve_names(lookup)?)
+            }
         };
 
         Ok(indexed_locals::Expression::new(ExprVariants::Known {
@@ -93,6 +93,7 @@ impl<'src> VariableBinding<'src, Expression<'src>> {
 
         Ok(VariableBinding {
             name: self.name,
+            binder: self.binder,
             variable_value,
             in_expression,
         })

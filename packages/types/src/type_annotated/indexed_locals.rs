@@ -39,9 +39,9 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
                 argument: argument.link(ctx)?,
                 typ: typ.link(ctx)?,
             },
-            Self::Let(binding) => GenericExpression::Let(binding.link(ctx)?),
-            Self::Pi(binding) => GenericExpression::Pi(binding.link(ctx)?),
-            Self::Lambda(binding) => GenericExpression::Lambda(binding.link(ctx)?),
+            Self::VariableBinding(binding) => {
+                GenericExpression::VariableBinding(binding.link(ctx)?)
+            }
         }))
     }
 }
@@ -63,6 +63,7 @@ impl<'src> VariableBinding<'src, Expression<'src>> {
 
         Ok(VariableBinding {
             name: self.name,
+            binder: self.binder,
             variable_value,
             in_expression,
         })

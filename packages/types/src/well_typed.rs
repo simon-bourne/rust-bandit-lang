@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{ExpressionReference, GenericExpression, SharedMut, VariableBinding};
+use crate::{Binder, ExpressionReference, GenericExpression, SharedMut, VariableBinding};
 
 mod pretty;
 
@@ -25,17 +25,19 @@ impl<'src> Expression<'src> {
 
                 function.apply(argument);
             }
-            GenericExpression::Let(variable_binding) => {
-                variable_binding.reduce();
-                let reduced = variable_binding.in_expression.clone();
-                drop(borrowed);
-                *self = reduced;
-            }
-            GenericExpression::Pi(variable_binding) => variable_binding.reduce(),
-            GenericExpression::Lambda(variable_binding) => {
-                variable_binding.variable_value.reduce();
-                variable_binding.in_expression.reduce();
-            }
+            GenericExpression::VariableBinding(variable_binding) => match variable_binding.binder {
+                Binder::Let => {
+                    variable_binding.reduce();
+                    let reduced = variable_binding.in_expression.clone();
+                    drop(borrowed);
+                    *self = reduced;
+                }
+                Binder::Pi => variable_binding.reduce(),
+                Binder::Lambda => {
+                    variable_binding.variable_value.reduce();
+                    variable_binding.in_expression.reduce();
+                }
+            },
         };
     }
 
@@ -46,9 +48,7 @@ impl<'src> Expression<'src> {
             GenericExpression::TypeOfType => {}
             GenericExpression::Constant { .. } => todo!(),
             GenericExpression::Apply { .. } => {}
-            GenericExpression::Let(_) => {}
-            GenericExpression::Pi(_) => {}
-            GenericExpression::Lambda(_variable_binding) => {
+            GenericExpression::VariableBinding(_) => {
                 todo!()
             }
         }

@@ -2,7 +2,7 @@ use std::{marker::PhantomData, rc::Rc};
 
 use super::pretty::{Document, Layout, Operator, Side};
 use crate::{
-    pretty::TypeAnnotated, ExpressionReference, GenericExpression, Pretty, VariableBinding,
+    pretty::TypeAnnotated, Binder, ExpressionReference, GenericExpression, Pretty, VariableBinding,
 };
 
 pub mod indexed_locals;
@@ -76,27 +76,15 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
     }
 
     pub fn let_binding(name: &'src str, variable_value: Self, in_expression: Self) -> Self {
-        Self::known(GenericExpression::Let(VariableBinding {
-            name: Some(name),
-            variable_value,
-            in_expression,
-        }))
+        Self::binding(Binder::Let, Some(name), variable_value, in_expression)
     }
 
     pub fn function_type(name: Option<&'src str>, variable_value: Self, result_type: Self) -> Self {
-        Self::known(GenericExpression::Pi(VariableBinding {
-            name,
-            variable_value,
-            in_expression: result_type,
-        }))
+        Self::binding(Binder::Pi, name, variable_value, result_type)
     }
 
     pub fn lambda(name: &'src str, variable_value: Self, in_expression: Self) -> Self {
-        Self::known(GenericExpression::Lambda(VariableBinding {
-            name: Some(name),
-            variable_value,
-            in_expression,
-        }))
+        Self::binding(Binder::Lambda, Some(name), variable_value, in_expression)
     }
 
     pub fn has_type(self, typ: Self) -> Self {
@@ -112,6 +100,20 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
 
     fn known(expression: GenericExpression<'src, Self>) -> Self {
         Self::new(ExprVariants::Known { expression })
+    }
+
+    fn binding(
+        binder: Binder,
+        name: Option<&'src str>,
+        variable_value: Self,
+        in_expression: Self,
+    ) -> Self {
+        Self::known(GenericExpression::VariableBinding(VariableBinding {
+            name,
+            binder,
+            variable_value,
+            in_expression,
+        }))
     }
 }
 
