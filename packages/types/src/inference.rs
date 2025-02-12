@@ -30,6 +30,8 @@ enum ExprVariants<'src> {
     },
 }
 
+type OldToNewVariable<'src> = HashMap<*mut ExprVariants<'src>, Expression<'src>>;
+
 impl<'src> Expression<'src> {
     pub fn unknown(typ: Self) -> Self {
         Self::new(ExprVariants::Unknown { name: None, typ })
@@ -48,10 +50,7 @@ impl<'src> Expression<'src> {
         self.make_fresh_variables(&mut HashMap::new())
     }
 
-    fn make_fresh_variables(
-        &self,
-        new_variables: &mut HashMap<*mut ExprVariants<'src>, Self>,
-    ) -> Self {
+    fn make_fresh_variables(&self, new_variables: &mut OldToNewVariable<'src>) -> Self {
         if let Some(bound_variable) = new_variables.get(&self.0.as_ptr()) {
             return bound_variable.clone();
         }
@@ -77,7 +76,7 @@ impl<'src> Expression<'src> {
         }
     }
 
-    fn deep_copy(&self, new_variables: &mut HashMap<*mut ExprVariants<'src>, Self>) -> Self {
+    fn deep_copy(&self, new_variables: &mut OldToNewVariable<'src>) -> Self {
         let key = self.0.as_ptr();
 
         if let Some(variable) = new_variables.get(&key) {
