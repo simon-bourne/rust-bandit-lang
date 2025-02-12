@@ -1,29 +1,25 @@
-use std::{marker::PhantomData, rc::Rc};
+use std::rc::Rc;
 
 use super::pretty::{Document, Layout, Operator, Side};
 use crate::{
-    pretty::TypeAnnotated, Binder, ExpressionReference, GenericExpression, Pretty, VariableBinding,
+    context::Context, inference, pretty::TypeAnnotated, Binder, ExpressionReference,
+    GenericExpression, Pretty, Result, VariableBinding,
 };
 
-pub mod named_locals;
-
 #[derive(Clone)]
-pub struct Expression<'src, Var: Pretty + Clone>(
-    Rc<ExprVariants<'src, Self, Var>>,
-    PhantomData<Var>,
-);
+pub struct Expression<'src>(Rc<ExprVariants<'src>>);
 
-impl<'src, Var: Pretty + Clone> ExpressionReference<'src> for Expression<'src, Var> {
+impl<'src> ExpressionReference<'src> for Expression<'src> {
     fn is_known(&self) -> bool {
         self.0.is_known()
     }
 
     fn typ(&self) -> Self {
-        self.0.typ(Self::known, |_| Self::unknown_type())
+        self.0.typ(Self::known)
     }
 }
 
-impl<Var: Pretty + Clone> Pretty for Expression<'_, Var> {
+impl Pretty for Expression<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self.0.as_ref() {
             ExprVariants::Known { expression } => expression.to_document(parent, layout),
@@ -38,7 +34,7 @@ impl<Var: Pretty + Clone> Pretty for Expression<'_, Var> {
     }
 }
 
-impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
+impl<'src> Expression<'src> {
     pub fn type_of_type() -> Self {
         Self::known(GenericExpression::TypeOfType)
     }
@@ -93,8 +89,26 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
         })
     }
 
-    fn new(expr: ExprVariants<'src, Self, Var>) -> Self {
-        Self(Rc::new(expr), PhantomData)
+    pub fn variable(name: &'src str) -> Self {
+        Self::new(ExprVariants::Variable(name))
+    }
+
+    pub fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Expression<'src>> {
+        Ok(match self.0.as_ref() {
+            ExprVariants::Known { expression } => expression.link(ctx)?,
+            ExprVariants::Variable(name) => ctx.lookup(name)?,
+            ExprVariants::TypeAnnotation { expression, typ } => {
+                let expression = expression.link(ctx)?;
+                let typ = &mut typ.link(ctx)?;
+                inference::Expression::unify(&mut expression.typ(), typ)?;
+                expression
+            }
+            ExprVariants::Unknown { typ } => inference::Expression::unknown(typ.link(ctx)?),
+        })
+    }
+
+    fn new(expr: ExprVariants<'src>) -> Self {
+        Self(Rc::new(expr))
     }
 
     fn known(expression: GenericExpression<'src, Self>) -> Self {
@@ -116,21 +130,21 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
     }
 }
 
-enum ExprVariants<'src, Expr: ExpressionReference<'src>, Var> {
+enum ExprVariants<'src> {
     Known {
-        expression: GenericExpression<'src, Expr>,
+        expression: GenericExpression<'src, Expression<'src>>,
     },
     TypeAnnotation {
-        expression: Expr,
-        typ: Expr,
+        expression: Expression<'src>,
+        typ: Expression<'src>,
     },
     Unknown {
-        typ: Expr,
+        typ: Expression<'src>,
     },
-    Variable(Var),
+    Variable(&'src str),
 }
 
-impl<'src, Expr: ExpressionReference<'src>, Var> ExprVariants<'src, Expr, Var> {
+impl<'src> ExprVariants<'src> {
     fn is_known(&self) -> bool {
         match self {
             Self::Known { .. } | Self::Variable(_) => true,
@@ -141,13 +155,62 @@ impl<'src, Expr: ExpressionReference<'src>, Var> ExprVariants<'src, Expr, Var> {
 
     fn typ(
         &self,
-        new: impl FnOnce(GenericExpression<'src, Expr>) -> Expr,
-        variable_type: impl FnOnce(&Var) -> Expr,
-    ) -> Expr {
+        new: impl FnOnce(GenericExpression<'src, Expression<'src>>) -> Expression<'src>,
+    ) -> Expression<'src> {
         match self {
             Self::Known { expression } => expression.typ(new),
-            Self::Variable(variable) => variable_type(variable),
+            Self::Variable(_) => Expression::unknown_type(),
             Self::TypeAnnotation { typ, .. } | Self::Unknown { typ, .. } => typ.clone(),
         }
+    }
+}
+
+impl<'src> GenericExpression<'src, Expression<'src>> {
+    pub fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Expression<'src>> {
+        Ok(inference::Expression::new_known(match self {
+            Self::TypeOfType => GenericExpression::TypeOfType,
+            Self::Constant { name, typ } => GenericExpression::Constant {
+                name,
+                typ: typ.link(ctx)?,
+            },
+            Self::Apply {
+                function,
+                argument,
+                typ,
+            } => GenericExpression::Apply {
+                function: function.link(ctx)?,
+                argument: argument.link(ctx)?,
+                typ: typ.link(ctx)?,
+            },
+            Self::VariableBinding(binding) => {
+                GenericExpression::VariableBinding(binding.link(ctx)?)
+            }
+        }))
+    }
+}
+
+impl<'src> VariableBinding<'src, Expression<'src>> {
+    fn link(
+        &self,
+        ctx: &mut Context<'src>,
+    ) -> Result<VariableBinding<'src, inference::Expression<'src>>> {
+        let mut variable_value = self.variable_value.link(ctx)?;
+
+        let in_expression = if let Some(name) = self.name {
+            variable_value.set_name(name);
+
+            ctx.with_variable(name, variable_value.clone(), |ctx| {
+                self.in_expression.link(ctx)
+            })?
+        } else {
+            self.in_expression.link(ctx)
+        }?;
+
+        Ok(VariableBinding {
+            name: self.name,
+            binder: self.binder,
+            variable_value,
+            in_expression,
+        })
     }
 }
