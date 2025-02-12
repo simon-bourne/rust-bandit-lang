@@ -57,18 +57,35 @@ impl<'src> Expression<'src> {
 
         match &*self.0.borrow() {
             ExprVariants::Known { name, expression } => {
-                if let GenericExpression::Let(variable_binding)
-                | GenericExpression::Pi(variable_binding)
-                | GenericExpression::Lambda(variable_binding) = expression
-                {
-                    let copy = variable_binding.variable_value.deep_copy(new_variables);
-                    new_variables.insert(variable_binding.variable_value.0.as_ptr(), copy);
-                }
+                let generic_expression = match expression {
+                    GenericExpression::Let(binding) => {
+                        GenericExpression::Let(binding.fresh_variables(new_variables))
+                    }
+                    GenericExpression::Pi(binding) => {
+                        GenericExpression::Pi(binding.fresh_variables(new_variables))
+                    }
+                    GenericExpression::Lambda(binding) => {
+                        GenericExpression::Lambda(binding.fresh_variables(new_variables))
+                    }
+                    GenericExpression::TypeOfType => GenericExpression::TypeOfType,
+                    GenericExpression::Constant { name, typ } => GenericExpression::Constant {
+                        name,
+                        typ: typ.make_fresh_variables(new_variables),
+                    },
+                    GenericExpression::Apply {
+                        function,
+                        argument,
+                        typ,
+                    } => GenericExpression::Apply {
+                        function: function.make_fresh_variables(new_variables),
+                        argument: argument.make_fresh_variables(new_variables),
+                        typ: typ.make_fresh_variables(new_variables),
+                    },
+                };
 
                 Self::new(ExprVariants::Known {
                     name: *name,
-                    expression: expression
-                        .map_expression(|expr| expr.make_fresh_variables(new_variables)),
+                    expression: generic_expression,
                 })
             }
             ExprVariants::Unknown { .. } => self.clone(),
@@ -325,6 +342,17 @@ impl<'src> VariableBinding<'src, Expression<'src>> {
     fn infer_types(&mut self) -> Result<()> {
         self.variable_value.always_infer_types()?;
         self.in_expression.infer_types()
+    }
+
+    fn fresh_variables(&self, new_variables: &mut OldToNewVariable<'src>) -> Self {
+        let variable_value = self.variable_value.deep_copy(new_variables);
+        let in_expression = self.in_expression.make_fresh_variables(new_variables);
+
+        Self {
+            name: self.name,
+            variable_value,
+            in_expression,
+        }
     }
 
     fn unify(binding0: &mut Self, binding1: &mut Self) -> Result<()> {
