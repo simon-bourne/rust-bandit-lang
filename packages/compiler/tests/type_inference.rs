@@ -101,6 +101,13 @@ fn scope_escape() {
 }
 
 #[test]
+// TODO: Implement an occurs check
+#[ignore = "This tests the occurs check, which is not implemented yet"]
+fn occurs_check() {
+    expect_inferred(r"\f => \x => f f x", "")
+}
+
+#[test]
 fn multi_id() {
     expect_inferred(
         "add (id Int one) (float_to_int (id Float pi))",
