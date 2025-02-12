@@ -79,7 +79,7 @@ impl<'src, Var: Pretty + Clone> Expression<'src, Var> {
         Self::binding(Binder::Let, Some(name), variable_value, in_expression)
     }
 
-    pub fn function_type(name: Option<&'src str>, variable_value: Self, result_type: Self) -> Self {
+    pub fn pi_type(name: Option<&'src str>, variable_value: Self, result_type: Self) -> Self {
         Self::binding(Binder::Pi, name, variable_value, result_type)
     }
 

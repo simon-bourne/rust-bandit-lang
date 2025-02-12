@@ -132,7 +132,7 @@ impl<'src> Expression<'src> {
         Self::new_known(GenericExpression::TypeOfType)
     }
 
-    fn function_type(argument_value: Self, result_type: Self) -> Self {
+    fn pi_type(argument_value: Self, result_type: Self) -> Self {
         Self::new_known(GenericExpression::pi(None, argument_value, result_type))
     }
 
@@ -362,12 +362,10 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
                 // TODO: Is this reasoning sound?
                 // We're creating a new bound variable (`argument`) here. If it's unknown, we
                 // want to infer it, so we don't want it to be fresh. Therefore we create fresh
-                // variables for `argument` and `typ`, not `function_type`.
-                let function_type = &mut Expression::function_type(
-                    argument.fresh_variables(),
-                    typ.fresh_variables(),
-                );
-                Expression::unify(function_type, &mut function.typ().fresh_variables())?;
+                // variables for `argument` and `typ`, not `pi_type`.
+                let pi_type =
+                    &mut Expression::pi_type(argument.fresh_variables(), typ.fresh_variables());
+                Expression::unify(pi_type, &mut function.typ().fresh_variables())?;
 
                 function.infer_types()?;
                 argument.infer_types()?;

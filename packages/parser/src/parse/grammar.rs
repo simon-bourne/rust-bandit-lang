@@ -12,19 +12,17 @@ pub fn expr<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> PResult<Expr
 }
 
 fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
-    separated_foldr1(
-        function_types(),
-        NamedOperator::HasType,
-        |term, _op, typ| term.has_type(typ),
-    )
+    separated_foldr1(pi_types(), NamedOperator::HasType, |term, _op, typ| {
+        term.has_type(typ)
+    })
 }
 
-fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
+fn pi_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
     separated_foldr1(
         function_applications(),
         NamedOperator::To,
         |input_type, _, output_type| {
-            Expression::function_type(
+            Expression::pi_type(
                 None,
                 Expression::unknown_value().has_type(input_type),
                 output_type,
@@ -58,7 +56,7 @@ fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
         Keyword::Forall,
         separated_pair(variable_binding(), Token::SuchThat, expr),
     )
-    .map(|((var, value), expr)| Expression::function_type(Some(var), value, expr))
+    .map(|((var, value), expr)| Expression::pi_type(Some(var), value, expr))
 }
 
 fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
