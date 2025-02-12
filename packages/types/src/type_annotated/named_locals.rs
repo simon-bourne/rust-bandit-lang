@@ -1,12 +1,10 @@
-use context::VariableLookup;
-
 use super::ExprVariants;
 use crate::{
-    context::Context, inference, type_annotated, type_annotated::indexed_locals, GenericExpression,
-    Result, VariableBinding,
+    context::Context,
+    inference,
+    type_annotated::{self},
+    ExpressionReference, GenericExpression, Result, VariableBinding,
 };
-
-mod context;
 
 pub type Expression<'src> = type_annotated::Expression<'src, &'src str>;
 
@@ -15,80 +13,60 @@ impl<'src> Expression<'src> {
         Self::new(ExprVariants::Variable(name))
     }
 
-    pub fn resolve_names(&self) -> Result<indexed_locals::Expression<'src>> {
-        self.resolve_names_with_lookup(&mut VariableLookup::default())
-    }
-
     pub fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Expression<'src>> {
-        self.resolve_names()?.link(ctx)
-    }
-
-    fn resolve_names_with_lookup(
-        &self,
-        lookup: &mut VariableLookup<'src>,
-    ) -> Result<indexed_locals::Expression<'src>> {
         Ok(match self.0.as_ref() {
-            ExprVariants::Known { expression } => expression.resolve_names(lookup)?,
-            ExprVariants::Variable(name) => {
-                indexed_locals::Expression::new(ExprVariants::Variable(lookup.lookup(name)))
-            }
+            ExprVariants::Known { expression } => expression.link(ctx)?,
+            ExprVariants::Variable(name) => ctx.lookup(name)?,
             ExprVariants::TypeAnnotation { expression, typ } => {
-                let expression = expression.resolve_names_with_lookup(lookup)?;
-                let typ = typ.resolve_names_with_lookup(lookup)?;
-                indexed_locals::Expression::new(ExprVariants::TypeAnnotation { expression, typ })
+                let expression = expression.link(ctx)?;
+                let typ = &mut typ.link(ctx)?;
+                inference::Expression::unify(&mut expression.typ(), typ)?;
+                expression
             }
-            ExprVariants::Unknown { typ } => {
-                let typ = typ.resolve_names_with_lookup(lookup)?;
-                indexed_locals::Expression::new(ExprVariants::Unknown { typ })
-            }
+            ExprVariants::Unknown { typ } => inference::Expression::unknown(typ.link(ctx)?),
         })
     }
 }
 
 impl<'src> GenericExpression<'src, Expression<'src>> {
-    fn resolve_names(
-        &self,
-        lookup: &mut VariableLookup<'src>,
-    ) -> Result<indexed_locals::Expression<'src>> {
-        let expr = match self {
+    pub fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Expression<'src>> {
+        Ok(inference::Expression::new_known(match self {
             Self::TypeOfType => GenericExpression::TypeOfType,
             Self::Constant { name, typ } => GenericExpression::Constant {
                 name,
-                typ: typ.resolve_names()?,
+                typ: typ.link(ctx)?,
             },
             Self::Apply {
                 function,
                 argument,
                 typ,
             } => GenericExpression::Apply {
-                function: function.resolve_names_with_lookup(lookup)?,
-                argument: argument.resolve_names_with_lookup(lookup)?,
-                typ: typ.resolve_names_with_lookup(lookup)?,
+                function: function.link(ctx)?,
+                argument: argument.link(ctx)?,
+                typ: typ.link(ctx)?,
             },
             Self::VariableBinding(binding) => {
-                GenericExpression::VariableBinding(binding.resolve_names(lookup)?)
+                GenericExpression::VariableBinding(binding.link(ctx)?)
             }
-        };
-
-        Ok(indexed_locals::Expression::new(ExprVariants::Known {
-            expression: expr,
         }))
     }
 }
 
 impl<'src> VariableBinding<'src, Expression<'src>> {
-    fn resolve_names(
+    fn link(
         &self,
-        lookup: &mut VariableLookup<'src>,
-    ) -> Result<VariableBinding<'src, indexed_locals::Expression<'src>>> {
-        let variable_value = self.variable_value.resolve_names_with_lookup(lookup)?;
+        ctx: &mut Context<'src>,
+    ) -> Result<VariableBinding<'src, inference::Expression<'src>>> {
+        let mut variable_value = self.variable_value.link(ctx)?;
 
         let in_expression = if let Some(name) = self.name {
-            lookup.with_variable(name, |lookup| {
-                self.in_expression.resolve_names_with_lookup(lookup)
-            })
+            variable_value.set_name(name);
+
+            ctx.with_variable(name, variable_value.clone(), |ctx| {
+                self.in_expression.link(ctx)
+            })?
         } else {
-            self.in_expression.resolve_names_with_lookup(lookup)
+            self.in_expression.link(ctx)
         }?;
 
         Ok(VariableBinding {

@@ -1,57 +1,55 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crate::{
-    inference, type_annotated::indexed_locals, DeBruijnIndex, InferenceError, Result, Variable,
-    VariableScope,
-};
+use crate::{inference, type_annotated::named_locals, InferenceError, Result};
 
-pub type GlobalValues<'a> = HashMap<&'a str, indexed_locals::Expression<'a>>;
+pub type GlobalValues<'a> = HashMap<&'a str, named_locals::Expression<'a>>;
 
 pub struct Context<'a> {
-    local_variables: Vec<inference::Expression<'a>>,
+    local_variables: HashMap<&'a str, Vec<inference::Expression<'a>>>,
     global_variables: Rc<GlobalValues<'a>>,
 }
 
 impl<'a> Context<'a> {
     pub fn new(global_variables: GlobalValues<'a>) -> Self {
         Self {
-            local_variables: Vec::new(),
+            local_variables: HashMap::new(),
             global_variables: Rc::new(global_variables),
         }
     }
 
     pub(crate) fn with_variable<Output>(
         &mut self,
+        name: &'a str,
         variable_value: inference::Expression<'a>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Result<Output> {
-        self.local_variables.push(variable_value);
+        self.local_variables
+            .entry(name)
+            .or_default()
+            .push(variable_value);
         let output = f(self);
-        self.local_variables.pop();
+        self.local_variables.entry(name).and_modify(|vars| {
+            vars.pop();
+        });
         Ok(output)
     }
 
-    pub(crate) fn lookup_value(
-        &mut self,
-        variable: Variable<'a>,
-    ) -> Result<inference::Expression<'a>> {
-        match variable.scope {
-            VariableScope::Local(index) => Ok(self.local_value(index)),
-            VariableScope::Global => self.global_value(variable.name),
+    pub(crate) fn lookup(&mut self, name: &'a str) -> Result<inference::Expression<'a>> {
+        if let Some(local) = self.lookup_local(name) {
+            Ok(local)
+        } else {
+            self.global_value(name)
         }
     }
 
-    fn local_value(&mut self, index: DeBruijnIndex) -> inference::Expression<'a> {
-        let len = self.local_variables.len();
-        assert!(index.0 <= len);
-        let debruijn_index = len - index.0;
-
-        self.local_variables[debruijn_index].clone()
+    fn lookup_local(&self, name: &'a str) -> Option<inference::Expression<'a>> {
+        Some(self.local_variables.get(name)?.last()?.clone())
     }
 
     fn global_value(&mut self, name: &'a str) -> Result<inference::Expression<'a>> {
+        // TODO: Cache each global var once it's linked
         let mut global_ctx = Context {
-            local_variables: Vec::new(),
+            local_variables: HashMap::new(),
             global_variables: self.global_variables.clone(),
         };
         let value = self

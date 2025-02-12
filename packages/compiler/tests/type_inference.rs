@@ -19,16 +19,11 @@ fn context<'src>(
     let mut global_items = HashMap::new();
 
     for typ in types {
-        global_items.insert(typ, Expression::type_constant(typ).resolve_names().unwrap());
+        global_items.insert(typ, Expression::type_constant(typ));
     }
 
     for (name, typ) in items {
-        global_items.insert(
-            name,
-            Expression::constant(name, parse(typ))
-                .resolve_names()
-                .unwrap(),
-        );
+        global_items.insert(name, Expression::constant(name, parse(typ)));
     }
 
     Context::new(global_items)

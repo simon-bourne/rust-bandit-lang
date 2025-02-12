@@ -110,27 +110,6 @@ impl<Expr> VariableBinding<'_, Expr> {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
-struct DeBruijnIndex(usize);
-
-#[derive(Copy, Clone, Eq, PartialEq)]
-enum VariableScope {
-    Local(DeBruijnIndex),
-    Global,
-}
-
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub struct Variable<'src> {
-    name: &'src str,
-    scope: VariableScope,
-}
-
-impl fmt::Debug for Variable<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.debug())
-    }
-}
-
 pub struct VariableReference<'src, Value> {
     name: &'src str,
     value: Value,

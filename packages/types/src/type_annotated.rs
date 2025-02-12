@@ -5,7 +5,6 @@ use crate::{
     pretty::TypeAnnotated, Binder, ExpressionReference, GenericExpression, Pretty, VariableBinding,
 };
 
-pub mod indexed_locals;
 pub mod named_locals;
 
 #[derive(Clone)]
