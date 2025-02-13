@@ -152,7 +152,7 @@ impl<'src> Expression<'src> {
             &mut Self::type_of_type(),
         )?;
 
-        match &mut *self.0.borrow_mut() {
+        match &mut *self.0.try_borrow_mut()? {
             ExprVariants::Known { expression, .. } => expression.infer_types(),
             ExprVariants::Unknown { typ, .. } => typ.infer_types(),
             ExprVariants::Link { target } => target.infer_types(),
@@ -173,7 +173,7 @@ impl<'src> Expression<'src> {
 
     fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
         {
-            let ExprVariants::Unknown { typ, .. } = &mut *self.0.borrow_mut() else {
+            let ExprVariants::Unknown { typ, .. } = &mut *self.0.try_borrow_mut()? else {
                 return Ok(ControlFlow::Continue(()));
             };
 
