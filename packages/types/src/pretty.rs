@@ -52,7 +52,7 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for VariableBinding<'src, Exp
                 if self.name.is_some() {
                     parenthesize_if(parent.is_some(), to_doc(Document::text("∀")))
                 } else {
-                    let layout = Layout::default().without_types();
+                    let layout = layout.without_types();
                     Operator::Arrow.to_document(
                         parent,
                         &self.variable_value.typ(),

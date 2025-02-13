@@ -68,6 +68,8 @@ fn simple_lambda() {
 #[test]
 // TODO: This should return an `InferenceError` or infer the type of `x` to be
 // `Type`, rather than borrow error.
+// At the moment, it fails because we try and unify `x.typ()` with `x` when we `link`. This would
+// create a circular reference if it weren't for the borrow error.
 #[should_panic]
 fn weird_lambda() {
     expect_inferred(r"\x ⇒ x : x", r"");
@@ -97,9 +99,11 @@ fn scope_escape() {
 
 #[test]
 // TODO: Implement an occurs check
+// Currently, this will happily infer an infinite type (and create `Rc` circular references). It
+// will stack overflow when we try and convert the expression to a string.
 #[ignore = "This tests the occurs check, which is not implemented yet"]
 fn occurs_check() {
-    expect_inferred(r"\f ⇒ \x ⇒ f f x", "")
+    expect_inferred(r"\x ⇒ x x", "");
 }
 
 #[test]
