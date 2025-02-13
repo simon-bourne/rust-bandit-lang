@@ -1,7 +1,7 @@
 use pretty::RcDoc;
 
 use super::{ExpressionReference, GenericExpression, VariableBinding};
-use crate::{Binder, VariableReference};
+use crate::Binder;
 
 pub trait Pretty {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document;
@@ -160,12 +160,6 @@ impl Pretty for Option<&str> {
     }
 }
 
-impl<'src, Value: ExpressionReference<'src>> Pretty for VariableReference<'src, Value> {
-    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        variable_to_document(Some(self.name), &self.value, parent, layout)
-    }
-}
-
 fn parenthesize_if(condition: bool, docs: Document) -> Document {
     if condition {
         Document::concat([Document::text("("), docs, Document::text(")")])
@@ -181,6 +175,7 @@ impl<Left: Pretty, Right: Pretty> Pretty for BinaryOperator<Left, Right> {
         self.1.to_document(parent, &self.0, &self.2, layout, layout)
     }
 }
+
 #[derive(Copy, Clone)]
 pub enum Operator {
     Equals,

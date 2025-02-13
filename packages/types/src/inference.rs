@@ -31,14 +31,6 @@ impl<'src> Expression<'src> {
         Self::new(ExprVariants::Unknown { name: None, typ })
     }
 
-    pub fn unknown_value() -> Self {
-        Self::unknown(Self::unknown_type())
-    }
-
-    pub fn unknown_type() -> Self {
-        Self::unknown(Self::type_of_type())
-    }
-
     // TODO: The implementation of this is ugly and inefficient.
     pub fn fresh_variables(&self) -> Self {
         self.make_fresh_variables(&mut HashMap::new())
