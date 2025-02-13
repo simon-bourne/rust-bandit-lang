@@ -94,7 +94,6 @@ fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
     .map(|((var, value), expr)| Expression::lambda(var, value, expr))
 }
 
-// TODO: Multiple variable bindings
 fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, Expression<'src>)> {
     (
         identifier(),
