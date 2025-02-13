@@ -99,7 +99,7 @@ fn scope_escape() {
 // TODO: Implement an occurs check
 #[ignore = "This tests the occurs check, which is not implemented yet"]
 fn occurs_check() {
-    expect_inferred(r"\f ⇒ \x ⇒ f f x", "")
+    expect_inferred(r"\x ⇒ x x", "");
 }
 
 #[test]
