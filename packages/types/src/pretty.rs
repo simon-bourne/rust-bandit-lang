@@ -1,7 +1,7 @@
 use pretty::RcDoc;
 
 use super::{ExpressionReference, GenericExpression, VariableBinding};
-use crate::{Binder, VariableReference};
+use crate::Binder;
 
 pub trait Pretty {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document;
@@ -157,12 +157,6 @@ impl Pretty for &str {
 impl Pretty for Option<&str> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         self.unwrap_or("_").to_document(parent, layout)
-    }
-}
-
-impl<'src, Value: ExpressionReference<'src>> Pretty for VariableReference<'src, Value> {
-    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        variable_to_document(Some(self.name), &self.value, parent, layout)
     }
 }
 

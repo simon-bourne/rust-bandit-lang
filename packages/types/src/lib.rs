@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fmt, rc::Rc, result};
+use std::{cell::RefCell, rc::Rc, result};
 
 pub mod context;
 pub mod inference;
@@ -107,16 +107,5 @@ impl<Expr> VariableBinding<'_, Expr> {
             variable_value: f(&self.variable_value),
             in_expression: f(&self.in_expression),
         }
-    }
-}
-
-pub struct VariableReference<'src, Value> {
-    name: &'src str,
-    value: Value,
-}
-
-impl<'src, Value: ExpressionReference<'src>> fmt::Debug for VariableReference<'src, Value> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_verbose_string(80))
     }
 }
