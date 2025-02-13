@@ -1,10 +1,4 @@
-use std::{
-    cell::{RefCell, RefMut},
-    collections::HashMap,
-    fmt,
-    ops::ControlFlow,
-    rc::Rc,
-};
+use std::{cell::RefMut, collections::HashMap, fmt, ops::ControlFlow};
 
 use crate::{
     ExpressionReference, GenericExpression, InferenceError, Pretty, Result, SharedMut,
@@ -137,14 +131,14 @@ impl<'src> Expression<'src> {
     }
 
     pub(crate) fn new_known(expression: GenericExpression<'src, Self>) -> Self {
-        Self(Rc::new(RefCell::new(ExprVariants::Known {
+        Self(SharedMut::new(ExprVariants::Known {
             name: None,
             expression,
-        })))
+        }))
     }
 
     fn new(expression: ExprVariants<'src>) -> Self {
-        Self(Rc::new(RefCell::new(expression)))
+        Self(SharedMut::new(expression))
     }
 
     /// Infer types, unless `self` is a bound variable, in which case do
@@ -203,7 +197,7 @@ impl<'src> Expression<'src> {
         x.collapse_links();
         y.collapse_links();
 
-        if Rc::ptr_eq(&x.0, &y.0)
+        if SharedMut::is_same(&x.0, &y.0)
             || x.unify_unknown(y)?.is_break()
             || y.unify_unknown(x)?.is_break()
         {
@@ -272,12 +266,9 @@ impl<'src> Expression<'src> {
     fn replace_with(&mut self, other: &Self) {
         let name = other.name().or_else(|| self.name());
 
-        RefCell::replace(
-            &self.0,
-            ExprVariants::Link {
-                target: other.clone(),
-            },
-        );
+        self.0.replace_with(ExprVariants::Link {
+            target: other.clone(),
+        });
         *self = other.clone();
 
         if let Some(name) = name {

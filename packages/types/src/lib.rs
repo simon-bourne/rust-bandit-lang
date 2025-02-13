@@ -1,4 +1,9 @@
-use std::{cell::RefCell, fmt, rc::Rc, result};
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    fmt,
+    rc::Rc,
+    result,
+};
 
 pub mod context;
 pub mod inference;
@@ -8,7 +13,39 @@ pub mod well_typed;
 
 pub use pretty::Pretty;
 
-type SharedMut<T> = Rc<RefCell<T>>;
+struct SharedMut<T>(Rc<RefCell<T>>);
+
+impl<T> SharedMut<T> {
+    pub fn new(x: T) -> Self {
+        Self(Rc::new(RefCell::new(x)))
+    }
+
+    pub fn is_same(x: &Self, y: &Self) -> bool {
+        Rc::ptr_eq(&x.0, &y.0)
+    }
+
+    pub fn borrow(&self) -> Ref<'_, T> {
+        self.0.borrow()
+    }
+
+    pub fn borrow_mut(&self) -> RefMut<'_, T> {
+        self.0.borrow_mut()
+    }
+
+    pub fn as_ptr(&self) -> *mut T {
+        self.0.as_ptr()
+    }
+
+    pub fn replace_with(&self, x: T) {
+        RefCell::replace(self.0.as_ref(), x);
+    }
+}
+
+impl<T> Clone for SharedMut<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
 
 pub type Result<T> = result::Result<T, InferenceError>;
 

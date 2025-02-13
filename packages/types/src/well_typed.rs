@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use crate::{Binder, ExpressionReference, GenericExpression, SharedMut, VariableBinding};
 
 mod pretty;
@@ -55,7 +53,7 @@ impl<'src> Expression<'src> {
     }
 
     fn new(expression: GenericExpression<'src, Self>) -> Self {
-        Self(Rc::new(RefCell::new(expression)))
+        Self(SharedMut::new(expression))
     }
 }
 
