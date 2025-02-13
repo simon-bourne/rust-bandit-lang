@@ -175,6 +175,7 @@ impl<Left: Pretty, Right: Pretty> Pretty for BinaryOperator<Left, Right> {
         self.1.to_document(parent, &self.0, &self.2, layout, layout)
     }
 }
+
 #[derive(Copy, Clone)]
 pub enum Operator {
     Equals,
