@@ -37,8 +37,8 @@ impl<'src> Expression<'src> {
     }
 
     fn make_fresh_variables(&self, new_variables: &mut OldToNewVariable<'src>) -> Self {
-        if let Some(bound_variable) = new_variables.get(&self.0.as_ptr()) {
-            return bound_variable.clone();
+        if let Some(new_variable) = new_variables.get(&self.0.as_ptr()) {
+            return new_variable.clone();
         }
 
         match &*self.0.borrow() {
@@ -73,7 +73,7 @@ impl<'src> Expression<'src> {
         }
     }
 
-    fn deep_copy(&self, new_variables: &mut OldToNewVariable<'src>) -> Self {
+    fn copy_if_unknown(&self, new_variables: &mut OldToNewVariable<'src>) -> Self {
         let key = self.0.as_ptr();
 
         if let Some(variable) = new_variables.get(&key) {
@@ -81,20 +81,17 @@ impl<'src> Expression<'src> {
         }
 
         match &*self.0.borrow() {
-            ExprVariants::Known { name, expression } => Self::new(ExprVariants::Known {
-                name: *name,
-                expression: expression.map_expression(|expr| expr.deep_copy(new_variables)),
-            }),
+            ExprVariants::Known { .. } => self.clone(),
             ExprVariants::Unknown { name, typ } => {
                 let new_unknown = Self::new(ExprVariants::Unknown {
                     name: *name,
-                    typ: typ.deep_copy(new_variables),
+                    typ: typ.make_fresh_variables(new_variables),
                 });
                 new_variables.insert(key, new_unknown.clone());
 
                 new_unknown
             }
-            ExprVariants::Link { target } => target.deep_copy(new_variables),
+            ExprVariants::Link { target } => target.copy_if_unknown(new_variables),
         }
     }
 
@@ -311,7 +308,7 @@ impl<'src> VariableBinding<'src, Expression<'src>> {
     }
 
     fn fresh_variables(&self, new_variables: &mut OldToNewVariable<'src>) -> Self {
-        let variable_value = self.variable_value.deep_copy(new_variables);
+        let variable_value = self.variable_value.copy_if_unknown(new_variables);
         let in_expression = self.in_expression.make_fresh_variables(new_variables);
 
         Self {

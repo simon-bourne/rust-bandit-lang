@@ -76,25 +76,6 @@ enum GenericExpression<'src, Expr: ExpressionReference<'src>> {
 }
 
 impl<'src, Expr: ExpressionReference<'src>> GenericExpression<'src, Expr> {
-    fn map_expression(&self, mut f: impl FnMut(&Expr) -> Expr) -> Self {
-        match self {
-            Self::TypeOfType => Self::TypeOfType,
-            Self::Constant { name, typ } => Self::Constant { name, typ: f(typ) },
-            Self::Apply {
-                function,
-                argument,
-                typ,
-            } => Self::Apply {
-                function: f(function),
-                argument: f(argument),
-                typ: f(typ),
-            },
-            Self::VariableBinding(variable_binding) => {
-                Self::VariableBinding(variable_binding.map_expression(f))
-            }
-        }
-    }
-
     fn pi(name: Option<&'src str>, variable_value: Expr, in_expression: Expr) -> Self {
         Self::VariableBinding(VariableBinding {
             name,
@@ -137,15 +118,4 @@ struct VariableBinding<'src, Expr> {
     binder: Binder,
     variable_value: Expr,
     in_expression: Expr,
-}
-
-impl<Expr> VariableBinding<'_, Expr> {
-    fn map_expression(&self, mut f: impl FnMut(&Expr) -> Expr) -> Self {
-        Self {
-            name: self.name,
-            binder: self.binder,
-            variable_value: f(&self.variable_value),
-            in_expression: f(&self.in_expression),
-        }
-    }
 }
