@@ -167,25 +167,28 @@ impl<'src> ExprVariants<'src> {
 
 impl<'src> GenericExpression<'src, Expression<'src>> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Expression<'src>> {
-        Ok(inference::Expression::new_known(0, match self {
-            Self::TypeOfType => GenericExpression::TypeOfType,
-            Self::Constant { name, typ } => GenericExpression::Constant {
-                name,
-                typ: typ.link(ctx)?,
+        Ok(inference::Expression::new_known(
+            0,
+            match self {
+                Self::TypeOfType => GenericExpression::TypeOfType,
+                Self::Constant { name, typ } => GenericExpression::Constant {
+                    name,
+                    typ: typ.link(ctx)?,
+                },
+                Self::Apply {
+                    function,
+                    argument,
+                    typ,
+                } => GenericExpression::Apply {
+                    function: function.link(ctx)?,
+                    argument: argument.link(ctx)?,
+                    typ: typ.link(ctx)?,
+                },
+                Self::VariableBinding(binding) => {
+                    GenericExpression::VariableBinding(binding.link(ctx)?)
+                }
             },
-            Self::Apply {
-                function,
-                argument,
-                typ,
-            } => GenericExpression::Apply {
-                function: function.link(ctx)?,
-                argument: argument.link(ctx)?,
-                typ: typ.link(ctx)?,
-            },
-            Self::VariableBinding(binding) => {
-                GenericExpression::VariableBinding(binding.link(ctx)?)
-            }
-        }))
+        ))
     }
 }
 
