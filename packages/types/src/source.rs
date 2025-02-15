@@ -167,7 +167,7 @@ impl<'src> ExprVariants<'src> {
 
 impl<'src> GenericExpression<'src, Expression<'src>> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Expression<'src>> {
-        Ok(inference::Expression::new_known(match self {
+        Ok(inference::Expression::new_known(0, match self {
             Self::TypeOfType => GenericExpression::TypeOfType,
             Self::Constant { name, typ } => GenericExpression::Constant {
                 name,

@@ -63,7 +63,7 @@ fn infer_types(input: &str) -> Result<inference::Expression, InferenceError> {
     );
 
     let mut expr = parse(input).link(ctx).unwrap();
-    expr.infer_types()?;
+    expr.infer_types(0)?;
     Ok(expr)
 }
 

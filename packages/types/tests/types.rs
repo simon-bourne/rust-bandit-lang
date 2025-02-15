@@ -16,7 +16,7 @@ fn infer_kinds() {
     .link(ctx)
     .unwrap();
 
-    constructor_type.infer_types().unwrap();
+    constructor_type.infer_types(0).unwrap();
     assert_eq!(
         constructor_type.to_pretty_string(80),
         r"\m : _ → _ ⇒ \a ⇒ (m : _ → _) a"

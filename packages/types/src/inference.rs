@@ -12,6 +12,7 @@ pub struct Expression<'src>(SharedMut<ExprVariants<'src>>);
 
 enum ExprVariants<'src> {
     Known {
+        pass: u64,
         name: Option<&'src str>,
         expression: GenericExpression<'src, Expression<'src>>,
     },
@@ -42,7 +43,11 @@ impl<'src> Expression<'src> {
         }
 
         match &*self.0.borrow() {
-            ExprVariants::Known { name, expression } => {
+            ExprVariants::Known {
+                pass,
+                name,
+                expression,
+            } => {
                 let generic_expression = match expression {
                     GenericExpression::VariableBinding(binding) => {
                         GenericExpression::VariableBinding(binding.fresh_variables(new_variables))
@@ -64,6 +69,7 @@ impl<'src> Expression<'src> {
                 };
 
                 Self::new(ExprVariants::Known {
+                    pass: *pass,
                     name: *name,
                     expression: generic_expression,
                 })
@@ -111,16 +117,20 @@ impl<'src> Expression<'src> {
         }
     }
 
-    fn type_of_type() -> Self {
-        Self::new_known(GenericExpression::TypeOfType)
+    fn type_of_type(pass: u64) -> Self {
+        Self::new_known(pass, GenericExpression::TypeOfType)
     }
 
-    fn pi_type(argument_value: Self, result_type: Self) -> Self {
-        Self::new_known(GenericExpression::pi(None, argument_value, result_type))
+    fn pi_type(pass: u64, argument_value: Self, result_type: Self) -> Self {
+        Self::new_known(
+            pass,
+            GenericExpression::pi(None, argument_value, result_type),
+        )
     }
 
-    pub(crate) fn new_known(expression: GenericExpression<'src, Self>) -> Self {
+    pub(crate) fn new_known(pass: u64, expression: GenericExpression<'src, Self>) -> Self {
         Self(SharedMut::new(ExprVariants::Known {
+            pass,
             name: None,
             expression,
         }))
@@ -130,30 +140,26 @@ impl<'src> Expression<'src> {
         Self(SharedMut::new(expression))
     }
 
-    /// Infer types, unless `self` is a bound variable, in which case do
-    /// nothing.
-    pub fn infer_types(&mut self) -> Result<()> {
-        // We want to return early if this is a bound name, unless this is the binding
-        // site. For example, in `let x = y in x`, the second `x` will just be a
-        // reference to `y` and we want to return early.
-        if self.name().is_some() {
-            Ok(())
-        } else {
-            self.always_infer_types()
-        }
-    }
-
-    fn always_infer_types(&mut self) -> Result<()> {
+    pub fn infer_types(&mut self, current_pass: u64) -> Result<()> {
         Self::unify(
             &mut self.typ().typ().fresh_variables(),
-            &mut Self::type_of_type(),
+            &mut Self::type_of_type(current_pass),
         )?;
 
         match &mut *self.0.try_borrow_mut()? {
-            ExprVariants::Known { expression, .. } => expression.infer_types(),
-            ExprVariants::Unknown { typ, .. } => typ.infer_types(),
-            ExprVariants::Link { target } => target.infer_types(),
+            ExprVariants::Known {
+                pass, expression, ..
+            } => {
+                if current_pass <= *pass {
+                    *pass = current_pass + 1;
+                    expression.infer_types(current_pass)?
+                }
+            }
+            ExprVariants::Unknown { typ, .. } => typ.infer_types(current_pass)?,
+            ExprVariants::Link { target } => target.infer_types(current_pass)?,
         }
+
+        Ok(())
     }
 
     fn collapse_links(&mut self) {
@@ -295,7 +301,9 @@ impl<'src> ExpressionReference<'src> for Expression<'src> {
 
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            ExprVariants::Known { expression, .. } => expression.typ(Self::new_known),
+            ExprVariants::Known {
+                pass, expression, ..
+            } => expression.typ(|e| Self::new_known(*pass, e)),
             ExprVariants::Unknown { typ, .. } => typ.clone(),
             ExprVariants::Link { target } => target.typ(),
         }
@@ -303,9 +311,9 @@ impl<'src> ExpressionReference<'src> for Expression<'src> {
 }
 
 impl<'src> VariableBinding<'src, Expression<'src>> {
-    fn infer_types(&mut self) -> Result<()> {
-        self.variable_value.always_infer_types()?;
-        self.in_expression.infer_types()
+    fn infer_types(&mut self, pass: u64) -> Result<()> {
+        self.variable_value.infer_types(pass)?;
+        self.in_expression.infer_types(pass)
     }
 
     fn fresh_variables(&self, new_variables: &mut OldToNewVariable<'src>) -> Self {
@@ -327,10 +335,10 @@ impl<'src> VariableBinding<'src, Expression<'src>> {
 }
 
 impl<'src> GenericExpression<'src, Expression<'src>> {
-    fn infer_types(&mut self) -> Result<()> {
+    fn infer_types(&mut self, pass: u64) -> Result<()> {
         match self {
             Self::TypeOfType => (),
-            Self::Constant { typ, .. } => typ.infer_types()?,
+            Self::Constant { typ, .. } => typ.infer_types(pass)?,
             Self::Apply {
                 function,
                 argument,
@@ -338,21 +346,24 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
             } => {
                 Expression::unify(
                     &mut typ.typ().fresh_variables(),
-                    &mut Expression::type_of_type(),
+                    &mut Expression::type_of_type(pass),
                 )?;
                 // TODO: Is this reasoning sound?
                 // We're creating a new bound variable (`argument`) here. If it's unknown, we
                 // want to infer it, so we don't want it to be fresh. Therefore we create fresh
                 // variables for `argument` and `typ`, not `pi_type`.
-                let pi_type =
-                    &mut Expression::pi_type(argument.fresh_variables(), typ.fresh_variables());
+                let pi_type = &mut Expression::pi_type(
+                    pass,
+                    argument.fresh_variables(),
+                    typ.fresh_variables(),
+                );
                 Expression::unify(pi_type, &mut function.typ().fresh_variables())?;
 
-                function.infer_types()?;
-                argument.infer_types()?;
-                typ.infer_types()?;
+                function.infer_types(pass)?;
+                argument.infer_types(pass)?;
+                typ.infer_types(pass)?;
             }
-            Self::VariableBinding(binding) => binding.infer_types()?,
+            Self::VariableBinding(binding) => binding.infer_types(pass)?,
         }
 
         Ok(())
