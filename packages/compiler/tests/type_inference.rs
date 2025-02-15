@@ -4,7 +4,7 @@ use bandit_parser::{
     lex::{SrcToken, Token},
     parse::expr,
 };
-use bandit_types::{context::Context, source::Expression, Pretty};
+use bandit_types::{context::Context, inference, source::Expression, InferenceError, Pretty};
 use winnow::Parser;
 
 fn parse(input: &str) -> Expression<'_> {
@@ -29,7 +29,24 @@ fn context<'src>(
     Context::new(global_items)
 }
 
-fn expect_inferred(input: &str, expected: &str) {
+trait Test {
+    fn infers(self, expected: &str);
+
+    fn fails(self);
+}
+
+impl Test for &str {
+    fn infers(self, expected: &str) {
+        let expr = infer_types(self).unwrap();
+        assert_eq!(expr.to_pretty_string(80), expected);
+    }
+
+    fn fails(self) {
+        assert!(infer_types(self).is_err());
+    }
+}
+
+fn infer_types(input: &str) -> Result<inference::Expression, InferenceError> {
     let ctx = &mut context(
         ["Bool", "Int", "Float"],
         [
@@ -46,23 +63,23 @@ fn expect_inferred(input: &str, expected: &str) {
     );
 
     let mut expr = parse(input).link(ctx).unwrap();
-    expr.infer_types().unwrap();
-    assert_eq!(expr.to_pretty_string(80), expected);
+    expr.infer_types()?;
+    Ok(expr)
 }
 
 #[test]
 fn one() {
-    expect_inferred("one", "one : Int");
+    "one".infers("one : Int");
 }
 
 #[test]
 fn simple_apply() {
-    expect_inferred("abs one", "(abs : Int → Int) (one : Int) : Int");
+    "abs one".infers("(abs : Int → Int) (one : Int) : Int");
 }
 
 #[test]
 fn simple_lambda() {
-    expect_inferred(r"(\x ⇒ x : Int) : Int -> Int", r"\x : Int ⇒ x : Int");
+    r"(\x ⇒ x : Int) : Int -> Int".infers(r"\x : Int ⇒ x : Int");
 }
 
 #[test]
@@ -72,29 +89,24 @@ fn simple_lambda() {
 // create a circular reference if it weren't for the borrow error.
 #[should_panic]
 fn weird_lambda() {
-    expect_inferred(r"\x ⇒ x : x", r"");
+    r"\x ⇒ x : x".fails();
 }
 
 #[test]
 fn partial_add() {
-    expect_inferred("add one", "(add : Int → Int → Int) (one : Int) : Int → Int");
+    "add one".infers("(add : Int → Int → Int) (one : Int) : Int → Int");
 }
 
 #[test]
 fn simple_id() {
-    expect_inferred(
-        "id _ one",
-        "((id : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int",
-    );
+    "id _ one".infers("((id : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int");
 }
 
-// TODO: This should fail
 #[test]
+// TODO: This is supposed to fail
+#[should_panic]
 fn scope_escape() {
-    expect_inferred(
-        "scoped _ id",
-        "((scoped : (∀a ⇒ (∀s ⇒ s → a) → a)) (a : Type) : (∀a ⇒ a → a) → a) (id : (∀a ⇒ a → a))",
-    )
+    "scoped _ id".fails()
 }
 
 #[test]
@@ -103,42 +115,37 @@ fn scope_escape() {
 // will stack overflow when we try and convert the expression to a string.
 #[ignore = "This tests the occurs check, which is not implemented yet"]
 fn occurs_check() {
-    expect_inferred(r"\x ⇒ x x", "");
+    r"\x ⇒ x x".infers("");
 }
 
 #[test]
 fn multi_id() {
-    expect_inferred(
-        "add (id Int one) (float_to_int (id Float pi))",
+    "add (id Int one) (float_to_int (id Float pi))".infers(
         "((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a ⇒ a → a)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
 }
 
 #[test]
 fn restrict_type() {
-    expect_inferred(
-        "let id2 = id ⇒ (id2 : Type -> Int -> Int)",
-        "let id2 : Type → Int → Int = id ⇒ id : Type → Int → Int",
-    )
+    "let id2 = id ⇒ (id2 : Type -> Int -> Int)"
+        .infers("let id2 : Type → Int → Int = id ⇒ id : Type → Int → Int")
 }
 
 #[test]
 fn polymorphic_let() {
-    expect_inferred(
-        "let id2 : (∀a ⇒ a → a) = id ⇒ add (id2 Int one) (float_to_int (id2 Float pi))",
+    "let id2 : (∀a ⇒ a → a) = id ⇒ add (id2 Int one) (float_to_int (id2 Float pi))".infers(
         "let id2 : (∀a ⇒ a → a) = id ⇒ ((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a ⇒ a → a)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
 }
 
 #[test]
 fn simple_polymorphic_lambda() {
-    expect_inferred(r"\x : (∀b ⇒ b) ⇒ x", r"\x : (∀b ⇒ b) ⇒ x : (∀b ⇒ b)");
+    r"\x : (∀b ⇒ b) ⇒ x".infers(r"\x : (∀b ⇒ b) ⇒ x : (∀b ⇒ b)");
 }
 
 #[test]
 fn simple_polymorphic_let() {
-    expect_inferred(
-        "let x : (∀b ⇒ b) = polymorphic ⇒ x",
+    "let x : (∀b ⇒ b) = polymorphic ⇒ x".infers(
         // TODO: We should have `x` on the RHS, not `polymorphic`.
         "let x : (∀b ⇒ b) = polymorphic ⇒ polymorphic : (∀b ⇒ b)",
     );
@@ -146,8 +153,7 @@ fn simple_polymorphic_let() {
 
 #[test]
 fn polymorphic_lambda() {
-    expect_inferred(
-        r"\id2 : (∀a ⇒ a → a) ⇒ add (id2 Int one) (float_to_int (id2 Float pi))",
+    r"\id2 : (∀a ⇒ a → a) ⇒ add (id2 Int one) (float_to_int (id2 Float pi))".infers(
         r"\id2 : (∀a ⇒ a → a) ⇒ ((add : Int → Int → Int) (((id2 : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a ⇒ a → a)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int",
     );
 }
