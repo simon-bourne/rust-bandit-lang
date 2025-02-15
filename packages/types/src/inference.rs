@@ -169,15 +169,16 @@ impl<'src> Expression<'src> {
     }
 
     fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
-        {
+        let mut typ = {
             let ExprVariants::Unknown { typ, .. } = &mut *self.0.try_borrow_mut()? else {
                 return Ok(ControlFlow::Continue(()));
             };
+            typ.clone()
+        };
 
-            Self::unify(typ, &mut other.typ())?;
-        }
-
+        // We need to replace ourself with `other` in case `typ` references `self`.
         self.replace_with(other);
+        Self::unify(&mut typ, &mut other.typ())?;
 
         Ok(ControlFlow::Break(()))
     }

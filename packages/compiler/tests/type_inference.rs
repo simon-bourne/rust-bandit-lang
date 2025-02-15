@@ -83,13 +83,8 @@ fn simple_lambda() {
 }
 
 #[test]
-// TODO: This should return an `InferenceError` or infer the type of `x` to be
-// `Type`, rather than borrow error.
-// At the moment, it fails because we try and unify `x.typ()` with `x` when we `link`. This would
-// create a circular reference if it weren't for the borrow error.
-#[should_panic]
-fn weird_lambda() {
-    r"\x ⇒ x : x".fails();
+fn self_referential_type() {
+    r"\x ⇒ x : x".infers(r#"\x : Type = Type ⇒ Type"#);
 }
 
 #[test]
