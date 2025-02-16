@@ -98,7 +98,7 @@ fn simple_id() {
 }
 
 #[test]
-// TODO: This is supposed to fail
+// TODO: This test should pass (i.e. inference should fail)
 #[should_panic]
 fn scope_escape() {
     "scoped _ id".fails()
@@ -123,7 +123,7 @@ fn multi_id() {
 #[test]
 fn restrict_type() {
     "let id2 = id ⇒ (id2 : Type -> Int -> Int)"
-        .infers("let id2 : Type → Int → Int = id ⇒ id : Type → Int → Int")
+        .infers("let id2 : (∀a ⇒ a → a) = id ⇒ id : Type → Int → Int")
 }
 
 #[test]

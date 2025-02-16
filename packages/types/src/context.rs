@@ -35,11 +35,12 @@ impl<'a> Context<'a> {
     }
 
     pub(crate) fn lookup(&mut self, name: &'a str) -> Result<inference::Expression<'a>> {
-        if let Some(local) = self.lookup_local(name) {
-            Ok(local)
+        Ok(if let Some(local) = self.lookup_local(name) {
+            local
         } else {
-            self.global_value(name)
+            self.global_value(name)?
         }
+        .fresh_variables())
     }
 
     fn lookup_local(&self, name: &'a str) -> Option<inference::Expression<'a>> {
