@@ -164,7 +164,7 @@ impl<'src> Term<'src> {
 
         Ok(match (&mut *self_ref, &mut *other_ref) {
             (GenericTerm::Variable(variable), GenericTerm::Variable(other_variable)) => {
-                // TODO: Prefer free variables with smaller scope
+                // TODO: Prefer bound variables, and free variables with smaller scope
                 Self::unify(&mut variable.typ, &mut other_variable.typ)?;
                 let other_name = other_variable.name;
                 drop((self_ref, other_ref));
