@@ -24,7 +24,7 @@ type OldToNewVariable<'src> = HashMap<*mut TermVariants<'src>, Term<'src>>;
 
 impl<'src> Term<'src> {
     pub fn unknown(typ: Self) -> Self {
-        Self::new_known(0, GenericTerm::Variable(Variable { name: None, typ }))
+        Self::new(0, GenericTerm::Variable(Variable { name: None, typ }))
     }
 
     pub fn unknown_value() -> Self {
@@ -68,10 +68,7 @@ impl<'src> Term<'src> {
                     },
                 };
 
-                Self::new(TermVariants::Known {
-                    pass: *pass,
-                    term: generic_term,
-                })
+                Self::new(*pass, generic_term)
             }
             TermVariants::Link { target } => target.make_fresh_variables(new_variables),
         }
@@ -87,7 +84,7 @@ impl<'src> Term<'src> {
         match &*self.0.borrow() {
             TermVariants::Known { pass, term } => {
                 if let GenericTerm::Variable(Variable { name, typ }) = term {
-                    let new_var = Self::new_known(
+                    let new_var = Self::new(
                         *pass,
                         GenericTerm::Variable(Variable {
                             name: *name,
@@ -105,20 +102,15 @@ impl<'src> Term<'src> {
     }
 
     fn type_of_type(pass: u64) -> Self {
-        Self::new_known(pass, GenericTerm::TypeOfType)
+        Self::new(pass, GenericTerm::TypeOfType)
     }
 
     fn pi_type(pass: u64, argument_value: Self, result_type: Self) -> Self {
-        Self::new_known(pass, GenericTerm::pi(None, argument_value, result_type))
+        Self::new(pass, GenericTerm::pi(None, argument_value, result_type))
     }
 
-    pub(crate) fn new_known(pass: u64, term: GenericTerm<'src, Self>) -> Self {
+    pub(crate) fn new(pass: u64, term: GenericTerm<'src, Self>) -> Self {
         Self(SharedMut::new(TermVariants::Known { pass, term }))
-    }
-
-    // TODO: Can we combine this and `new_known`
-    fn new(term: TermVariants<'src>) -> Self {
-        Self(SharedMut::new(term))
     }
 
     pub fn infer_types(&mut self, current_pass: u64) -> Result<()> {
@@ -291,7 +283,6 @@ pub struct Variable<'src> {
 impl<'src> TermReference<'src> for Term<'src> {
     type Variable = Variable<'src>;
 
-    // TODO: Invert and rename to `is_free_variable`
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
             TermVariants::Known { term, .. } => {
@@ -304,7 +295,7 @@ impl<'src> TermReference<'src> for Term<'src> {
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
             TermVariants::Known { pass, term, .. } => {
-                term.typ(|e| Self::new_known(*pass, e), |var| var.typ.clone())
+                term.typ(|e| Self::new(*pass, e), |var| var.typ.clone())
             }
             TermVariants::Link { target } => target.typ(),
         }

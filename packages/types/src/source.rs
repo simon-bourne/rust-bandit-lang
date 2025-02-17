@@ -141,7 +141,7 @@ impl<'src> TermVariants<'src> {
 
 impl<'src> GenericTerm<'src, Term<'src>> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Term<'src>> {
-        Ok(inference::Term::new_known(
+        Ok(inference::Term::new(
             0,
             match self {
                 Self::TypeOfType => GenericTerm::TypeOfType,
