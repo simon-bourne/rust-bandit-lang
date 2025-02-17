@@ -194,6 +194,35 @@ impl<'src> Term<'src> {
         Ok(ControlFlow::Break(()))
     }
 
+    fn unify_variable(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
+        let mut self_ref = self.known().expect("self should be known at this point");
+        let mut other_ref = other.known().expect("other should be known at this point");
+
+        Ok(match (&mut *self_ref, &mut *other_ref) {
+            (GenericTerm::Variable(variable0), GenericTerm::Variable(variable1)) => {
+                // TODO: Prefer bound variables, and free variables with smaller scope
+                let mut typ = variable0.typ();
+                drop((self_ref, other_ref));
+                self.replace_with(other);
+                Self::unify(&mut typ, &mut other.typ())?;
+
+                ControlFlow::Break(())
+            }
+            (GenericTerm::Variable(variable), _) => {
+                let mut typ = variable.typ();
+                drop((self_ref, other_ref));
+                self.replace_with(other);
+                Self::unify(&mut typ, &mut other.typ())?;
+
+                ControlFlow::Break(())
+            }
+            (GenericTerm::TypeOfType, _rhs)
+            | (GenericTerm::Constant { .. }, _rhs)
+            | (GenericTerm::Apply { .. }, _rhs)
+            | (GenericTerm::VariableBinding(_), _rhs) => ControlFlow::Continue(()),
+        })
+    }
+
     pub fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
         x.collapse_links();
         y.collapse_links();
@@ -201,6 +230,8 @@ impl<'src> Term<'src> {
         if SharedMut::is_same(&x.0, &y.0)
             || x.unify_unknown(y)?.is_break()
             || y.unify_unknown(x)?.is_break()
+            || x.unify_variable(y)?.is_break()
+            || y.unify_variable(x)?.is_break()
         {
             return Ok(());
         }
@@ -246,9 +277,6 @@ impl<'src> Term<'src> {
                 Self::unify(argument, argument1)?;
                 Self::unify(typ, typ1)?;
             }
-            (GenericTerm::Variable(_variable0), GenericTerm::Variable(_variable1)) => todo!(),
-            (GenericTerm::Variable(_variable), _other) => todo!(),
-            (_other, GenericTerm::Variable(_variable)) => todo!(),
             (GenericTerm::VariableBinding(binding0), GenericTerm::VariableBinding(binding1)) => {
                 VariableBinding::unify(binding0, binding1)?
             }
@@ -256,6 +284,7 @@ impl<'src> Term<'src> {
             (GenericTerm::TypeOfType, _rhs)
             | (GenericTerm::Constant { .. }, _rhs)
             | (GenericTerm::Apply { .. }, _rhs)
+            | (GenericTerm::Variable(_), _rhs)
             | (GenericTerm::VariableBinding(_), _rhs) => Err(InferenceError)?,
         }
 
