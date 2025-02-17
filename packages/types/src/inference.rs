@@ -258,11 +258,9 @@ impl<'src> Term<'src> {
 
     fn value<'a>(&'a mut self) -> RefMut<'a, GenericTerm<'src, Self>> {
         self.collapse_links();
-        RefMut::map(self.0.borrow_mut(), |x| {
-            match x {
-                TermVariants::Value { term, .. } => term,
-                TermVariants::Link { .. } => unreachable!("Links should be collapsed at this point"),
-            }
+        RefMut::map(self.0.borrow_mut(), |x| match x {
+            TermVariants::Value { term, .. } => term,
+            TermVariants::Link { .. } => unreachable!("Links should be collapsed at this point"),
         })
     }
 }
