@@ -8,23 +8,23 @@ pub fn basic(c: &mut Criterion) {
     for _i in 0..4922 {
         input.push_str(
             r#"
-expr
-expr
+term
+term
 do
-    (expr expr)
-        expr
-    expr expr (do
-            expr expr
-            expr
-            expr)
+    (term term)
+        term
+    term term (do
+            term term
+            term
+            term)
     do
-            expr
+            term
     do
-        expr
-exprexpr
-expr do expr expr do
-    expr
-    expr
+        term
+termterm
+term do term term do
+    term
+    term
 "#,
         );
     }

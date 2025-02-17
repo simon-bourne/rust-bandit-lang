@@ -2,10 +2,10 @@ use std::{collections::HashMap, rc::Rc};
 
 use crate::{inference, source, InferenceError, Result};
 
-pub type GlobalValues<'a> = HashMap<&'a str, source::Expression<'a>>;
+pub type GlobalValues<'a> = HashMap<&'a str, source::Term<'a>>;
 
 pub struct Context<'a> {
-    local_variables: HashMap<&'a str, Vec<inference::Expression<'a>>>,
+    local_variables: HashMap<&'a str, Vec<inference::Term<'a>>>,
     global_variables: Rc<GlobalValues<'a>>,
 }
 
@@ -20,7 +20,7 @@ impl<'a> Context<'a> {
     pub(crate) fn with_variable<Output>(
         &mut self,
         name: &'a str,
-        variable_value: inference::Expression<'a>,
+        variable_value: inference::Term<'a>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Result<Output> {
         self.local_variables
@@ -34,7 +34,7 @@ impl<'a> Context<'a> {
         Ok(output)
     }
 
-    pub(crate) fn lookup(&mut self, name: &'a str) -> Result<inference::Expression<'a>> {
+    pub(crate) fn lookup(&mut self, name: &'a str) -> Result<inference::Term<'a>> {
         Ok(if let Some(local) = self.lookup_local(name) {
             local
         } else {
@@ -43,11 +43,11 @@ impl<'a> Context<'a> {
         .fresh_variables())
     }
 
-    fn lookup_local(&self, name: &'a str) -> Option<inference::Expression<'a>> {
+    fn lookup_local(&self, name: &'a str) -> Option<inference::Term<'a>> {
         Some(self.local_variables.get(name)?.last()?.clone())
     }
 
-    fn global_value(&mut self, name: &'a str) -> Result<inference::Expression<'a>> {
+    fn global_value(&mut self, name: &'a str) -> Result<inference::Term<'a>> {
         // TODO: Cache each global var once it's linked
         let mut global_ctx = Context {
             local_variables: HashMap::new(),

@@ -1,35 +1,35 @@
 use std::{cell::RefMut, collections::HashMap, fmt, ops::ControlFlow};
 
 use crate::{
-    ExpressionReference, GenericExpression, InferenceError, Pretty, Result, SharedMut,
+    TermReference, GenericTerm, InferenceError, Pretty, Result, SharedMut,
     VariableBinding,
 };
 
 mod pretty;
 
 #[derive(Clone)]
-pub struct Expression<'src>(SharedMut<ExprVariants<'src>>);
+pub struct Term<'src>(SharedMut<TermVariants<'src>>);
 
-enum ExprVariants<'src> {
+enum TermVariants<'src> {
     Known {
         pass: u64,
         name: Option<&'src str>,
-        expression: GenericExpression<'src, Expression<'src>>,
+        term: GenericTerm<'src, Term<'src>>,
     },
     Unknown {
         name: Option<&'src str>,
-        typ: Expression<'src>,
+        typ: Term<'src>,
     },
     Link {
-        target: Expression<'src>,
+        target: Term<'src>,
     },
 }
 
-type OldToNewVariable<'src> = HashMap<*mut ExprVariants<'src>, Expression<'src>>;
+type OldToNewVariable<'src> = HashMap<*mut TermVariants<'src>, Term<'src>>;
 
-impl<'src> Expression<'src> {
+impl<'src> Term<'src> {
     pub fn unknown(typ: Self) -> Self {
-        Self::new(ExprVariants::Unknown { name: None, typ })
+        Self::new(TermVariants::Unknown { name: None, typ })
     }
 
     // TODO: The implementation of this is ugly and inefficient.
@@ -43,39 +43,39 @@ impl<'src> Expression<'src> {
         }
 
         match &*self.0.borrow() {
-            ExprVariants::Known {
+            TermVariants::Known {
                 pass,
                 name,
-                expression,
+                term,
             } => {
-                let generic_expression = match expression {
-                    GenericExpression::VariableBinding(binding) => {
-                        GenericExpression::VariableBinding(binding.fresh_variables(new_variables))
+                let generic_term = match term {
+                    GenericTerm::VariableBinding(binding) => {
+                        GenericTerm::VariableBinding(binding.fresh_variables(new_variables))
                     }
-                    GenericExpression::TypeOfType => GenericExpression::TypeOfType,
-                    GenericExpression::Constant { name, typ } => GenericExpression::Constant {
+                    GenericTerm::TypeOfType => GenericTerm::TypeOfType,
+                    GenericTerm::Constant { name, typ } => GenericTerm::Constant {
                         name,
                         typ: typ.make_fresh_variables(new_variables),
                     },
-                    GenericExpression::Apply {
+                    GenericTerm::Apply {
                         function,
                         argument,
                         typ,
-                    } => GenericExpression::Apply {
+                    } => GenericTerm::Apply {
                         function: function.make_fresh_variables(new_variables),
                         argument: argument.make_fresh_variables(new_variables),
                         typ: typ.make_fresh_variables(new_variables),
                     },
                 };
 
-                Self::new(ExprVariants::Known {
+                Self::new(TermVariants::Known {
                     pass: *pass,
                     name: *name,
-                    expression: generic_expression,
+                    term: generic_term,
                 })
             }
-            ExprVariants::Unknown { .. } => self.clone(),
-            ExprVariants::Link { target } => target.make_fresh_variables(new_variables),
+            TermVariants::Unknown { .. } => self.clone(),
+            TermVariants::Link { target } => target.make_fresh_variables(new_variables),
         }
     }
 
@@ -87,9 +87,9 @@ impl<'src> Expression<'src> {
         }
 
         match &*self.0.borrow() {
-            ExprVariants::Known { .. } => self.clone(),
-            ExprVariants::Unknown { name, typ } => {
-                let new_unknown = Self::new(ExprVariants::Unknown {
+            TermVariants::Known { .. } => self.clone(),
+            TermVariants::Unknown { name, typ } => {
+                let new_unknown = Self::new(TermVariants::Unknown {
                     name: *name,
                     typ: typ.make_fresh_variables(new_variables),
                 });
@@ -97,47 +97,47 @@ impl<'src> Expression<'src> {
 
                 new_unknown
             }
-            ExprVariants::Link { target } => target.copy_if_unknown(new_variables),
+            TermVariants::Link { target } => target.copy_if_unknown(new_variables),
         }
     }
 
     fn name(&self) -> Option<&'src str> {
         match &*self.0.borrow() {
-            ExprVariants::Known { name, .. } | ExprVariants::Unknown { name, .. } => *name,
-            ExprVariants::Link { target } => target.name(),
+            TermVariants::Known { name, .. } | TermVariants::Unknown { name, .. } => *name,
+            TermVariants::Link { target } => target.name(),
         }
     }
 
     pub fn set_name(&mut self, new_name: &'src str) {
         match &mut *self.0.borrow_mut() {
-            ExprVariants::Known { name, .. } | ExprVariants::Unknown { name, .. } => {
+            TermVariants::Known { name, .. } | TermVariants::Unknown { name, .. } => {
                 *name = Some(new_name)
             }
-            ExprVariants::Link { target } => target.set_name(new_name),
+            TermVariants::Link { target } => target.set_name(new_name),
         }
     }
 
     fn type_of_type(pass: u64) -> Self {
-        Self::new_known(pass, GenericExpression::TypeOfType)
+        Self::new_known(pass, GenericTerm::TypeOfType)
     }
 
     fn pi_type(pass: u64, argument_value: Self, result_type: Self) -> Self {
         Self::new_known(
             pass,
-            GenericExpression::pi(None, argument_value, result_type),
+            GenericTerm::pi(None, argument_value, result_type),
         )
     }
 
-    pub(crate) fn new_known(pass: u64, expression: GenericExpression<'src, Self>) -> Self {
-        Self(SharedMut::new(ExprVariants::Known {
+    pub(crate) fn new_known(pass: u64, term: GenericTerm<'src, Self>) -> Self {
+        Self(SharedMut::new(TermVariants::Known {
             pass,
             name: None,
-            expression,
+            term,
         }))
     }
 
-    fn new(expression: ExprVariants<'src>) -> Self {
-        Self(SharedMut::new(expression))
+    fn new(term: TermVariants<'src>) -> Self {
+        Self(SharedMut::new(term))
     }
 
     pub fn infer_types(&mut self, current_pass: u64) -> Result<()> {
@@ -147,16 +147,16 @@ impl<'src> Expression<'src> {
         )?;
 
         match &mut *self.0.try_borrow_mut()? {
-            ExprVariants::Known {
-                pass, expression, ..
+            TermVariants::Known {
+                pass, term, ..
             } => {
                 if current_pass <= *pass {
                     *pass = current_pass + 1;
-                    expression.infer_types(current_pass)?
+                    term.infer_types(current_pass)?
                 }
             }
-            ExprVariants::Unknown { typ, .. } => typ.infer_types(current_pass)?,
-            ExprVariants::Link { target } => target.infer_types(current_pass)?,
+            TermVariants::Unknown { typ, .. } => typ.infer_types(current_pass)?,
+            TermVariants::Link { target } => target.infer_types(current_pass)?,
         }
 
         Ok(())
@@ -164,9 +164,9 @@ impl<'src> Expression<'src> {
 
     fn collapse_links(&mut self) {
         // Collapse links from the bottom up so they are also collapsed for other
-        // expressions that reference this chain.
+        // terms that reference this chain.
         *self = {
-            let ExprVariants::Link { target } = &mut *self.0.borrow_mut() else {
+            let TermVariants::Link { target } = &mut *self.0.borrow_mut() else {
                 return;
             };
             target.collapse_links();
@@ -176,7 +176,7 @@ impl<'src> Expression<'src> {
 
     fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
         let mut typ = {
-            let ExprVariants::Unknown { typ, .. } = &mut *self.0.try_borrow_mut()? else {
+            let TermVariants::Unknown { typ, .. } = &mut *self.0.try_borrow_mut()? else {
                 return Ok(ControlFlow::Continue(()));
             };
             typ.clone()
@@ -205,33 +205,33 @@ impl<'src> Expression<'src> {
 
         // TODO: Application evaluation:
         //
-        // - If all types are known, and the expression is `Reducible::Maybe`:
-        //      - Evaluate the expression as much as possible.
+        // - If all types are known, and the term is `Reducible::Maybe`:
+        //      - Evaluate the term as much as possible.
         // - Otherwise add to a list of deferred unifications.
         // - Only unify applications if they're both `Reducible::No` (meaning we've
-        //   tried to evaluate the expression).
+        //   tried to evaluate the term).
         // - Reducible has another variant of `Reducible::PendingTypeCheck`
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
-            (GenericExpression::TypeOfType, GenericExpression::TypeOfType) => (),
+            (GenericTerm::TypeOfType, GenericTerm::TypeOfType) => (),
             (
-                GenericExpression::Constant {
+                GenericTerm::Constant {
                     name: name0,
                     typ: typ0,
                 },
-                GenericExpression::Constant {
+                GenericTerm::Constant {
                     name: name1,
                     typ: typ1,
                 },
             ) if name0 == name1 => Self::unify(typ0, typ1)?,
             (
-                GenericExpression::Apply {
+                GenericTerm::Apply {
                     function,
                     argument,
                     typ,
                 },
-                GenericExpression::Apply {
+                GenericTerm::Apply {
                     function: function1,
                     argument: argument1,
                     typ: typ1,
@@ -242,14 +242,14 @@ impl<'src> Expression<'src> {
                 Self::unify(typ, typ1)?;
             }
             (
-                GenericExpression::VariableBinding(binding0),
-                GenericExpression::VariableBinding(binding1),
+                GenericTerm::VariableBinding(binding0),
+                GenericTerm::VariableBinding(binding1),
             ) => VariableBinding::unify(binding0, binding1)?,
             // It's safer to explicitly ignore each variant
-            (GenericExpression::TypeOfType, _rhs)
-            | (GenericExpression::Constant { .. }, _rhs)
-            | (GenericExpression::Apply { .. }, _rhs)
-            | (GenericExpression::VariableBinding(_), _rhs) => Err(InferenceError)?,
+            (GenericTerm::TypeOfType, _rhs)
+            | (GenericTerm::Constant { .. }, _rhs)
+            | (GenericTerm::Apply { .. }, _rhs)
+            | (GenericTerm::VariableBinding(_), _rhs) => Err(InferenceError)?,
         }
 
         drop(x_ref);
@@ -262,7 +262,7 @@ impl<'src> Expression<'src> {
     fn replace_with(&mut self, other: &Self) {
         let name = other.name().or_else(|| self.name());
 
-        self.0.replace_with(ExprVariants::Link {
+        self.0.replace_with(TermVariants::Link {
             target: other.clone(),
         });
         *self = other.clone();
@@ -272,10 +272,10 @@ impl<'src> Expression<'src> {
         }
     }
 
-    fn known<'a>(&'a self) -> Option<RefMut<'a, GenericExpression<'src, Self>>> {
+    fn known<'a>(&'a self) -> Option<RefMut<'a, GenericTerm<'src, Self>>> {
         RefMut::filter_map(self.0.borrow_mut(), |x| {
-            if let ExprVariants::Known { expression, .. } = x {
-                Some(expression)
+            if let TermVariants::Known { term, .. } = x {
+                Some(term)
             } else {
                 None
             }
@@ -284,57 +284,57 @@ impl<'src> Expression<'src> {
     }
 }
 
-impl fmt::Debug for Expression<'_> {
+impl fmt::Debug for Term<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.debug())
     }
 }
 
-impl<'src> ExpressionReference<'src> for Expression<'src> {
+impl<'src> TermReference<'src> for Term<'src> {
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
-            ExprVariants::Known { .. } => true,
-            ExprVariants::Unknown { .. } => false,
-            ExprVariants::Link { target } => target.is_known(),
+            TermVariants::Known { .. } => true,
+            TermVariants::Unknown { .. } => false,
+            TermVariants::Link { target } => target.is_known(),
         }
     }
 
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            ExprVariants::Known {
-                pass, expression, ..
-            } => expression.typ(|e| Self::new_known(*pass, e)),
-            ExprVariants::Unknown { typ, .. } => typ.clone(),
-            ExprVariants::Link { target } => target.typ(),
+            TermVariants::Known {
+                pass, term, ..
+            } => term.typ(|e| Self::new_known(*pass, e)),
+            TermVariants::Unknown { typ, .. } => typ.clone(),
+            TermVariants::Link { target } => target.typ(),
         }
     }
 }
 
-impl<'src> VariableBinding<'src, Expression<'src>> {
+impl<'src> VariableBinding<'src, Term<'src>> {
     fn infer_types(&mut self, pass: u64) -> Result<()> {
         self.variable_value.infer_types(pass)?;
-        self.in_expression.infer_types(pass)
+        self.in_term.infer_types(pass)
     }
 
     fn fresh_variables(&self, new_variables: &mut OldToNewVariable<'src>) -> Self {
         let variable_value = self.variable_value.copy_if_unknown(new_variables);
-        let in_expression = self.in_expression.make_fresh_variables(new_variables);
+        let in_term = self.in_term.make_fresh_variables(new_variables);
 
         Self {
             name: self.name,
             binder: self.binder,
             variable_value,
-            in_expression,
+            in_term,
         }
     }
 
     fn unify(binding0: &mut Self, binding1: &mut Self) -> Result<()> {
-        Expression::unify(&mut binding0.variable_value, &mut binding1.variable_value)?;
-        Expression::unify(&mut binding0.in_expression, &mut binding1.in_expression)
+        Term::unify(&mut binding0.variable_value, &mut binding1.variable_value)?;
+        Term::unify(&mut binding0.in_term, &mut binding1.in_term)
     }
 }
 
-impl<'src> GenericExpression<'src, Expression<'src>> {
+impl<'src> GenericTerm<'src, Term<'src>> {
     fn infer_types(&mut self, pass: u64) -> Result<()> {
         match self {
             Self::TypeOfType => (),
@@ -344,20 +344,20 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
                 argument,
                 typ,
             } => {
-                Expression::unify(
+                Term::unify(
                     &mut typ.typ().fresh_variables(),
-                    &mut Expression::type_of_type(pass),
+                    &mut Term::type_of_type(pass),
                 )?;
                 // TODO: Is this reasoning sound?
                 // We're creating a new bound variable (`argument`) here. If it's unknown, we
                 // want to infer it, so we don't want it to be fresh. Therefore we create fresh
                 // variables for `argument` and `typ`, not `pi_type`.
-                let pi_type = &mut Expression::pi_type(
+                let pi_type = &mut Term::pi_type(
                     pass,
                     argument.fresh_variables(),
                     typ.fresh_variables(),
                 );
-                Expression::unify(pi_type, &mut function.typ().fresh_variables())?;
+                Term::unify(pi_type, &mut function.typ().fresh_variables())?;
 
                 function.infer_types(pass)?;
                 argument.infer_types(pass)?;

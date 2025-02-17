@@ -2,14 +2,14 @@ use std::rc::Rc;
 
 use super::pretty::{Document, Layout, Operator, Side};
 use crate::{
-    context::Context, inference, pretty::TypeAnnotated, Binder, ExpressionReference,
-    GenericExpression, Pretty, Result, VariableBinding,
+    context::Context, inference, pretty::TypeAnnotated, Binder, TermReference,
+    GenericTerm, Pretty, Result, VariableBinding,
 };
 
 #[derive(Clone)]
-pub struct Expression<'src>(Rc<ExprVariants<'src>>);
+pub struct Term<'src>(Rc<TermVariants<'src>>);
 
-impl<'src> ExpressionReference<'src> for Expression<'src> {
+impl<'src> TermReference<'src> for Term<'src> {
     fn is_known(&self) -> bool {
         self.0.is_known()
     }
@@ -19,159 +19,159 @@ impl<'src> ExpressionReference<'src> for Expression<'src> {
     }
 }
 
-impl Pretty for Expression<'_> {
+impl Pretty for Term<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self.0.as_ref() {
-            ExprVariants::Known { expression } => expression.to_document(parent, layout),
-            ExprVariants::Variable(variable) => variable.to_document(parent, layout),
-            ExprVariants::TypeAnnotation { expression, typ } => {
-                TypeAnnotated::new(expression, typ).to_document(parent, layout)
+            TermVariants::Known { term } => term.to_document(parent, layout),
+            TermVariants::Variable(variable) => variable.to_document(parent, layout),
+            TermVariants::TypeAnnotation { term, typ } => {
+                TypeAnnotated::new(term, typ).to_document(parent, layout)
             }
-            ExprVariants::Unknown { typ } => {
+            TermVariants::Unknown { typ } => {
                 TypeAnnotated::new(None, typ).to_document(parent, layout)
             }
         }
     }
 }
 
-impl<'src> Expression<'src> {
+impl<'src> Term<'src> {
     pub fn type_of_type() -> Self {
-        Self::known(GenericExpression::TypeOfType)
+        Self::known(GenericTerm::TypeOfType)
     }
 
     pub fn unknown_value() -> Self {
-        Self::new(ExprVariants::Unknown {
+        Self::new(TermVariants::Unknown {
             typ: Self::unknown_type(),
         })
     }
 
     pub fn unknown_type() -> Self {
-        Self::new(ExprVariants::Unknown {
+        Self::new(TermVariants::Unknown {
             typ: Self::type_of_type(),
         })
     }
 
     pub fn type_constant(name: &'src str) -> Self {
-        Self::known(GenericExpression::Constant {
+        Self::known(GenericTerm::Constant {
             name,
             typ: Self::type_of_type(),
         })
     }
 
     pub fn constant(name: &'src str, typ: Self) -> Self {
-        Self::known(GenericExpression::Constant { name, typ })
+        Self::known(GenericTerm::Constant { name, typ })
     }
 
     pub fn apply(self, argument: Self) -> Self {
-        Self::known(GenericExpression::Apply {
+        Self::known(GenericTerm::Apply {
             function: self,
             argument,
             typ: Self::unknown_type(),
         })
     }
 
-    pub fn let_binding(name: &'src str, variable_value: Self, in_expression: Self) -> Self {
-        Self::binding(Binder::Let, Some(name), variable_value, in_expression)
+    pub fn let_binding(name: &'src str, variable_value: Self, in_term: Self) -> Self {
+        Self::binding(Binder::Let, Some(name), variable_value, in_term)
     }
 
     pub fn pi_type(name: Option<&'src str>, variable_value: Self, result_type: Self) -> Self {
         Self::binding(Binder::Pi, name, variable_value, result_type)
     }
 
-    pub fn lambda(name: &'src str, variable_value: Self, in_expression: Self) -> Self {
-        Self::binding(Binder::Lambda, Some(name), variable_value, in_expression)
+    pub fn lambda(name: &'src str, variable_value: Self, in_term: Self) -> Self {
+        Self::binding(Binder::Lambda, Some(name), variable_value, in_term)
     }
 
     pub fn has_type(self, typ: Self) -> Self {
-        Self::new(ExprVariants::TypeAnnotation {
-            expression: self,
+        Self::new(TermVariants::TypeAnnotation {
+            term: self,
             typ,
         })
     }
 
     pub fn variable(name: &'src str) -> Self {
-        Self::new(ExprVariants::Variable(name))
+        Self::new(TermVariants::Variable(name))
     }
 
-    pub fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Expression<'src>> {
+    pub fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Term<'src>> {
         Ok(match self.0.as_ref() {
-            ExprVariants::Known { expression } => expression.link(ctx)?,
-            ExprVariants::Variable(name) => ctx.lookup(name)?,
-            ExprVariants::TypeAnnotation { expression, typ } => {
-                let expression = expression.link(ctx)?;
+            TermVariants::Known { term } => term.link(ctx)?,
+            TermVariants::Variable(name) => ctx.lookup(name)?,
+            TermVariants::TypeAnnotation { term, typ } => {
+                let term = term.link(ctx)?;
                 let typ = &mut typ.link(ctx)?;
-                inference::Expression::unify(&mut expression.typ(), typ)?;
-                expression
+                inference::Term::unify(&mut term.typ(), typ)?;
+                term
             }
-            ExprVariants::Unknown { typ } => inference::Expression::unknown(typ.link(ctx)?),
+            TermVariants::Unknown { typ } => inference::Term::unknown(typ.link(ctx)?),
         })
     }
 
-    fn new(expr: ExprVariants<'src>) -> Self {
-        Self(Rc::new(expr))
+    fn new(term: TermVariants<'src>) -> Self {
+        Self(Rc::new(term))
     }
 
-    fn known(expression: GenericExpression<'src, Self>) -> Self {
-        Self::new(ExprVariants::Known { expression })
+    fn known(term: GenericTerm<'src, Self>) -> Self {
+        Self::new(TermVariants::Known { term })
     }
 
     fn binding(
         binder: Binder,
         name: Option<&'src str>,
         variable_value: Self,
-        in_expression: Self,
+        in_term: Self,
     ) -> Self {
-        Self::known(GenericExpression::VariableBinding(VariableBinding {
+        Self::known(GenericTerm::VariableBinding(VariableBinding {
             name,
             binder,
             variable_value,
-            in_expression,
+            in_term,
         }))
     }
 }
 
-enum ExprVariants<'src> {
+enum TermVariants<'src> {
     Known {
-        expression: GenericExpression<'src, Expression<'src>>,
+        term: GenericTerm<'src, Term<'src>>,
     },
     TypeAnnotation {
-        expression: Expression<'src>,
-        typ: Expression<'src>,
+        term: Term<'src>,
+        typ: Term<'src>,
     },
     Unknown {
-        typ: Expression<'src>,
+        typ: Term<'src>,
     },
     Variable(&'src str),
 }
 
-impl<'src> ExprVariants<'src> {
+impl<'src> TermVariants<'src> {
     fn is_known(&self) -> bool {
         match self {
             Self::Known { .. } | Self::Variable(_) => true,
-            Self::TypeAnnotation { expression, .. } => expression.is_known(),
+            Self::TypeAnnotation { term, .. } => term.is_known(),
             Self::Unknown { .. } => false,
         }
     }
 
     fn typ(
         &self,
-        new: impl FnOnce(GenericExpression<'src, Expression<'src>>) -> Expression<'src>,
-    ) -> Expression<'src> {
+        new: impl FnOnce(GenericTerm<'src, Term<'src>>) -> Term<'src>,
+    ) -> Term<'src> {
         match self {
-            Self::Known { expression } => expression.typ(new),
-            Self::Variable(_) => Expression::unknown_type(),
+            Self::Known { term } => term.typ(new),
+            Self::Variable(_) => Term::unknown_type(),
             Self::TypeAnnotation { typ, .. } | Self::Unknown { typ, .. } => typ.clone(),
         }
     }
 }
 
-impl<'src> GenericExpression<'src, Expression<'src>> {
-    fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Expression<'src>> {
-        Ok(inference::Expression::new_known(
+impl<'src> GenericTerm<'src, Term<'src>> {
+    fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Term<'src>> {
+        Ok(inference::Term::new_known(
             0,
             match self {
-                Self::TypeOfType => GenericExpression::TypeOfType,
-                Self::Constant { name, typ } => GenericExpression::Constant {
+                Self::TypeOfType => GenericTerm::TypeOfType,
+                Self::Constant { name, typ } => GenericTerm::Constant {
                     name,
                     typ: typ.link(ctx)?,
                 },
@@ -179,41 +179,41 @@ impl<'src> GenericExpression<'src, Expression<'src>> {
                     function,
                     argument,
                     typ,
-                } => GenericExpression::Apply {
+                } => GenericTerm::Apply {
                     function: function.link(ctx)?,
                     argument: argument.link(ctx)?,
                     typ: typ.link(ctx)?,
                 },
                 Self::VariableBinding(binding) => {
-                    GenericExpression::VariableBinding(binding.link(ctx)?)
+                    GenericTerm::VariableBinding(binding.link(ctx)?)
                 }
             },
         ))
     }
 }
 
-impl<'src> VariableBinding<'src, Expression<'src>> {
+impl<'src> VariableBinding<'src, Term<'src>> {
     fn link(
         &self,
         ctx: &mut Context<'src>,
-    ) -> Result<VariableBinding<'src, inference::Expression<'src>>> {
+    ) -> Result<VariableBinding<'src, inference::Term<'src>>> {
         let mut variable_value = self.variable_value.link(ctx)?;
 
-        let in_expression = if let Some(name) = self.name {
+        let in_term = if let Some(name) = self.name {
             variable_value.set_name(name);
 
             ctx.with_variable(name, variable_value.clone(), |ctx| {
-                self.in_expression.link(ctx)
+                self.in_term.link(ctx)
             })?
         } else {
-            self.in_expression.link(ctx)
+            self.in_term.link(ctx)
         }?;
 
         Ok(VariableBinding {
             name: self.name,
             binder: self.binder,
             variable_value,
-            in_expression,
+            in_term,
         })
     }
 }

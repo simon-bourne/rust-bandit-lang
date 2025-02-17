@@ -4,38 +4,38 @@ use winnow::{
     PResult, Parser as _,
 };
 
-use super::{Expression, Parser, TokenList};
+use super::{Term, Parser, TokenList};
 use crate::lex::{Grouping, Keyword, NamedOperator, SrcToken, Token};
 
-pub fn expr<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> PResult<Expression<'src>> {
+pub fn term<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> PResult<Term<'src>> {
     type_annotations().parse_next(input)
 }
 
-fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
+fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     separated_foldr1(pi_types(), NamedOperator::HasType, |term, _op, typ| {
         term.has_type(typ)
     })
 }
 
-fn pi_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
+fn pi_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     separated_foldr1(
         function_applications(),
         NamedOperator::To,
         |input_type, _, output_type| {
-            Expression::pi_type(
+            Term::pi_type(
                 None,
-                Expression::unknown_value().has_type(input_type),
+                Term::unknown_value().has_type(input_type),
                 output_type,
             )
         },
     )
 }
 
-fn function_applications<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
-    repeat(1.., primary()).map(|es: Vec<_>| es.into_iter().reduce(Expression::apply).unwrap())
+fn function_applications<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
+    repeat(1.., primary()).map(|es: Vec<_>| es.into_iter().reduce(Term::apply).unwrap())
 }
 
-fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
+fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     alt((
         unknown(),
         typ(),
@@ -43,62 +43,62 @@ fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
         forall(),
         lambda(),
         let_binding(),
-        parenthesized(expr),
+        parenthesized(term),
     ))
 }
 
-fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
-    identifier().verify_map(|name| (name == "Type").then(Expression::type_of_type))
+fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
+    identifier().verify_map(|name| (name == "Type").then(Term::type_of_type))
 }
 
-fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
+fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(
         Keyword::Forall,
-        separated_pair(variable_binding(), Token::SuchThat, expr),
+        separated_pair(variable_binding(), Token::SuchThat, term),
     )
-    .map(|((var, value), expr)| Expression::pi_type(Some(var), value, expr))
+    .map(|((var, value), term)| Term::pi_type(Some(var), value, term))
 }
 
-fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
+fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(
         Keyword::Let,
         (
             identifier(),
-            opt(preceded(NamedOperator::HasType, expr)),
+            opt(preceded(NamedOperator::HasType, term)),
             NamedOperator::Assign,
-            expr,
+            term,
             Token::SuchThat,
-            expr,
+            term,
         ),
     )
     .map(
-        |(var, typ, _assign, variable_value, _linend, in_expression)| {
-            Expression::let_binding(
+        |(var, typ, _assign, variable_value, _linend, in_term)| {
+            Term::let_binding(
                 var,
                 if let Some(typ) = typ {
                     variable_value.has_type(typ)
                 } else {
                     variable_value
                 },
-                in_expression,
+                in_term,
             )
         },
     )
 }
 
-fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
+fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(
         Token::Lambda,
-        separated_pair(variable_binding(), Token::SuchThat, expr),
+        separated_pair(variable_binding(), Token::SuchThat, term),
     )
-    .map(|((var, value), expr)| Expression::lambda(var, value, expr))
+    .map(|((var, value), term)| Term::lambda(var, value, term))
 }
 
-fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, Expression<'src>)> {
+fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, Term<'src>)> {
     (
         identifier(),
-        opt(preceded(NamedOperator::HasType, expr)).map(|typ| {
-            let value = Expression::unknown_value();
+        opt(preceded(NamedOperator::HasType, term)).map(|typ| {
+            let value = Term::unknown_value();
 
             if let Some(typ) = typ {
                 value.has_type(typ)
@@ -109,12 +109,12 @@ fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, E
     )
 }
 
-fn unknown<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
-    Token::Unknown.map(|_| Expression::unknown_value())
+fn unknown<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
+    Token::Unknown.map(|_| Term::unknown_value())
 }
 
-fn variable<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Expression<'src>> {
-    identifier().map(Expression::variable)
+fn variable<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
+    identifier().map(Term::variable)
 }
 
 fn identifier<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, &'src str> {

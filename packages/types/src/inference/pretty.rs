@@ -1,4 +1,4 @@
-use super::{ExprVariants, Expression};
+use super::{TermVariants, Term};
 use crate::{
     pretty::{Document, Layout, Operator, Side, TypeAnnotated},
     Pretty,
@@ -6,7 +6,7 @@ use crate::{
 
 struct WithId<'src> {
     name: Option<&'src str>,
-    id: *mut ExprVariants<'src>,
+    id: *mut TermVariants<'src>,
 }
 
 impl Pretty for WithId<'_> {
@@ -26,16 +26,16 @@ impl Pretty for WithId<'_> {
     }
 }
 
-impl Pretty for Expression<'_> {
+impl Pretty for Term<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match &*self.0.borrow() {
-            ExprVariants::Known { expression, .. } => expression.to_document(parent, layout),
-            ExprVariants::Unknown { name, typ } => {
+            TermVariants::Known { term, .. } => term.to_document(parent, layout),
+            TermVariants::Unknown { name, typ } => {
                 let name = *name;
                 let id = self.0.as_ptr();
                 TypeAnnotated::new(WithId { name, id }, typ).to_document(parent, layout)
             }
-            ExprVariants::Link { target } => target.to_document(parent, layout),
+            TermVariants::Link { target } => target.to_document(parent, layout),
         }
     }
 }

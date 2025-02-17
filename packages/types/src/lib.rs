@@ -55,48 +55,48 @@ pub type Result<T> = result::Result<T, InferenceError>;
 #[derive(Debug)]
 pub struct InferenceError;
 
-pub trait ExpressionReference<'src>: Pretty + Clone + Sized {
+pub trait TermReference<'src>: Pretty + Clone + Sized {
     fn is_known(&self) -> bool;
 
     fn typ(&self) -> Self;
 }
 
-enum GenericExpression<'src, Expr: ExpressionReference<'src>> {
+enum GenericTerm<'src, Term: TermReference<'src>> {
     TypeOfType,
     Constant {
         name: &'src str,
-        typ: Expr,
+        typ: Term,
     },
     Apply {
-        function: Expr,
-        argument: Expr,
-        typ: Expr,
+        function: Term,
+        argument: Term,
+        typ: Term,
     },
-    VariableBinding(VariableBinding<'src, Expr>),
+    VariableBinding(VariableBinding<'src, Term>),
 }
 
-impl<'src, Expr: ExpressionReference<'src>> GenericExpression<'src, Expr> {
-    fn pi(name: Option<&'src str>, variable_value: Expr, in_expression: Expr) -> Self {
+impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
+    fn pi(name: Option<&'src str>, variable_value: Term, in_term: Term) -> Self {
         Self::VariableBinding(VariableBinding {
             name,
             binder: Binder::Pi,
             variable_value,
-            in_expression,
+            in_term,
         })
     }
 
-    fn typ(&self, new: impl FnOnce(Self) -> Expr) -> Expr {
+    fn typ(&self, new: impl FnOnce(Self) -> Term) -> Term {
         match self {
-            GenericExpression::TypeOfType => new(GenericExpression::TypeOfType),
-            GenericExpression::Constant { typ, .. } => typ.clone(),
-            GenericExpression::Apply { typ, .. } => typ.clone(),
-            GenericExpression::VariableBinding(binding) => match binding.binder {
-                Binder::Let => binding.in_expression.typ(),
-                Binder::Pi => new(GenericExpression::TypeOfType),
-                Binder::Lambda => new(GenericExpression::pi(
+            GenericTerm::TypeOfType => new(GenericTerm::TypeOfType),
+            GenericTerm::Constant { typ, .. } => typ.clone(),
+            GenericTerm::Apply { typ, .. } => typ.clone(),
+            GenericTerm::VariableBinding(binding) => match binding.binder {
+                Binder::Let => binding.in_term.typ(),
+                Binder::Pi => new(GenericTerm::TypeOfType),
+                Binder::Lambda => new(GenericTerm::pi(
                     None,
                     binding.variable_value.clone(),
-                    binding.in_expression.typ(),
+                    binding.in_term.typ(),
                 )),
             },
         }
@@ -113,9 +113,9 @@ enum Binder {
     Lambda,
 }
 
-struct VariableBinding<'src, Expr> {
+struct VariableBinding<'src, Term> {
     name: Option<&'src str>,
     binder: Binder,
-    variable_value: Expr,
-    in_expression: Expr,
+    variable_value: Term,
+    in_term: Term,
 }

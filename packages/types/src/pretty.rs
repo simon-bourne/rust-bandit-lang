@@ -1,6 +1,6 @@
 use pretty::RcDoc;
 
-use super::{ExpressionReference, GenericExpression, VariableBinding};
+use super::{TermReference, GenericTerm, VariableBinding};
 use crate::Binder;
 
 pub trait Pretty {
@@ -32,14 +32,14 @@ impl<T: Pretty> Pretty for &'_ T {
     }
 }
 
-impl<'src, Expr: ExpressionReference<'src>> Pretty for VariableBinding<'src, Expr> {
+impl<'src, Term: TermReference<'src>> Pretty for VariableBinding<'src, Term> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         let to_doc = |kind| {
             Document::concat([
                 kind,
                 variable_to_document(self.name, &self.variable_value, None, layout),
                 Document::text(" ⇒ "),
-                self.in_expression.to_document(None, layout),
+                self.in_term.to_document(None, layout),
             ])
         };
 
@@ -56,7 +56,7 @@ impl<'src, Expr: ExpressionReference<'src>> Pretty for VariableBinding<'src, Exp
                     Operator::Arrow.to_document(
                         parent,
                         &self.variable_value.typ(),
-                        &self.in_expression,
+                        &self.in_term,
                         layout,
                         layout,
                     )
@@ -75,7 +75,7 @@ pub struct TypeAnnotated<Value: Pretty, Type: Pretty> {
 impl<'a, 'src, Value, Type> TypeAnnotated<Value, &'a Type>
 where
     Value: Pretty,
-    Type: ExpressionReference<'src> + 'a,
+    Type: TermReference<'src> + 'a,
 {
     pub fn new(value: Value, typ: &'a Type) -> Self {
         Self {
@@ -104,7 +104,7 @@ impl<Value: Pretty, Type: Pretty> Pretty for TypeAnnotated<Value, Type> {
 
 pub fn variable_to_document<'src>(
     name: Option<&str>,
-    value: &impl ExpressionReference<'src>,
+    value: &impl TermReference<'src>,
     parent: Option<(Operator, Side)>,
     layout: Layout,
 ) -> Document {
@@ -124,7 +124,7 @@ pub fn variable_to_document<'src>(
     }
 }
 
-impl<'src, Expr: ExpressionReference<'src>> Pretty for GenericExpression<'src, Expr> {
+impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self {
             Self::TypeOfType => Document::text("Type"),

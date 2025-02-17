@@ -1,18 +1,18 @@
-use crate::{Binder, ExpressionReference, GenericExpression, SharedMut, VariableBinding};
+use crate::{Binder, TermReference, GenericTerm, SharedMut, VariableBinding};
 
 mod pretty;
 
 #[derive(Clone)]
-pub struct Expression<'src>(SharedMut<GenericExpression<'src, Self>>);
+pub struct Term<'src>(SharedMut<GenericTerm<'src, Self>>);
 
-impl<'src> Expression<'src> {
+impl<'src> Term<'src> {
     pub fn reduce(&mut self) {
         let mut borrowed = self.0.borrow_mut();
 
         match &mut *borrowed {
-            GenericExpression::TypeOfType => {}
-            GenericExpression::Constant { typ, .. } => typ.reduce(),
-            GenericExpression::Apply {
+            GenericTerm::TypeOfType => {}
+            GenericTerm::Constant { typ, .. } => typ.reduce(),
+            GenericTerm::Apply {
                 function,
                 argument,
                 typ,
@@ -23,17 +23,17 @@ impl<'src> Expression<'src> {
 
                 function.apply(argument);
             }
-            GenericExpression::VariableBinding(variable_binding) => match variable_binding.binder {
+            GenericTerm::VariableBinding(variable_binding) => match variable_binding.binder {
                 Binder::Let => {
                     variable_binding.reduce();
-                    let reduced = variable_binding.in_expression.clone();
+                    let reduced = variable_binding.in_term.clone();
                     drop(borrowed);
                     *self = reduced;
                 }
                 Binder::Pi => variable_binding.reduce(),
                 Binder::Lambda => {
                     variable_binding.variable_value.reduce();
-                    variable_binding.in_expression.reduce();
+                    variable_binding.in_term.reduce();
                 }
             },
         };
@@ -43,21 +43,21 @@ impl<'src> Expression<'src> {
         let mut borrowed = self.0.borrow_mut();
 
         match &mut *borrowed {
-            GenericExpression::TypeOfType => {}
-            GenericExpression::Constant { .. } => todo!(),
-            GenericExpression::Apply { .. } => {}
-            GenericExpression::VariableBinding(_) => {
+            GenericTerm::TypeOfType => {}
+            GenericTerm::Constant { .. } => todo!(),
+            GenericTerm::Apply { .. } => {}
+            GenericTerm::VariableBinding(_) => {
                 todo!()
             }
         }
     }
 
-    fn new(expression: GenericExpression<'src, Self>) -> Self {
-        Self(SharedMut::new(expression))
+    fn new(term: GenericTerm<'src, Self>) -> Self {
+        Self(SharedMut::new(term))
     }
 }
 
-impl<'src> ExpressionReference<'src> for Expression<'src> {
+impl<'src> TermReference<'src> for Term<'src> {
     fn is_known(&self) -> bool {
         true
     }
@@ -67,9 +67,9 @@ impl<'src> ExpressionReference<'src> for Expression<'src> {
     }
 }
 
-impl<'src> VariableBinding<'src, Expression<'src>> {
+impl<'src> VariableBinding<'src, Term<'src>> {
     fn reduce(&mut self) {
         self.variable_value.reduce();
-        self.in_expression.reduce();
+        self.in_term.reduce();
     }
 }

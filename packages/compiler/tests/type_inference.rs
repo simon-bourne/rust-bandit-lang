@@ -2,14 +2,14 @@ use std::collections::HashMap;
 
 use bandit_parser::{
     lex::{SrcToken, Token},
-    parse::expr,
+    parse::term,
 };
-use bandit_types::{context::Context, inference, source::Expression, InferenceError, Pretty};
+use bandit_types::{context::Context, inference, source::Term, InferenceError, Pretty};
 use winnow::Parser;
 
-fn parse(input: &str) -> Expression<'_> {
+fn parse(input: &str) -> Term<'_> {
     let tokens: Vec<SrcToken> = Token::layout(input).collect();
-    expr.parse(&tokens).unwrap()
+    term.parse(&tokens).unwrap()
 }
 
 fn context<'src>(
@@ -19,11 +19,11 @@ fn context<'src>(
     let mut global_items = HashMap::new();
 
     for typ in types {
-        global_items.insert(typ, Expression::type_constant(typ));
+        global_items.insert(typ, Term::type_constant(typ));
     }
 
     for (name, typ) in items {
-        global_items.insert(name, Expression::constant(name, parse(typ)));
+        global_items.insert(name, Term::constant(name, parse(typ)));
     }
 
     Context::new(global_items)
@@ -37,8 +37,8 @@ trait Test {
 
 impl Test for &str {
     fn infers(self, expected: &str) {
-        let expr = infer_types(self).unwrap();
-        assert_eq!(expr.to_pretty_string(80), expected);
+        let term = infer_types(self).unwrap();
+        assert_eq!(term.to_pretty_string(80), expected);
     }
 
     fn fails(self) {
@@ -46,7 +46,7 @@ impl Test for &str {
     }
 }
 
-fn infer_types(input: &str) -> Result<inference::Expression, InferenceError> {
+fn infer_types(input: &str) -> Result<inference::Term, InferenceError> {
     let ctx = &mut context(
         ["Bool", "Int", "Float"],
         [
@@ -62,9 +62,9 @@ fn infer_types(input: &str) -> Result<inference::Expression, InferenceError> {
         ],
     );
 
-    let mut expr = parse(input).link(ctx).unwrap();
-    expr.infer_types(0)?;
-    Ok(expr)
+    let mut term = parse(input).link(ctx).unwrap();
+    term.infer_types(0)?;
+    Ok(term)
 }
 
 #[test]
@@ -107,7 +107,7 @@ fn scope_escape() {
 #[test]
 // TODO: Implement an occurs check
 // Currently, this will happily infer an infinite type (and create `Rc` circular references). It
-// will stack overflow when we try and convert the expression to a string.
+// will stack overflow when we try and convert the term to a string.
 #[ignore = "This tests the occurs check, which is not implemented yet"]
 fn occurs_check() {
     r"\x ⇒ x x".infers("");
