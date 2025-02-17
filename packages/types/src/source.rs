@@ -10,7 +10,7 @@ use crate::{
 pub struct Term<'src>(Rc<TermVariants<'src>>);
 
 impl<'src> TermReference<'src> for Term<'src> {
-    type Variable = &'src str;
+    type Variable = Option<&'src str>;
 
     fn is_known(&self) -> bool {
         self.0.is_known()
@@ -173,11 +173,8 @@ impl<'src> GenericTerm<'src, Term<'src>> {
                     argument: argument.link(ctx)?,
                     typ: typ.link(ctx)?,
                 },
-                Self::Variable(name) => GenericTerm::Variable(inference::Variable::Bound {
-                    name,
-                    value: ctx.lookup(name)?,
-                    typ: inference::Term::unknown_type(),
-                }),
+                Self::Variable(Some(name)) => return ctx.lookup(name),
+                Self::Variable(None) => return Ok(inference::Term::unknown_type()),
                 Self::VariableBinding(binding) => GenericTerm::VariableBinding(binding.link(ctx)?),
             },
         ))
@@ -189,11 +186,9 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         &self,
         ctx: &mut Context<'src>,
     ) -> Result<VariableBinding<'src, inference::Term<'src>>> {
-        let mut variable_value = self.variable_value.link(ctx)?;
+        let variable_value = self.variable_value.link(ctx)?;
 
         let in_term = if let Some(name) = self.name {
-            variable_value.set_name(name);
-
             ctx.with_variable(name, variable_value.clone(), |ctx| self.in_term.link(ctx))?
         } else {
             self.in_term.link(ctx)

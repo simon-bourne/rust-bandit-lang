@@ -13,12 +13,7 @@ enum TermVariants<'src> {
     // TODO: Rename to `Value`
     Known {
         pass: u64,
-        name: Option<&'src str>,
         term: GenericTerm<'src, Term<'src>>,
-    },
-    Unknown {
-        name: Option<&'src str>,
-        typ: Term<'src>,
     },
     Link {
         target: Term<'src>,
@@ -29,7 +24,7 @@ type OldToNewVariable<'src> = HashMap<*mut TermVariants<'src>, Term<'src>>;
 
 impl<'src> Term<'src> {
     pub fn unknown(typ: Self) -> Self {
-        Self::new(TermVariants::Unknown { name: None, typ })
+        Self::new_known(0, GenericTerm::Variable(Variable { name: None, typ }))
     }
 
     pub fn unknown_type() -> Self {
@@ -47,18 +42,15 @@ impl<'src> Term<'src> {
         }
 
         match &*self.0.borrow() {
-            TermVariants::Known { pass, name, term } => {
+            TermVariants::Known { pass, term } => {
                 let generic_term = match term {
-                    GenericTerm::Variable(variable) => GenericTerm::Variable(match variable {
-                        Variable::Free { typ } => Variable::Free {
-                            typ: typ.make_fresh_variables(new_variables),
-                        },
-                        Variable::Bound { name, value, typ } => Variable::Bound {
-                            name,
-                            value: value.make_fresh_variables(new_variables),
-                            typ: typ.make_fresh_variables(new_variables),
-                        },
-                    }),
+                    GenericTerm::Variable(variable) => {
+                        let typ = variable.typ.make_fresh_variables(new_variables);
+                        GenericTerm::Variable(Variable {
+                            name: variable.name,
+                            typ,
+                        })
+                    }
                     GenericTerm::VariableBinding(binding) => {
                         GenericTerm::VariableBinding(binding.fresh_variables(new_variables))
                     }
@@ -80,16 +72,14 @@ impl<'src> Term<'src> {
 
                 Self::new(TermVariants::Known {
                     pass: *pass,
-                    name: *name,
                     term: generic_term,
                 })
             }
-            TermVariants::Unknown { .. } => self.clone(),
             TermVariants::Link { target } => target.make_fresh_variables(new_variables),
         }
     }
 
-    fn copy_if_unknown(&self, new_variables: &mut OldToNewVariable<'src>) -> Self {
+    fn copy_if_variable(&self, new_variables: &mut OldToNewVariable<'src>) -> Self {
         let key = self.0.as_ptr();
 
         if let Some(variable) = new_variables.get(&key) {
@@ -97,33 +87,26 @@ impl<'src> Term<'src> {
         }
 
         match &*self.0.borrow() {
-            TermVariants::Known { .. } => self.clone(),
-            TermVariants::Unknown { name, typ } => {
-                let new_unknown = Self::new(TermVariants::Unknown {
-                    name: *name,
-                    typ: typ.make_fresh_variables(new_variables),
-                });
-                new_variables.insert(key, new_unknown.clone());
-
-                new_unknown
+            TermVariants::Known { pass, term } => {
+                if let GenericTerm::Variable(Variable {
+                    name: Some(name),
+                    typ,
+                }) = term
+                {
+                    let new_var = Self::new_known(
+                        *pass,
+                        GenericTerm::Variable(Variable {
+                            name: Some(*name),
+                            typ: typ.make_fresh_variables(new_variables),
+                        }),
+                    );
+                    new_variables.insert(key, new_var.clone());
+                    new_var
+                } else {
+                    self.clone()
+                }
             }
-            TermVariants::Link { target } => target.copy_if_unknown(new_variables),
-        }
-    }
-
-    fn name(&self) -> Option<&'src str> {
-        match &*self.0.borrow() {
-            TermVariants::Known { name, .. } | TermVariants::Unknown { name, .. } => *name,
-            TermVariants::Link { target } => target.name(),
-        }
-    }
-
-    pub fn set_name(&mut self, new_name: &'src str) {
-        match &mut *self.0.borrow_mut() {
-            TermVariants::Known { name, .. } | TermVariants::Unknown { name, .. } => {
-                *name = Some(new_name)
-            }
-            TermVariants::Link { target } => target.set_name(new_name),
+            TermVariants::Link { target } => target.copy_if_variable(new_variables),
         }
     }
 
@@ -136,13 +119,10 @@ impl<'src> Term<'src> {
     }
 
     pub(crate) fn new_known(pass: u64, term: GenericTerm<'src, Self>) -> Self {
-        Self(SharedMut::new(TermVariants::Known {
-            pass,
-            name: None,
-            term,
-        }))
+        Self(SharedMut::new(TermVariants::Known { pass, term }))
     }
 
+    // TODO: Can we combine this and `new_known`
     fn new(term: TermVariants<'src>) -> Self {
         Self(SharedMut::new(term))
     }
@@ -154,13 +134,12 @@ impl<'src> Term<'src> {
         )?;
 
         match &mut *self.0.try_borrow_mut()? {
-            TermVariants::Known { pass, term, .. } => {
+            TermVariants::Known { pass, term } => {
                 if current_pass <= *pass {
                     *pass = current_pass + 1;
                     term.infer_types(current_pass)?
                 }
             }
-            TermVariants::Unknown { typ, .. } => typ.infer_types(current_pass)?,
             TermVariants::Link { target } => target.infer_types(current_pass)?,
         }
 
@@ -179,37 +158,27 @@ impl<'src> Term<'src> {
         };
     }
 
-    fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
-        let mut typ = {
-            let TermVariants::Unknown { typ, .. } = &mut *self.0.try_borrow_mut()? else {
-                return Ok(ControlFlow::Continue(()));
-            };
-            typ.clone()
-        };
-
-        // We need to replace ourself with `other` in case `typ` references `self`.
-        self.replace_with(other);
-        Self::unify(&mut typ, &mut other.typ())?;
-
-        Ok(ControlFlow::Break(()))
-    }
-
     fn unify_variable(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
         let mut self_ref = self.known().expect("self should be known at this point");
         let mut other_ref = other.known().expect("other should be known at this point");
 
         Ok(match (&mut *self_ref, &mut *other_ref) {
-            (GenericTerm::Variable(variable0), GenericTerm::Variable(variable1)) => {
+            (GenericTerm::Variable(variable), GenericTerm::Variable(other_variable)) => {
                 // TODO: Prefer bound variables, and free variables with smaller scope
-                let mut typ = variable0.typ();
+                Self::unify(&mut variable.typ, &mut other_variable.typ)?;
+                let other_name = other_variable.name;
                 drop((self_ref, other_ref));
-                self.replace_with(other);
-                Self::unify(&mut typ, &mut other.typ())?;
+
+                if other_name.is_some() {
+                    self.replace_with(other);
+                } else {
+                    other.replace_with(self);
+                }
 
                 ControlFlow::Break(())
             }
             (GenericTerm::Variable(variable), _) => {
-                let mut typ = variable.typ();
+                let mut typ = variable.typ.clone();
                 drop((self_ref, other_ref));
                 self.replace_with(other);
                 Self::unify(&mut typ, &mut other.typ())?;
@@ -228,8 +197,6 @@ impl<'src> Term<'src> {
         y.collapse_links();
 
         if SharedMut::is_same(&x.0, &y.0)
-            || x.unify_unknown(y)?.is_break()
-            || y.unify_unknown(x)?.is_break()
             || x.unify_variable(y)?.is_break()
             || y.unify_variable(x)?.is_break()
         {
@@ -296,16 +263,10 @@ impl<'src> Term<'src> {
     }
 
     fn replace_with(&mut self, other: &Self) {
-        let name = other.name().or_else(|| self.name());
-
         self.0.replace_with(TermVariants::Link {
             target: other.clone(),
         });
         *self = other.clone();
-
-        if let Some(name) = name {
-            self.set_name(name);
-        }
     }
 
     fn known<'a>(&'a self) -> Option<RefMut<'a, GenericTerm<'src, Self>>> {
@@ -326,43 +287,20 @@ impl fmt::Debug for Term<'_> {
     }
 }
 
-pub enum Variable<'src> {
-    Free {
-        typ: Term<'src>,
-    },
-    Bound {
-        name: &'src str,
-        value: Term<'src>,
-        typ: Term<'src>,
-    },
-}
-
-impl<'src> Variable<'src> {
-    fn typ(&self) -> Term<'src> {
-        match self {
-            Self::Free { typ } | Variable::Bound { typ, .. } => typ.clone(),
-        }
-    }
-
-    fn infer_types(&mut self, pass: u64) -> Result<()> {
-        match self {
-            Self::Free { typ } => typ.infer_types(pass),
-            Self::Bound { value, typ, .. } => {
-                value.infer_types(pass)?;
-                typ.infer_types(pass)?;
-                Ok(())
-            }
-        }
-    }
+pub struct Variable<'src> {
+    name: Option<&'src str>,
+    typ: Term<'src>,
 }
 
 impl<'src> TermReference<'src> for Term<'src> {
     type Variable = Variable<'src>;
 
+    // TODO: Invert and rename to `is_free_variable`
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
-            TermVariants::Known { .. } => true,
-            TermVariants::Unknown { .. } => false,
+            TermVariants::Known { term, .. } => {
+                !matches!(term, GenericTerm::Variable(Variable { name: Some(_), .. }))
+            }
             TermVariants::Link { target } => target.is_known(),
         }
     }
@@ -370,9 +308,8 @@ impl<'src> TermReference<'src> for Term<'src> {
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
             TermVariants::Known { pass, term, .. } => {
-                term.typ(|e| Self::new_known(*pass, e), Variable::typ)
+                term.typ(|e| Self::new_known(*pass, e), |var| var.typ.clone())
             }
-            TermVariants::Unknown { typ, .. } => typ.clone(),
             TermVariants::Link { target } => target.typ(),
         }
     }
@@ -385,7 +322,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
     }
 
     fn fresh_variables(&self, new_variables: &mut OldToNewVariable<'src>) -> Self {
-        let variable_value = self.variable_value.copy_if_unknown(new_variables);
+        let variable_value = self.variable_value.copy_if_variable(new_variables);
         let in_term = self.in_term.make_fresh_variables(new_variables);
 
         Self {
@@ -428,7 +365,7 @@ impl<'src> GenericTerm<'src, Term<'src>> {
                 argument.infer_types(pass)?;
                 typ.infer_types(pass)?;
             }
-            Self::Variable(variable) => variable.infer_types(pass)?,
+            Self::Variable(variable) => variable.typ.infer_types(pass)?,
             Self::VariableBinding(binding) => binding.infer_types(pass)?,
         }
 

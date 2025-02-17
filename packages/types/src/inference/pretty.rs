@@ -32,11 +32,6 @@ impl Pretty for Term<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match &*self.0.borrow() {
             TermVariants::Known { term, .. } => term.to_document(parent, layout),
-            TermVariants::Unknown { name, typ } => {
-                let name = *name;
-                let id = self.0.as_ptr();
-                TypeAnnotated::new(WithId { value: name, id }, typ).to_document(parent, layout)
-            }
             TermVariants::Link { target } => target.to_document(parent, layout),
         }
     }
@@ -44,18 +39,24 @@ impl Pretty for Term<'_> {
 
 impl Pretty for Variable<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        match self {
-            Self::Free { typ } => TypeAnnotated::new(
+        if let Some(name) = self.name {
+            TypeAnnotated::new(
+                WithId {
+                    value: name,
+                    id: ptr::from_ref(self),
+                },
+                &self.typ,
+            )
+            .to_document(parent, layout)
+        } else {
+            TypeAnnotated::new(
                 WithId {
                     value: None,
                     id: ptr::from_ref(self),
                 },
-                typ,
+                &self.typ,
             )
-            .to_document(parent, layout),
-            Self::Bound { name, value, typ } => {
-                TypeAnnotated::new(WithId { value, id: name }, typ).to_document(parent, layout)
-            }
+            .to_document(parent, layout)
         }
     }
 }
