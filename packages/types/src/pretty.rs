@@ -137,6 +137,7 @@ impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
                 typ,
             } => TypeAnnotated::new(BinaryOperator(function, Operator::Apply, argument), typ)
                 .to_document(parent, layout),
+            Self::Variable(variable) => variable.to_document(parent, layout),
             Self::VariableBinding(binding) => binding.to_document(parent, layout),
         }
     }

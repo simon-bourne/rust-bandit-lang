@@ -147,7 +147,7 @@ impl<'src> TermVariants<'src> {
 
     fn typ(&self, new: impl FnOnce(GenericTerm<'src, Term<'src>>) -> Term<'src>) -> Term<'src> {
         match self {
-            Self::Known { term } => term.typ(new),
+            Self::Known { term } => term.typ(new, |_| Term::unknown_type()),
             Self::Variable(_) => Term::unknown_type(),
             Self::TypeAnnotation { typ, .. } | Self::Unknown { typ, .. } => typ.clone(),
         }
@@ -173,6 +173,11 @@ impl<'src> GenericTerm<'src, Term<'src>> {
                     argument: argument.link(ctx)?,
                     typ: typ.link(ctx)?,
                 },
+                Self::Variable(name) => GenericTerm::Variable(inference::Variable::Bound {
+                    name,
+                    value: ctx.lookup(name)?,
+                    typ: inference::Term::unknown_type(),
+                }),
                 Self::VariableBinding(binding) => GenericTerm::VariableBinding(binding.link(ctx)?),
             },
         ))

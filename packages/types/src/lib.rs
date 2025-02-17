@@ -57,7 +57,7 @@ pub struct InferenceError;
 
 pub trait TermReference<'src>: Pretty + Clone + Sized {
     type Variable: Pretty;
-    
+
     fn is_known(&self) -> bool;
 
     fn typ(&self) -> Self;
@@ -74,6 +74,7 @@ enum GenericTerm<'src, Term: TermReference<'src>> {
         argument: Term,
         typ: Term,
     },
+    Variable(Term::Variable),
     VariableBinding(VariableBinding<'src, Term>),
 }
 
@@ -87,11 +88,16 @@ impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
         })
     }
 
-    fn typ(&self, new: impl FnOnce(Self) -> Term) -> Term {
+    fn typ(
+        &self,
+        new: impl FnOnce(Self) -> Term,
+        variable_type: impl FnOnce(&Term::Variable) -> Term,
+    ) -> Term {
         match self {
             GenericTerm::TypeOfType => new(GenericTerm::TypeOfType),
             GenericTerm::Constant { typ, .. } => typ.clone(),
             GenericTerm::Apply { typ, .. } => typ.clone(),
+            GenericTerm::Variable(variable) => variable_type(variable),
             GenericTerm::VariableBinding(binding) => match binding.binder {
                 Binder::Let => binding.in_term.typ(),
                 Binder::Pi => new(GenericTerm::TypeOfType),

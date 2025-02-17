@@ -10,6 +10,7 @@ mod pretty;
 pub struct Term<'src>(SharedMut<TermVariants<'src>>);
 
 enum TermVariants<'src> {
+    // TODO: Rename to `Value`
     Known {
         pass: u64,
         name: Option<&'src str>,
@@ -31,6 +32,10 @@ impl<'src> Term<'src> {
         Self::new(TermVariants::Unknown { name: None, typ })
     }
 
+    pub fn unknown_type() -> Self {
+        Self::unknown(Self::type_of_type(0))
+    }
+
     // TODO: The implementation of this is ugly and inefficient.
     pub fn fresh_variables(&self) -> Self {
         self.make_fresh_variables(&mut HashMap::new())
@@ -44,6 +49,16 @@ impl<'src> Term<'src> {
         match &*self.0.borrow() {
             TermVariants::Known { pass, name, term } => {
                 let generic_term = match term {
+                    GenericTerm::Variable(variable) => GenericTerm::Variable(match variable {
+                        Variable::Free { typ } => Variable::Free {
+                            typ: typ.make_fresh_variables(new_variables),
+                        },
+                        Variable::Bound { name, value, typ } => Variable::Bound {
+                            name,
+                            value: value.make_fresh_variables(new_variables),
+                            typ: typ.make_fresh_variables(new_variables),
+                        },
+                    }),
                     GenericTerm::VariableBinding(binding) => {
                         GenericTerm::VariableBinding(binding.fresh_variables(new_variables))
                     }
@@ -231,6 +246,9 @@ impl<'src> Term<'src> {
                 Self::unify(argument, argument1)?;
                 Self::unify(typ, typ1)?;
             }
+            (GenericTerm::Variable(_variable0), GenericTerm::Variable(_variable1)) => todo!(),
+            (GenericTerm::Variable(_variable), _other) => todo!(),
+            (_other, GenericTerm::Variable(_variable)) => todo!(),
             (GenericTerm::VariableBinding(binding0), GenericTerm::VariableBinding(binding1)) => {
                 VariableBinding::unify(binding0, binding1)?
             }
@@ -290,6 +308,25 @@ pub enum Variable<'src> {
     },
 }
 
+impl<'src> Variable<'src> {
+    fn typ(&self) -> Term<'src> {
+        match self {
+            Self::Free { typ } | Variable::Bound { typ, .. } => typ.clone(),
+        }
+    }
+
+    fn infer_types(&mut self, pass: u64) -> Result<()> {
+        match self {
+            Self::Free { typ } => typ.infer_types(pass),
+            Self::Bound { value, typ, .. } => {
+                value.infer_types(pass)?;
+                typ.infer_types(pass)?;
+                Ok(())
+            }
+        }
+    }
+}
+
 impl<'src> TermReference<'src> for Term<'src> {
     type Variable = Variable<'src>;
 
@@ -303,7 +340,9 @@ impl<'src> TermReference<'src> for Term<'src> {
 
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            TermVariants::Known { pass, term, .. } => term.typ(|e| Self::new_known(*pass, e)),
+            TermVariants::Known { pass, term, .. } => {
+                term.typ(|e| Self::new_known(*pass, e), Variable::typ)
+            }
             TermVariants::Unknown { typ, .. } => typ.clone(),
             TermVariants::Link { target } => target.typ(),
         }
@@ -360,6 +399,7 @@ impl<'src> GenericTerm<'src, Term<'src>> {
                 argument.infer_types(pass)?;
                 typ.infer_types(pass)?;
             }
+            Self::Variable(variable) => variable.infer_types(pass)?,
             Self::VariableBinding(binding) => binding.infer_types(pass)?,
         }
 

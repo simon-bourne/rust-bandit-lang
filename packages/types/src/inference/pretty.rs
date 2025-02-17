@@ -45,8 +45,17 @@ impl Pretty for Term<'_> {
 impl Pretty for Variable<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self {
-            Self::Free { typ } => TypeAnnotated::new(WithId { value: None, id: ptr::from_ref(self) }, typ).to_document(parent, layout),
-            Self::Bound { name, value, typ } => TypeAnnotated::new(WithId { value, id: name }, typ).to_document(parent, layout),
+            Self::Free { typ } => TypeAnnotated::new(
+                WithId {
+                    value: None,
+                    id: ptr::from_ref(self),
+                },
+                typ,
+            )
+            .to_document(parent, layout),
+            Self::Bound { name, value, typ } => {
+                TypeAnnotated::new(WithId { value, id: name }, typ).to_document(parent, layout)
+            }
         }
     }
 }

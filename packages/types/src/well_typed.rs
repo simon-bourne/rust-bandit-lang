@@ -23,6 +23,7 @@ impl<'src> Term<'src> {
 
                 function.apply(argument);
             }
+            GenericTerm::Variable(_) => todo!(),
             GenericTerm::VariableBinding(variable_binding) => match variable_binding.binder {
                 Binder::Let => {
                     variable_binding.reduce();
@@ -46,6 +47,7 @@ impl<'src> Term<'src> {
             GenericTerm::TypeOfType => {}
             GenericTerm::Constant { .. } => todo!(),
             GenericTerm::Apply { .. } => {}
+            GenericTerm::Variable(_) => todo!(),
             GenericTerm::VariableBinding(_) => {
                 todo!()
             }
@@ -65,7 +67,7 @@ impl<'src> TermReference<'src> for Term<'src> {
     }
 
     fn typ(&self) -> Self {
-        self.0.borrow().typ(Self::new)
+        self.0.borrow().typ(Self::new, Self::typ)
     }
 }
 
