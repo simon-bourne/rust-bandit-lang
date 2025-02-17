@@ -131,18 +131,6 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    fn collapse_links(&mut self) {
-        // Collapse links from the bottom up so they are also collapsed for other
-        // terms that reference this chain.
-        *self = {
-            let TermVariants::Link { target } = &mut *self.0.borrow_mut() else {
-                return;
-            };
-            target.collapse_links();
-            target.clone()
-        };
-    }
-
     fn unify_variable(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
         let mut self_ref = self.known().expect("self should be known at this point");
         let mut other_ref = other.known().expect("other should be known at this point");
@@ -254,6 +242,18 @@ impl<'src> Term<'src> {
             target: other.clone(),
         });
         *self = other.clone();
+    }
+
+    fn collapse_links(&mut self) {
+        // Collapse links from the bottom up so they are also collapsed for other
+        // terms that reference this chain.
+        *self = {
+            let TermVariants::Link { target } = &mut *self.0.borrow_mut() else {
+                return;
+            };
+            target.collapse_links();
+            target.clone()
+        };
     }
 
     fn known<'a>(&'a self) -> Option<RefMut<'a, GenericTerm<'src, Self>>> {
