@@ -159,7 +159,7 @@ impl<'src> GenericTerm<'src, Term<'src>> {
                     typ: typ.link(ctx)?,
                 },
                 Self::Variable(Some(name)) => return ctx.lookup(name),
-                Self::Variable(None) => return Ok(inference::Term::unknown_type()),
+                Self::Variable(None) => return Ok(inference::Term::unknown_value()),
                 Self::VariableBinding(binding) => GenericTerm::VariableBinding(binding.link(ctx)?),
             },
         ))

@@ -27,6 +27,10 @@ impl<'src> Term<'src> {
         Self::new_known(0, GenericTerm::Variable(Variable { name: None, typ }))
     }
 
+    pub fn unknown_value() -> Self {
+        Self::unknown(Self::unknown_type())
+    }
+
     pub fn unknown_type() -> Self {
         Self::unknown(Self::type_of_type(0))
     }
