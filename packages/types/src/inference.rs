@@ -86,15 +86,11 @@ impl<'src> Term<'src> {
 
         match &*self.0.borrow() {
             TermVariants::Known { pass, term } => {
-                if let GenericTerm::Variable(Variable {
-                    name: Some(name),
-                    typ,
-                }) = term
-                {
+                if let GenericTerm::Variable(Variable { name, typ }) = term {
                     let new_var = Self::new_known(
                         *pass,
                         GenericTerm::Variable(Variable {
-                            name: Some(*name),
+                            name: *name,
                             typ: typ.make_fresh_variables(new_variables),
                         }),
                     );
@@ -167,7 +163,7 @@ impl<'src> Term<'src> {
                 let mut other_typ = other_variable.typ.clone();
                 let name = variable.name;
                 drop((self_ref, other_ref));
-                
+
                 if name.is_some() {
                     other.replace_with(self);
                 } else {
