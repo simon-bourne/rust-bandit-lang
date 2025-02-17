@@ -17,14 +17,14 @@ impl<'src> TermReference<'src> for Term<'src> {
     }
 
     fn typ(&self) -> Self {
-        self.0.typ(Self::known)
+        self.0.typ(Self::value)
     }
 }
 
 impl Pretty for Term<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self.0.as_ref() {
-            TermVariants::Known { term } => term.to_document(parent, layout),
+            TermVariants::Value { term } => term.to_document(parent, layout),
             TermVariants::TypeAnnotation { term, typ } => {
                 TypeAnnotated::new(term, typ).to_document(parent, layout)
             }
@@ -34,26 +34,26 @@ impl Pretty for Term<'_> {
 
 impl<'src> Term<'src> {
     pub fn type_of_type() -> Self {
-        Self::known(GenericTerm::TypeOfType)
+        Self::value(GenericTerm::TypeOfType)
     }
 
     pub fn unknown() -> Self {
-        Self::known(GenericTerm::Variable(None))
+        Self::value(GenericTerm::Variable(None))
     }
 
     pub fn type_constant(name: &'src str) -> Self {
-        Self::known(GenericTerm::Constant {
+        Self::value(GenericTerm::Constant {
             name,
             typ: Self::type_of_type(),
         })
     }
 
     pub fn constant(name: &'src str, typ: Self) -> Self {
-        Self::known(GenericTerm::Constant { name, typ })
+        Self::value(GenericTerm::Constant { name, typ })
     }
 
     pub fn apply(self, argument: Self) -> Self {
-        Self::known(GenericTerm::Apply {
+        Self::value(GenericTerm::Apply {
             function: self,
             argument,
             typ: Self::unknown(),
@@ -77,12 +77,12 @@ impl<'src> Term<'src> {
     }
 
     pub fn variable(name: &'src str) -> Self {
-        Self::known(GenericTerm::Variable(Some(name)))
+        Self::value(GenericTerm::Variable(Some(name)))
     }
 
     pub fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Term<'src>> {
         Ok(match self.0.as_ref() {
-            TermVariants::Known { term } => term.link(ctx)?,
+            TermVariants::Value { term } => term.link(ctx)?,
             TermVariants::TypeAnnotation { term, typ } => {
                 let term = term.link(ctx)?;
                 let typ = &mut typ.link(ctx)?;
@@ -96,8 +96,8 @@ impl<'src> Term<'src> {
         Self(Rc::new(term))
     }
 
-    fn known(term: GenericTerm<'src, Self>) -> Self {
-        Self::new(TermVariants::Known { term })
+    fn value(term: GenericTerm<'src, Self>) -> Self {
+        Self::new(TermVariants::Value { term })
     }
 
     fn binding(
@@ -106,7 +106,7 @@ impl<'src> Term<'src> {
         variable_value: Self,
         in_term: Self,
     ) -> Self {
-        Self::known(GenericTerm::VariableBinding(VariableBinding {
+        Self::value(GenericTerm::VariableBinding(VariableBinding {
             name,
             binder,
             variable_value,
@@ -116,24 +116,24 @@ impl<'src> Term<'src> {
 }
 
 enum TermVariants<'src> {
-    Known { term: GenericTerm<'src, Term<'src>> },
+    Value { term: GenericTerm<'src, Term<'src>> },
     TypeAnnotation { term: Term<'src>, typ: Term<'src> },
 }
 
 impl<'src> TermVariants<'src> {
     fn is_known(&self) -> bool {
         match self {
-            Self::Known {
+            Self::Value {
                 term: GenericTerm::Variable(None),
             } => false,
-            Self::Known { .. } => true,
+            Self::Value { .. } => true,
             Self::TypeAnnotation { term, .. } => term.is_known(),
         }
     }
 
     fn typ(&self, new: impl FnOnce(GenericTerm<'src, Term<'src>>) -> Term<'src>) -> Term<'src> {
         match self {
-            Self::Known { term } => term.typ(new, |_| Term::unknown()),
+            Self::Value { term } => term.typ(new, |_| Term::unknown()),
             Self::TypeAnnotation { typ, .. } => typ.clone(),
         }
     }
