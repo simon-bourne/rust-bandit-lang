@@ -2,8 +2,8 @@ use std::rc::Rc;
 
 use super::pretty::{Document, Layout, Operator, Side};
 use crate::{
-    context::Context, inference, pretty::TypeAnnotated, Binder, TermReference,
-    GenericTerm, Pretty, Result, VariableBinding,
+    context::Context, inference, pretty::TypeAnnotated, Binder, GenericTerm, Pretty, Result,
+    TermReference, VariableBinding,
 };
 
 #[derive(Clone)]
@@ -83,10 +83,7 @@ impl<'src> Term<'src> {
     }
 
     pub fn has_type(self, typ: Self) -> Self {
-        Self::new(TermVariants::TypeAnnotation {
-            term: self,
-            typ,
-        })
+        Self::new(TermVariants::TypeAnnotation { term: self, typ })
     }
 
     pub fn variable(name: &'src str) -> Self {
@@ -131,16 +128,9 @@ impl<'src> Term<'src> {
 }
 
 enum TermVariants<'src> {
-    Known {
-        term: GenericTerm<'src, Term<'src>>,
-    },
-    TypeAnnotation {
-        term: Term<'src>,
-        typ: Term<'src>,
-    },
-    Unknown {
-        typ: Term<'src>,
-    },
+    Known { term: GenericTerm<'src, Term<'src>> },
+    TypeAnnotation { term: Term<'src>, typ: Term<'src> },
+    Unknown { typ: Term<'src> },
     Variable(&'src str),
 }
 
@@ -153,10 +143,7 @@ impl<'src> TermVariants<'src> {
         }
     }
 
-    fn typ(
-        &self,
-        new: impl FnOnce(GenericTerm<'src, Term<'src>>) -> Term<'src>,
-    ) -> Term<'src> {
+    fn typ(&self, new: impl FnOnce(GenericTerm<'src, Term<'src>>) -> Term<'src>) -> Term<'src> {
         match self {
             Self::Known { term } => term.typ(new),
             Self::Variable(_) => Term::unknown_type(),
@@ -184,9 +171,7 @@ impl<'src> GenericTerm<'src, Term<'src>> {
                     argument: argument.link(ctx)?,
                     typ: typ.link(ctx)?,
                 },
-                Self::VariableBinding(binding) => {
-                    GenericTerm::VariableBinding(binding.link(ctx)?)
-                }
+                Self::VariableBinding(binding) => GenericTerm::VariableBinding(binding.link(ctx)?),
             },
         ))
     }
@@ -202,9 +187,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         let in_term = if let Some(name) = self.name {
             variable_value.set_name(name);
 
-            ctx.with_variable(name, variable_value.clone(), |ctx| {
-                self.in_term.link(ctx)
-            })?
+            ctx.with_variable(name, variable_value.clone(), |ctx| self.in_term.link(ctx))?
         } else {
             self.in_term.link(ctx)
         }?;

@@ -1,4 +1,4 @@
-use crate::{Binder, TermReference, GenericTerm, SharedMut, VariableBinding};
+use crate::{Binder, GenericTerm, SharedMut, TermReference, VariableBinding};
 
 mod pretty;
 

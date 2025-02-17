@@ -1,8 +1,7 @@
 use std::{cell::RefMut, collections::HashMap, fmt, ops::ControlFlow};
 
 use crate::{
-    TermReference, GenericTerm, InferenceError, Pretty, Result, SharedMut,
-    VariableBinding,
+    GenericTerm, InferenceError, Pretty, Result, SharedMut, TermReference, VariableBinding,
 };
 
 mod pretty;
@@ -43,11 +42,7 @@ impl<'src> Term<'src> {
         }
 
         match &*self.0.borrow() {
-            TermVariants::Known {
-                pass,
-                name,
-                term,
-            } => {
+            TermVariants::Known { pass, name, term } => {
                 let generic_term = match term {
                     GenericTerm::VariableBinding(binding) => {
                         GenericTerm::VariableBinding(binding.fresh_variables(new_variables))
@@ -122,10 +117,7 @@ impl<'src> Term<'src> {
     }
 
     fn pi_type(pass: u64, argument_value: Self, result_type: Self) -> Self {
-        Self::new_known(
-            pass,
-            GenericTerm::pi(None, argument_value, result_type),
-        )
+        Self::new_known(pass, GenericTerm::pi(None, argument_value, result_type))
     }
 
     pub(crate) fn new_known(pass: u64, term: GenericTerm<'src, Self>) -> Self {
@@ -147,9 +139,7 @@ impl<'src> Term<'src> {
         )?;
 
         match &mut *self.0.try_borrow_mut()? {
-            TermVariants::Known {
-                pass, term, ..
-            } => {
+            TermVariants::Known { pass, term, .. } => {
                 if current_pass <= *pass {
                     *pass = current_pass + 1;
                     term.infer_types(current_pass)?
@@ -241,10 +231,9 @@ impl<'src> Term<'src> {
                 Self::unify(argument, argument1)?;
                 Self::unify(typ, typ1)?;
             }
-            (
-                GenericTerm::VariableBinding(binding0),
-                GenericTerm::VariableBinding(binding1),
-            ) => VariableBinding::unify(binding0, binding1)?,
+            (GenericTerm::VariableBinding(binding0), GenericTerm::VariableBinding(binding1)) => {
+                VariableBinding::unify(binding0, binding1)?
+            }
             // It's safer to explicitly ignore each variant
             (GenericTerm::TypeOfType, _rhs)
             | (GenericTerm::Constant { .. }, _rhs)
@@ -301,9 +290,7 @@ impl<'src> TermReference<'src> for Term<'src> {
 
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            TermVariants::Known {
-                pass, term, ..
-            } => term.typ(|e| Self::new_known(*pass, e)),
+            TermVariants::Known { pass, term, .. } => term.typ(|e| Self::new_known(*pass, e)),
             TermVariants::Unknown { typ, .. } => typ.clone(),
             TermVariants::Link { target } => target.typ(),
         }
@@ -352,11 +339,8 @@ impl<'src> GenericTerm<'src, Term<'src>> {
                 // We're creating a new bound variable (`argument`) here. If it's unknown, we
                 // want to infer it, so we don't want it to be fresh. Therefore we create fresh
                 // variables for `argument` and `typ`, not `pi_type`.
-                let pi_type = &mut Term::pi_type(
-                    pass,
-                    argument.fresh_variables(),
-                    typ.fresh_variables(),
-                );
+                let pi_type =
+                    &mut Term::pi_type(pass, argument.fresh_variables(), typ.fresh_variables());
                 Term::unify(pi_type, &mut function.typ().fresh_variables())?;
 
                 function.infer_types(pass)?;

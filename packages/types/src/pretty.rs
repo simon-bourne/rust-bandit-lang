@@ -1,6 +1,6 @@
 use pretty::RcDoc;
 
-use super::{TermReference, GenericTerm, VariableBinding};
+use super::{GenericTerm, TermReference, VariableBinding};
 use crate::Binder;
 
 pub trait Pretty {

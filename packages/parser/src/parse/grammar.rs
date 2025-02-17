@@ -4,7 +4,7 @@ use winnow::{
     PResult, Parser as _,
 };
 
-use super::{Term, Parser, TokenList};
+use super::{Parser, Term, TokenList};
 use crate::lex::{Grouping, Keyword, NamedOperator, SrcToken, Token};
 
 pub fn term<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> PResult<Term<'src>> {
@@ -71,19 +71,17 @@ fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
             term,
         ),
     )
-    .map(
-        |(var, typ, _assign, variable_value, _linend, in_term)| {
-            Term::let_binding(
-                var,
-                if let Some(typ) = typ {
-                    variable_value.has_type(typ)
-                } else {
-                    variable_value
-                },
-                in_term,
-            )
-        },
-    )
+    .map(|(var, typ, _assign, variable_value, _linend, in_term)| {
+        Term::let_binding(
+            var,
+            if let Some(typ) = typ {
+                variable_value.has_type(typ)
+            } else {
+                variable_value
+            },
+            in_term,
+        )
+    })
 }
 
 fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {

@@ -1,4 +1,4 @@
-use super::{TermVariants, Term};
+use super::{Term, TermVariants};
 use crate::{
     pretty::{Document, Layout, Operator, Side, TypeAnnotated},
     Pretty,
