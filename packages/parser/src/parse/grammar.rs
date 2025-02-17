@@ -24,7 +24,7 @@ fn pi_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
         |input_type, _, output_type| {
             Term::pi_type(
                 None,
-                Term::unknown_value().has_type(input_type),
+                Term::unknown().has_type(input_type),
                 output_type,
             )
         },
@@ -96,7 +96,7 @@ fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, T
     (
         identifier(),
         opt(preceded(NamedOperator::HasType, term)).map(|typ| {
-            let value = Term::unknown_value();
+            let value = Term::unknown();
 
             if let Some(typ) = typ {
                 value.has_type(typ)
@@ -108,7 +108,7 @@ fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, T
 }
 
 fn unknown<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    Token::Unknown.map(|_| Term::unknown_value())
+    Token::Unknown.map(|_| Term::unknown())
 }
 
 fn variable<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
