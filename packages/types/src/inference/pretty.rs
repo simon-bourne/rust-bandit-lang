@@ -1,17 +1,19 @@
-use super::{Term, TermVariants};
+use std::ptr;
+
+use super::{Term, TermVariants, Variable};
 use crate::{
     pretty::{Document, Layout, Operator, Side, TypeAnnotated},
     Pretty,
 };
 
-struct WithId<'src> {
-    name: Option<&'src str>,
-    id: *mut TermVariants<'src>,
+struct WithId<Id, Value> {
+    id: *const Id,
+    value: Value,
 }
 
-impl Pretty for WithId<'_> {
+impl<Id, Value: Pretty> Pretty for WithId<Id, Value> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        let name_doc = self.name.to_document(parent, layout);
+        let name_doc = self.value.to_document(parent, layout);
 
         if layout.unknown_ids {
             Document::concat([
@@ -33,9 +35,18 @@ impl Pretty for Term<'_> {
             TermVariants::Unknown { name, typ } => {
                 let name = *name;
                 let id = self.0.as_ptr();
-                TypeAnnotated::new(WithId { name, id }, typ).to_document(parent, layout)
+                TypeAnnotated::new(WithId { value: name, id }, typ).to_document(parent, layout)
             }
             TermVariants::Link { target } => target.to_document(parent, layout),
+        }
+    }
+}
+
+impl Pretty for Variable<'_> {
+    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
+        match self {
+            Self::Free { typ } => TypeAnnotated::new(WithId { value: None, id: ptr::from_ref(self) }, typ).to_document(parent, layout),
+            Self::Bound { name, value, typ } => TypeAnnotated::new(WithId { value, id: name }, typ).to_document(parent, layout),
         }
     }
 }

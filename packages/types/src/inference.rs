@@ -279,7 +279,20 @@ impl fmt::Debug for Term<'_> {
     }
 }
 
+pub enum Variable<'src> {
+    Free {
+        typ: Term<'src>,
+    },
+    Bound {
+        name: &'src str,
+        value: Term<'src>,
+        typ: Term<'src>,
+    },
+}
+
 impl<'src> TermReference<'src> for Term<'src> {
+    type Variable = Variable<'src>;
+
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
             TermVariants::Known { .. } => true,

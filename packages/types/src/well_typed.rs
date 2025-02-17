@@ -58,6 +58,8 @@ impl<'src> Term<'src> {
 }
 
 impl<'src> TermReference<'src> for Term<'src> {
+    type Variable = Self;
+
     fn is_known(&self) -> bool {
         true
     }

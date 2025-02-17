@@ -10,6 +10,8 @@ use crate::{
 pub struct Term<'src>(Rc<TermVariants<'src>>);
 
 impl<'src> TermReference<'src> for Term<'src> {
+    type Variable = &'src str;
+
     fn is_known(&self) -> bool {
         self.0.is_known()
     }
