@@ -31,7 +31,7 @@ impl<Id, Value: Pretty> Pretty for WithId<Id, Value> {
 impl Pretty for Term<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match &*self.0.borrow() {
-            TermVariants::Known { term, .. } => term.to_document(parent, layout),
+            TermVariants::Value { term, .. } => term.to_document(parent, layout),
             TermVariants::Link { target } => target.to_document(parent, layout),
         }
     }

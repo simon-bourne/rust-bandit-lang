@@ -10,8 +10,7 @@ mod pretty;
 pub struct Term<'src>(SharedMut<TermVariants<'src>>);
 
 enum TermVariants<'src> {
-    // TODO: Rename to `Value`
-    Known {
+    Value {
         pass: u64,
         term: GenericTerm<'src, Term<'src>>,
     },
@@ -46,7 +45,7 @@ impl<'src> Term<'src> {
         }
 
         match &*self.0.borrow() {
-            TermVariants::Known { pass, term } => {
+            TermVariants::Value { pass, term } => {
                 let generic_term = match term {
                     GenericTerm::Variable(_) => return self.clone(),
                     GenericTerm::VariableBinding(binding) => {
@@ -82,7 +81,7 @@ impl<'src> Term<'src> {
         }
 
         match &*self.0.borrow() {
-            TermVariants::Known { pass, term } => {
+            TermVariants::Value { pass, term } => {
                 if let GenericTerm::Variable(Variable { name, typ }) = term {
                     let new_var = Self::new(
                         *pass,
@@ -110,7 +109,7 @@ impl<'src> Term<'src> {
     }
 
     pub(crate) fn new(pass: u64, term: GenericTerm<'src, Self>) -> Self {
-        Self(SharedMut::new(TermVariants::Known { pass, term }))
+        Self(SharedMut::new(TermVariants::Value { pass, term }))
     }
 
     pub fn infer_types(&mut self, current_pass: u64) -> Result<()> {
@@ -120,7 +119,7 @@ impl<'src> Term<'src> {
         )?;
 
         match &mut *self.0.try_borrow_mut()? {
-            TermVariants::Known { pass, term } => {
+            TermVariants::Value { pass, term } => {
                 if current_pass <= *pass {
                     *pass = current_pass + 1;
                     term.infer_types(current_pass)?
@@ -259,7 +258,7 @@ impl<'src> Term<'src> {
 
     fn known<'a>(&'a self) -> Option<RefMut<'a, GenericTerm<'src, Self>>> {
         RefMut::filter_map(self.0.borrow_mut(), |x| {
-            if let TermVariants::Known { term, .. } = x {
+            if let TermVariants::Value { term, .. } = x {
                 Some(term)
             } else {
                 None
@@ -285,7 +284,7 @@ impl<'src> TermReference<'src> for Term<'src> {
 
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
-            TermVariants::Known { term, .. } => {
+            TermVariants::Value { term, .. } => {
                 !matches!(term, GenericTerm::Variable(Variable { name: None, .. }))
             }
             TermVariants::Link { target } => target.is_known(),
@@ -294,7 +293,7 @@ impl<'src> TermReference<'src> for Term<'src> {
 
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            TermVariants::Known { pass, term, .. } => {
+            TermVariants::Value { pass, term, .. } => {
                 term.typ(|e| Self::new(*pass, e), |var| var.typ.clone())
             }
             TermVariants::Link { target } => target.typ(),
