@@ -162,16 +162,18 @@ impl<'src> Term<'src> {
 
         Ok(match (&mut *self_ref, &mut *other_ref) {
             (GenericTerm::Variable(variable), GenericTerm::Variable(other_variable)) => {
-                // TODO: Prefer bound variables, and free variables with smaller scope
-                Self::unify(&mut variable.typ, &mut other_variable.typ)?;
-                let other_name = other_variable.name;
+                // TODO: Prefer free variables with smaller scope
+                let mut typ = variable.typ.clone();
+                let mut other_typ = other_variable.typ.clone();
+                let name = variable.name;
                 drop((self_ref, other_ref));
-
-                if other_name.is_some() {
-                    self.replace_with(other);
-                } else {
+                
+                if name.is_some() {
                     other.replace_with(self);
+                } else {
+                    self.replace_with(other);
                 }
+                Self::unify(&mut typ, &mut other_typ)?;
 
                 ControlFlow::Break(())
             }
