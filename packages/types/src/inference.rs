@@ -48,13 +48,7 @@ impl<'src> Term<'src> {
         match &*self.0.borrow() {
             TermVariants::Known { pass, term } => {
                 let generic_term = match term {
-                    GenericTerm::Variable(variable) => {
-                        let typ = variable.typ.make_fresh_variables(new_variables);
-                        GenericTerm::Variable(Variable {
-                            name: variable.name,
-                            typ,
-                        })
-                    }
+                    GenericTerm::Variable(_) => return self.clone(),
                     GenericTerm::VariableBinding(binding) => {
                         GenericTerm::VariableBinding(binding.fresh_variables(new_variables))
                     }
