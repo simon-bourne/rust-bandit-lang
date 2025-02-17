@@ -299,7 +299,7 @@ impl<'src> TermReference<'src> for Term<'src> {
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
             TermVariants::Known { term, .. } => {
-                !matches!(term, GenericTerm::Variable(Variable { name: Some(_), .. }))
+                !matches!(term, GenericTerm::Variable(Variable { name: None, .. }))
             }
             TermVariants::Link { target } => target.is_known(),
         }
