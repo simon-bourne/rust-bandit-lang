@@ -22,11 +22,7 @@ fn pi_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
         function_applications(),
         NamedOperator::To,
         |input_type, _, output_type| {
-            Term::pi_type(
-                None,
-                Term::unknown().has_type(input_type),
-                output_type,
-            )
+            Term::pi_type(None, Term::unknown().has_type(input_type), output_type)
         },
     )
 }
