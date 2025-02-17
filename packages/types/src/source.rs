@@ -25,12 +25,8 @@ impl Pretty for Term<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self.0.as_ref() {
             TermVariants::Known { term } => term.to_document(parent, layout),
-            TermVariants::Variable(variable) => variable.to_document(parent, layout),
             TermVariants::TypeAnnotation { term, typ } => {
                 TypeAnnotated::new(term, typ).to_document(parent, layout)
-            }
-            TermVariants::Unknown { typ } => {
-                TypeAnnotated::new(None, typ).to_document(parent, layout)
             }
         }
     }
@@ -41,16 +37,8 @@ impl<'src> Term<'src> {
         Self::known(GenericTerm::TypeOfType)
     }
 
-    pub fn unknown_value() -> Self {
-        Self::new(TermVariants::Unknown {
-            typ: Self::unknown_type(),
-        })
-    }
-
-    pub fn unknown_type() -> Self {
-        Self::new(TermVariants::Unknown {
-            typ: Self::type_of_type(),
-        })
+    pub fn unknown() -> Self {
+        Self::known(GenericTerm::Variable(None))
     }
 
     pub fn type_constant(name: &'src str) -> Self {
@@ -68,7 +56,7 @@ impl<'src> Term<'src> {
         Self::known(GenericTerm::Apply {
             function: self,
             argument,
-            typ: Self::unknown_type(),
+            typ: Self::unknown(),
         })
     }
 
@@ -89,20 +77,18 @@ impl<'src> Term<'src> {
     }
 
     pub fn variable(name: &'src str) -> Self {
-        Self::new(TermVariants::Variable(name))
+        Self::known(GenericTerm::Variable(Some(name)))
     }
 
     pub fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Term<'src>> {
         Ok(match self.0.as_ref() {
             TermVariants::Known { term } => term.link(ctx)?,
-            TermVariants::Variable(name) => ctx.lookup(name)?,
             TermVariants::TypeAnnotation { term, typ } => {
                 let term = term.link(ctx)?;
                 let typ = &mut typ.link(ctx)?;
                 inference::Term::unify(&mut term.typ(), typ)?;
                 term
             }
-            TermVariants::Unknown { typ } => inference::Term::unknown(typ.link(ctx)?),
         })
     }
 
@@ -132,24 +118,23 @@ impl<'src> Term<'src> {
 enum TermVariants<'src> {
     Known { term: GenericTerm<'src, Term<'src>> },
     TypeAnnotation { term: Term<'src>, typ: Term<'src> },
-    Unknown { typ: Term<'src> },
-    Variable(&'src str),
 }
 
 impl<'src> TermVariants<'src> {
     fn is_known(&self) -> bool {
         match self {
-            Self::Known { .. } | Self::Variable(_) => true,
+            Self::Known {
+                term: GenericTerm::Variable(None),
+            } => false,
+            Self::Known { .. } => true,
             Self::TypeAnnotation { term, .. } => term.is_known(),
-            Self::Unknown { .. } => false,
         }
     }
 
     fn typ(&self, new: impl FnOnce(GenericTerm<'src, Term<'src>>) -> Term<'src>) -> Term<'src> {
         match self {
-            Self::Known { term } => term.typ(new, |_| Term::unknown_type()),
-            Self::Variable(_) => Term::unknown_type(),
-            Self::TypeAnnotation { typ, .. } | Self::Unknown { typ, .. } => typ.clone(),
+            Self::Known { term } => term.typ(new, |_| Term::unknown()),
+            Self::TypeAnnotation { typ, .. } => typ.clone(),
         }
     }
 }
