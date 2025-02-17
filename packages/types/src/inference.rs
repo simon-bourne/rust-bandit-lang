@@ -132,8 +132,8 @@ impl<'src> Term<'src> {
     }
 
     fn unify_variable(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
-        let mut self_ref = self.known().expect("self should be known at this point");
-        let mut other_ref = other.known().expect("other should be known at this point");
+        let mut self_ref = self.value();
+        let mut other_ref = other.value();
 
         Ok(match (&mut *self_ref, &mut *other_ref) {
             (GenericTerm::Variable(variable), GenericTerm::Variable(other_variable)) => {
@@ -178,8 +178,8 @@ impl<'src> Term<'src> {
             return Ok(());
         }
 
-        let mut x_ref = x.known().expect("x should be known at this point");
-        let mut y_ref = y.known().expect("y should be known at this point");
+        let mut x_ref = x.value();
+        let mut y_ref = y.value();
 
         // TODO: Application evaluation:
         //
@@ -256,15 +256,14 @@ impl<'src> Term<'src> {
         };
     }
 
-    fn known<'a>(&'a self) -> Option<RefMut<'a, GenericTerm<'src, Self>>> {
-        RefMut::filter_map(self.0.borrow_mut(), |x| {
-            if let TermVariants::Value { term, .. } = x {
-                Some(term)
-            } else {
-                None
+    fn value<'a>(&'a mut self) -> RefMut<'a, GenericTerm<'src, Self>> {
+        self.collapse_links();
+        RefMut::map(self.0.borrow_mut(), |x| {
+            match x {
+                TermVariants::Value { term, .. } => term,
+                TermVariants::Link { .. } => unreachable!("Links should be collapsed at this point"),
             }
         })
-        .ok()
     }
 }
 
