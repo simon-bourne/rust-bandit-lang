@@ -26,7 +26,7 @@ impl<'a> Context<'a> {
         self.local_variables
             .entry(name)
             .or_default()
-            .push(variable_value);
+            .push(inference::Term::variable(name, variable_value));
         let output = f(self);
         self.local_variables.entry(name).and_modify(|vars| {
             vars.pop();
@@ -39,8 +39,7 @@ impl<'a> Context<'a> {
             local
         } else {
             self.global_value(name)?
-        }
-        .fresh_variables())
+        })
     }
 
     fn lookup_local(&self, name: &'a str) -> Option<inference::Term<'a>> {

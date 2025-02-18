@@ -166,7 +166,6 @@ impl<'src> GenericTerm<'src, Term<'src>> {
     }
 }
 
-// TODO: This is broken. We're loosing the variable name.
 impl<'src> VariableBinding<'src, Term<'src>> {
     fn link(
         &self,
