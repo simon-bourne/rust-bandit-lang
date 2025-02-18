@@ -171,9 +171,10 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         &self,
         ctx: &mut Context<'src>,
     ) -> Result<VariableBinding<'src, inference::Term<'src>>> {
-        let variable_value = self.variable_value.link(ctx)?;
+        let mut variable_value = self.variable_value.link(ctx)?;
 
         let in_term = if let Some(name) = self.name {
+            variable_value.set_variable_name(name);
             ctx.with_variable(name, variable_value.clone(), |ctx| self.in_term.link(ctx))?
         } else {
             self.in_term.link(ctx)

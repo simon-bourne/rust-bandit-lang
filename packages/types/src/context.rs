@@ -26,7 +26,7 @@ impl<'a> Context<'a> {
         self.local_variables
             .entry(name)
             .or_default()
-            .push(inference::Term::variable(name, variable_value));
+            .push(variable_value);
         let output = f(self);
         self.local_variables.entry(name).and_modify(|vars| {
             vars.pop();

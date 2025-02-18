@@ -3,7 +3,7 @@ use std::ptr;
 use super::{Term, TermVariants, Variable};
 use crate::{
     pretty::{Document, Layout, Operator, Side, TypeAnnotated},
-    Pretty, TermReference,
+    Pretty,
 };
 
 struct WithId<Id, Value> {
@@ -40,18 +40,13 @@ impl Pretty for Term<'_> {
 impl Pretty for Variable<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         let id = ptr::from_ref(self);
-        match self {
-            // TODO: Need to think about whether we want to keep variables around.
-            Self::Bound { name, value } => {
-                if value.is_known() {
-                    value.to_document(parent, layout)
-                } else {
-                    WithId { value: name, id }.to_document(parent, layout)
-                }
-            }
-            Self::Free { typ } => {
-                TypeAnnotated::new(WithId { value: None, id }, typ).to_document(parent, layout)
-            }
-        }
+        TypeAnnotated::new(
+            WithId {
+                value: self.name,
+                id,
+            },
+            &self.typ,
+        )
+        .to_document(parent, layout)
     }
 }
