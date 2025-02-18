@@ -302,6 +302,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         let mut value = self.variable_value.value();
 
         let variable_value = if let Some(variable_value) = new_variables.get(&key) {
+            drop(value);
             variable_value.clone()
         } else if let GenericTerm::Variable(variable) = &mut *value {
             // TODO: We need a debruijn level to see if `self` binds `self.variable_value`.
@@ -318,7 +319,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
             variable_value
         } else {
             drop(value);
-            self.variable_value.clone()
+            self.variable_value.make_fresh_variables(new_variables)
         };
 
         let in_term = self.in_term.make_fresh_variables(new_variables);
