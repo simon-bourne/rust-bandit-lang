@@ -45,8 +45,13 @@ impl<'src> Term<'src> {
         self.make_fresh_variables(&mut HashMap::new())
     }
 
+    fn fresh_key(&mut self) -> *mut TermVariants<'src> {
+        self.collapse_links();
+        self.0.as_ptr()
+    }
+
     fn make_fresh_variables(&mut self, new_variables: &mut OldToNewVariable<'src>) -> Self {
-        if let Some(new_variable) = new_variables.get(&self.0.as_ptr()) {
+        if let Some(new_variable) = new_variables.get(&self.fresh_key()) {
             return new_variable.clone();
         }
 
@@ -298,7 +303,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
     }
 
     fn make_fresh_variables(&mut self, new_variables: &mut OldToNewVariable<'src>) -> Self {
-        let key = self.variable_value.0.as_ptr();
+        let key = self.variable_value.fresh_key();
         let mut value = self.variable_value.value();
 
         let variable_value = if let Some(variable_value) = new_variables.get(&key) {
