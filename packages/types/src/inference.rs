@@ -48,7 +48,14 @@ impl<'src> Term<'src> {
             return new_variable.clone();
         }
 
-        let generic_term = match &mut *self.value() {
+        let mut value = self.value();
+
+        let generic_term = match &mut *value {
+            // TODO: Do we need this case?
+            GenericTerm::Variable(Variable::Free { .. }) => {
+                drop(value);
+                return self.clone();
+            }
             GenericTerm::Variable(variable) => {
                 GenericTerm::Variable(variable.fresh_variables(new_variables))
             }
@@ -146,39 +153,48 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    fn unify_variable(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
+    fn unify_bound_variable(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
         let mut self_ref = self.value();
         let mut other_ref = other.value();
 
         Ok(match (&mut *self_ref, &mut *other_ref) {
-            (GenericTerm::Variable(variable), GenericTerm::Variable(other_variable)) => {
-                // TODO: Prefer free variables with smaller scope
-                let mut typ = variable.typ();
-                let mut other_typ = other_variable.typ();
-                let is_bound = variable.is_bound();
+            (
+                GenericTerm::Variable(Variable::Bound { value, .. }),
+                GenericTerm::Variable(Variable::Free { typ }),
+            ) => {
+                let mut other_type = typ.clone();
+                let mut typ = value.typ();
                 drop((self_ref, other_ref));
-
-                if is_bound {
-                    other.replace_with(self);
-                } else {
-                    self.replace_with(other);
-                }
-                Self::unify(&mut typ, &mut other_typ)?;
+                other.replace_with(self);
+                Self::unify(&mut typ, &mut other_type)?;
 
                 ControlFlow::Break(())
             }
-            (GenericTerm::Variable(variable), _) => {
-                let mut typ = variable.typ();
+            (GenericTerm::Variable(Variable::Bound { value, .. }), _) => {
+                // TODO: Prefer variables with smaller scope
+                let mut value = value.clone();
                 drop((self_ref, other_ref));
                 self.replace_with(other);
-                Self::unify(&mut typ, &mut other.typ())?;
+                Self::unify(&mut value, other)?;
 
                 ControlFlow::Break(())
             }
-            (GenericTerm::TypeOfType, _rhs)
-            | (GenericTerm::Constant { .. }, _rhs)
-            | (GenericTerm::Apply { .. }, _rhs)
-            | (GenericTerm::VariableBinding(_), _rhs) => ControlFlow::Continue(()),
+            _ => ControlFlow::Continue(()),
+        })
+    }
+
+    fn unify_variable(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
+        let mut self_ref = self.value();
+
+        Ok(if let GenericTerm::Variable(variable) = &mut *self_ref {
+            let mut typ = variable.typ();
+            drop(self_ref);
+            self.replace_with(other);
+            Self::unify(&mut typ, &mut other.typ())?;
+
+            ControlFlow::Break(())
+        } else {
+            ControlFlow::Continue(())
         })
     }
 
@@ -187,6 +203,8 @@ impl<'src> Term<'src> {
         y.collapse_links();
 
         if SharedMut::is_same(&x.0, &y.0)
+            || x.unify_bound_variable(y)?.is_break()
+            || y.unify_bound_variable(x)?.is_break()
             || x.unify_variable(y)?.is_break()
             || y.unify_variable(x)?.is_break()
         {
@@ -292,10 +310,6 @@ pub enum Variable<'src> {
 }
 
 impl<'src> Variable<'src> {
-    fn is_bound(&self) -> bool {
-        matches!(self, Self::Bound { .. })
-    }
-
     fn typ(&self) -> Term<'src> {
         match self {
             Self::Bound { value, .. } => value.typ(),
