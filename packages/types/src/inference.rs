@@ -39,61 +39,51 @@ impl<'src> Term<'src> {
     }
 
     // TODO: The implementation of this is ugly and inefficient.
-    pub fn fresh_variables(&self) -> Self {
+    pub fn fresh_variables(&mut self) -> Self {
         self.make_fresh_variables(&mut HashMap::new())
     }
 
-    fn make_fresh_variables(&self, new_variables: &mut OldToNewVariable<'src>) -> Self {
+    fn make_fresh_variables(&mut self, new_variables: &mut OldToNewVariable<'src>) -> Self {
         if let Some(new_variable) = new_variables.get(&self.0.as_ptr()) {
             return new_variable.clone();
         }
 
-        match &*self.0.borrow() {
-            TermVariants::Value { pass, term } => {
-                let generic_term = match term {
-                    GenericTerm::Variable(variable) => {
-                        GenericTerm::Variable(variable.fresh_variables(new_variables))
-                    }
-                    GenericTerm::VariableBinding(binding) => {
-                        GenericTerm::VariableBinding(binding.fresh_variables(new_variables))
-                    }
-                    GenericTerm::TypeOfType => GenericTerm::TypeOfType,
-                    GenericTerm::Constant { name, typ } => GenericTerm::Constant {
-                        name,
-                        typ: typ.make_fresh_variables(new_variables),
-                    },
-                    GenericTerm::Apply {
-                        function,
-                        argument,
-                        typ,
-                    } => GenericTerm::Apply {
-                        function: function.make_fresh_variables(new_variables),
-                        argument: argument.make_fresh_variables(new_variables),
-                        typ: typ.make_fresh_variables(new_variables),
-                    },
-                };
-
-                Self::new(*pass, generic_term)
+        let generic_term = match &mut *self.value() {
+            GenericTerm::Variable(variable) => {
+                GenericTerm::Variable(variable.fresh_variables(new_variables))
             }
-            TermVariants::Link { target } => target.make_fresh_variables(new_variables),
-        }
+            GenericTerm::VariableBinding(binding) => {
+                GenericTerm::VariableBinding(binding.fresh_variables(new_variables))
+            }
+            GenericTerm::TypeOfType => GenericTerm::TypeOfType,
+            GenericTerm::Constant { name, typ } => GenericTerm::Constant {
+                name,
+                typ: typ.make_fresh_variables(new_variables),
+            },
+            GenericTerm::Apply {
+                function,
+                argument,
+                typ,
+            } => GenericTerm::Apply {
+                function: function.make_fresh_variables(new_variables),
+                argument: argument.make_fresh_variables(new_variables),
+                typ: typ.make_fresh_variables(new_variables),
+            },
+        };
+
+        Self::new(0, generic_term)
     }
 
-    fn copy_free_variables(&self, new_variables: &mut OldToNewVariable<'src>) -> Self {
+    fn copy_free_variables(&mut self, new_variables: &mut OldToNewVariable<'src>) -> Self {
         let key = self.0.as_ptr();
 
         if let Some(variable) = new_variables.get(&key) {
             return variable.clone();
         }
 
-        let term = self.0.borrow();
+        let mut value = self.value();
 
-        let (pass, term) = match &*term {
-            TermVariants::Value { pass, term } => (*pass, term),
-            TermVariants::Link { target } => return target.copy_free_variables(new_variables),
-        };
-
-        let new_term = match term {
+        let new_term = match &mut *value {
             GenericTerm::TypeOfType => GenericTerm::TypeOfType,
             GenericTerm::Constant { name, typ } => GenericTerm::Constant {
                 name,
@@ -113,13 +103,16 @@ impl<'src> Term<'src> {
                     typ: typ.copy_free_variables(new_variables),
                 })
             }
-            GenericTerm::Variable(Variable::Bound { .. }) => return self.make_fresh_variables(new_variables),
+            GenericTerm::Variable(Variable::Bound { .. }) => {
+                drop(value);
+                return self.make_fresh_variables(new_variables);
+            }
             GenericTerm::VariableBinding(binding) => {
                 GenericTerm::VariableBinding(binding.copy_free_variables(new_variables))
             }
         };
 
-        Self::new(pass, new_term)
+        Self::new(0, new_term)
     }
 
     fn type_of_type(pass: u64) -> Self {
@@ -361,7 +354,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         self.in_term.infer_types(pass)
     }
 
-    fn fresh_variables(&self, new_variables: &mut OldToNewVariable<'src>) -> Self {
+    fn fresh_variables(&mut self, new_variables: &mut OldToNewVariable<'src>) -> Self {
         let variable_value = self.variable_value.copy_free_variables(new_variables);
         new_variables.insert(self.variable_value.0.as_ptr(), variable_value.clone());
 
@@ -375,7 +368,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         }
     }
 
-    fn copy_free_variables(&self, new_variables: &mut OldToNewVariable<'src>) -> Self {
+    fn copy_free_variables(&mut self, new_variables: &mut OldToNewVariable<'src>) -> Self {
         let variable_value = self.variable_value.copy_free_variables(new_variables);
         let in_term = self.in_term.copy_free_variables(new_variables);
 
