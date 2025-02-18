@@ -58,7 +58,7 @@ impl<'src> Term<'src> {
                 return self.clone();
             }
             GenericTerm::VariableBinding(binding) => {
-                GenericTerm::VariableBinding(binding.fresh_variables(new_variables))
+                GenericTerm::VariableBinding(binding.make_fresh_variables(new_variables))
             }
             GenericTerm::TypeOfType => GenericTerm::TypeOfType,
             GenericTerm::Constant { name, typ } => GenericTerm::Constant {
@@ -297,7 +297,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         self.in_term.infer_types(pass)
     }
 
-    fn fresh_variables(&mut self, new_variables: &mut OldToNewVariable<'src>) -> Self {
+    fn make_fresh_variables(&mut self, new_variables: &mut OldToNewVariable<'src>) -> Self {
         let key = self.variable_value.0.as_ptr();
         let mut value = self.variable_value.value();
 
