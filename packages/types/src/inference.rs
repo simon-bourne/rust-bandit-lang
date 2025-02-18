@@ -301,7 +301,9 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         let key = self.variable_value.0.as_ptr();
         let mut value = self.variable_value.value();
 
-        let variable_value = if let GenericTerm::Variable(variable) = &mut *value {
+        let variable_value = if let Some(variable_value) = new_variables.get(&key) {
+            variable_value.clone()
+        } else if let GenericTerm::Variable(variable) = &mut *value {
             // TODO: We need a debruijn level to see if `self` binds `self.variable_value`.
             // It could have been unified to another bound variable.
             let variable_value = Term::new(
