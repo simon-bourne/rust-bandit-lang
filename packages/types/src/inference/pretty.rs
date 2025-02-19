@@ -15,7 +15,7 @@ impl<Id, Value: Pretty> Pretty for WithId<Id, Value> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         let name_doc = self.value.to_document(parent, layout);
 
-        if layout.unknown_ids {
+        if layout.show_id {
             Document::concat([
                 name_doc,
                 Document::text("["),

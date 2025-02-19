@@ -87,7 +87,7 @@ where
 
 impl<Value: Pretty, Type: Pretty> Pretty for TypeAnnotated<Value, Type> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        if layout.annotate_types {
+        if layout.annotate_type {
             if let Some(typ) = self.typ.as_ref() {
                 return Operator::HasType.to_document(
                     parent,
@@ -111,7 +111,7 @@ pub fn variable_to_document<'src>(
     let typ = &value.typ();
     let type_annotated = TypeAnnotated::new(name, typ);
 
-    if value.is_known() || layout.show_unknowns {
+    if value.is_known() || layout.show_unknown {
         Operator::Equals.to_document(
             parent,
             &type_annotated,
@@ -266,23 +266,23 @@ pub type Document = RcDoc<'static>;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct Layout {
-    pub annotate_types: bool,
-    pub unknown_ids: bool,
-    pub show_unknowns: bool,
+    pub annotate_type: bool,
+    pub show_id: bool,
+    pub show_unknown: bool,
 }
 
 impl Layout {
     fn verbose() -> Self {
         Self {
-            annotate_types: true,
-            unknown_ids: true,
-            show_unknowns: true,
+            annotate_type: true,
+            show_id: true,
+            show_unknown: true,
         }
     }
 
     fn without_types(self) -> Self {
         Self {
-            annotate_types: false,
+            annotate_type: false,
             ..self
         }
     }
@@ -291,9 +291,9 @@ impl Layout {
 impl Default for Layout {
     fn default() -> Self {
         Self {
-            annotate_types: true,
-            unknown_ids: false,
-            show_unknowns: false,
+            annotate_type: true,
+            show_id: false,
+            show_unknown: false,
         }
     }
 }
