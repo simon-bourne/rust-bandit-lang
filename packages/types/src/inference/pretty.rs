@@ -1,6 +1,6 @@
 use std::ptr;
 
-use super::{Term, TermVariants, Variable};
+use super::{Term, TermEnum, Variable};
 use crate::{
     pretty::{Document, Layout, Operator, Side, TypeAnnotated},
     Pretty,
@@ -31,8 +31,8 @@ impl<Id, Value: Pretty> Pretty for WithId<Id, Value> {
 impl Pretty for Term<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match &*self.0.borrow() {
-            TermVariants::Value { term, .. } => term.to_document(parent, layout),
-            TermVariants::Link { target } => target.to_document(parent, layout),
+            TermEnum::Value { term, .. } => term.to_document(parent, layout),
+            TermEnum::Link { target } => target.to_document(parent, layout),
         }
     }
 }

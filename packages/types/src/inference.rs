@@ -7,9 +7,9 @@ use crate::{
 mod pretty;
 
 #[derive(Clone)]
-pub struct Term<'src>(SharedMut<TermVariants<'src>>);
+pub struct Term<'src>(SharedMut<TermEnum<'src>>);
 
-enum TermVariants<'src> {
+enum TermEnum<'src> {
     Value {
         pass: u64,
         term: GenericTerm<'src, Term<'src>>,
@@ -19,7 +19,7 @@ enum TermVariants<'src> {
     },
 }
 
-type OldToNewVariable<'src> = HashMap<*mut TermVariants<'src>, Term<'src>>;
+type OldToNewVariable<'src> = HashMap<*mut TermEnum<'src>, Term<'src>>;
 
 impl<'src> Term<'src> {
     pub fn unknown(typ: Self) -> Self {
@@ -45,7 +45,7 @@ impl<'src> Term<'src> {
         self.make_fresh_variables(&mut HashMap::new())
     }
 
-    fn fresh_key(&mut self) -> *mut TermVariants<'src> {
+    fn fresh_key(&mut self) -> *mut TermEnum<'src> {
         self.collapse_links();
         self.0.as_ptr()
     }
@@ -93,7 +93,7 @@ impl<'src> Term<'src> {
     }
 
     pub(crate) fn new(pass: u64, term: GenericTerm<'src, Self>) -> Self {
-        Self(SharedMut::new(TermVariants::Value { pass, term }))
+        Self(SharedMut::new(TermEnum::Value { pass, term }))
     }
 
     pub fn infer_types(&mut self, current_pass: u64) -> Result<()> {
@@ -103,13 +103,13 @@ impl<'src> Term<'src> {
         )?;
 
         match &mut *self.0.try_borrow_mut()? {
-            TermVariants::Value { pass, term } => {
+            TermEnum::Value { pass, term } => {
                 if current_pass <= *pass {
                     *pass = current_pass + 1;
                     term.infer_types(current_pass)?
                 }
             }
-            TermVariants::Link { target } => target.infer_types(current_pass)?,
+            TermEnum::Link { target } => target.infer_types(current_pass)?,
         }
 
         Ok(())
@@ -238,7 +238,7 @@ impl<'src> Term<'src> {
     }
 
     fn replace_with(&mut self, other: &Self) {
-        self.0.replace_with(TermVariants::Link {
+        self.0.replace_with(TermEnum::Link {
             target: other.clone(),
         });
         *self = other.clone();
@@ -248,7 +248,7 @@ impl<'src> Term<'src> {
         // Collapse links from the bottom up so they are also collapsed for other
         // terms that reference this chain.
         *self = {
-            let TermVariants::Link { target } = &mut *self.0.borrow_mut() else {
+            let TermEnum::Link { target } = &mut *self.0.borrow_mut() else {
                 return;
             };
             target.collapse_links();
@@ -259,8 +259,8 @@ impl<'src> Term<'src> {
     fn value<'a>(&'a mut self) -> RefMut<'a, GenericTerm<'src, Self>> {
         self.collapse_links();
         RefMut::map(self.0.borrow_mut(), |x| match x {
-            TermVariants::Value { term, .. } => term,
-            TermVariants::Link { .. } => unreachable!("Links should be collapsed at this point"),
+            TermEnum::Value { term, .. } => term,
+            TermEnum::Link { .. } => unreachable!("Links should be collapsed at this point"),
         })
     }
 }
@@ -281,17 +281,17 @@ impl<'src> TermReference<'src> for Term<'src> {
 
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
-            TermVariants::Value { term, .. } => !matches!(term, GenericTerm::Variable(_)),
-            TermVariants::Link { target } => target.is_known(),
+            TermEnum::Value { term, .. } => !matches!(term, GenericTerm::Variable(_)),
+            TermEnum::Link { target } => target.is_known(),
         }
     }
 
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            TermVariants::Value { pass, term, .. } => {
+            TermEnum::Value { pass, term, .. } => {
                 term.typ(|e| Self::new(*pass, e), |var| var.typ.clone())
             }
-            TermVariants::Link { target } => target.typ(),
+            TermEnum::Link { target } => target.typ(),
         }
     }
 }

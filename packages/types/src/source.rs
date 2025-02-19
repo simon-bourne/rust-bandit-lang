@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct Term<'src>(Rc<TermVariants<'src>>);
+pub struct Term<'src>(Rc<TermEnum<'src>>);
 
 impl<'src> TermReference<'src> for Term<'src> {
     type Variable = Option<&'src str>;
@@ -24,8 +24,8 @@ impl<'src> TermReference<'src> for Term<'src> {
 impl Pretty for Term<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self.0.as_ref() {
-            TermVariants::Value { term } => term.to_document(parent, layout),
-            TermVariants::TypeAnnotation { term, typ } => {
+            TermEnum::Value { term } => term.to_document(parent, layout),
+            TermEnum::TypeAnnotation { term, typ } => {
                 TypeAnnotated::new(term, typ).to_document(parent, layout)
             }
         }
@@ -73,7 +73,7 @@ impl<'src> Term<'src> {
     }
 
     pub fn has_type(self, typ: Self) -> Self {
-        Self::new(TermVariants::TypeAnnotation { term: self, typ })
+        Self::new(TermEnum::TypeAnnotation { term: self, typ })
     }
 
     pub fn variable(name: &'src str) -> Self {
@@ -82,8 +82,8 @@ impl<'src> Term<'src> {
 
     pub fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Term<'src>> {
         Ok(match self.0.as_ref() {
-            TermVariants::Value { term } => term.link(ctx)?,
-            TermVariants::TypeAnnotation { term, typ } => {
+            TermEnum::Value { term } => term.link(ctx)?,
+            TermEnum::TypeAnnotation { term, typ } => {
                 let term = term.link(ctx)?;
                 let typ = &mut typ.link(ctx)?;
                 inference::Term::unify(&mut term.typ(), typ)?;
@@ -92,12 +92,12 @@ impl<'src> Term<'src> {
         })
     }
 
-    fn new(term: TermVariants<'src>) -> Self {
+    fn new(term: TermEnum<'src>) -> Self {
         Self(Rc::new(term))
     }
 
     fn value(term: GenericTerm<'src, Self>) -> Self {
-        Self::new(TermVariants::Value { term })
+        Self::new(TermEnum::Value { term })
     }
 
     fn binding(
@@ -115,12 +115,12 @@ impl<'src> Term<'src> {
     }
 }
 
-enum TermVariants<'src> {
+enum TermEnum<'src> {
     Value { term: GenericTerm<'src, Term<'src>> },
     TypeAnnotation { term: Term<'src>, typ: Term<'src> },
 }
 
-impl<'src> TermVariants<'src> {
+impl<'src> TermEnum<'src> {
     fn is_known(&self) -> bool {
         match self {
             Self::Value {
