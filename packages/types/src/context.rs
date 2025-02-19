@@ -39,7 +39,8 @@ impl<'a> Context<'a> {
             local
         } else {
             self.global_value(name)?
-        })
+        }
+        .fresh_variables())
     }
 
     fn lookup_local(&self, name: &'a str) -> Option<inference::Term<'a>> {
