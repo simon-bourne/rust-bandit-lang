@@ -317,7 +317,8 @@ impl<'src> VariableBinding<'src, Term<'src>> {
                 }),
             );
             drop(value);
-            new_variables.insert(key, variable_value.clone());
+            let existing = new_variables.insert(key, variable_value.clone());
+            assert!(existing.is_none(), "Found out of scope variable");
             variable_value
         } else {
             drop(value);
