@@ -33,13 +33,13 @@ impl<'src> Term<'src> {
     pub fn unknown_type() -> Self {
         Self::unknown(Self::type_of_type(0))
     }
-    
+
     pub fn set_variable_name(&mut self, name: &'src str) {
         if let GenericTerm::Variable(variable) = &mut *self.value() {
             variable.name = Some(name);
         }
     }
-    
+
     // TODO: The implementation of this is ugly and inefficient.
     pub fn fresh_variables(&mut self) -> Self {
         self.make_fresh_variables(&mut HashMap::new())
