@@ -117,7 +117,7 @@ pub fn variable_to_document<'src>(
             &type_annotated,
             value,
             layout,
-            layout.without_types(),
+            layout.without_types().variable_value(),
         )
     } else {
         type_annotated.to_document(parent, layout)
@@ -269,6 +269,13 @@ pub struct Layout {
     pub annotate_type: bool,
     pub show_id: bool,
     pub show_unknown: bool,
+    pub variable: LayoutVariable,
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum LayoutVariable {
+    Name,
+    Value,
 }
 
 impl Layout {
@@ -277,12 +284,20 @@ impl Layout {
             annotate_type: true,
             show_id: true,
             show_unknown: true,
+            variable: LayoutVariable::Name,
         }
     }
 
     fn without_types(self) -> Self {
         Self {
             annotate_type: false,
+            ..self
+        }
+    }
+
+    fn variable_value(self) -> Self {
+        Self {
+            variable: LayoutVariable::Value,
             ..self
         }
     }
@@ -294,6 +309,7 @@ impl Default for Layout {
             annotate_type: true,
             show_id: false,
             show_unknown: false,
+            variable: LayoutVariable::Name,
         }
     }
 }

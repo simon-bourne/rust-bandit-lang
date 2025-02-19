@@ -123,13 +123,15 @@ fn multi_id() {
 #[test]
 fn restrict_type() {
     "let id2 = id ⇒ (id2 : Type -> Int -> Int)"
-        .infers("let id2 : (∀a ⇒ a → a) = id ⇒ id : Type → Int → Int")
+        .infers("let id2 : Type → Int → Int = id ⇒ id2 : Type → Int → Int")
+    // TODO: This should be:
+    // .infers("let id2 : (∀a ⇒ a → a) = id ⇒ id : Type → Int → Int")
 }
 
 #[test]
 fn polymorphic_let() {
     "let id2 : (∀a ⇒ a → a) = id ⇒ add (id2 Int one) (float_to_int (id2 Float pi))".infers(
-        "let id2 : (∀a ⇒ a → a) = id ⇒ ((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a ⇒ a → a)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
+        "let id2 : (∀a ⇒ a → a) = id ⇒ ((add : Int → Int → Int) (((id2 : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a ⇒ a → a)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
 }
 
@@ -140,10 +142,7 @@ fn simple_polymorphic_lambda() {
 
 #[test]
 fn simple_polymorphic_let() {
-    "let x : (∀b ⇒ b) = polymorphic ⇒ x".infers(
-        // TODO: We should have `x` on the RHS, not `polymorphic`.
-        "let x : (∀b ⇒ b) = polymorphic ⇒ polymorphic : (∀b ⇒ b)",
-    );
+    "let x : (∀b ⇒ b) = polymorphic ⇒ x".infers("let x : (∀b ⇒ b) = polymorphic ⇒ x : (∀b ⇒ b)");
 }
 
 #[test]

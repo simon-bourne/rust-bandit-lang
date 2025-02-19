@@ -1,8 +1,8 @@
 use std::ptr;
 
-use super::{Term, TermEnum, Variable};
+use super::{Term, TermEnum, Variable, VariableValue};
 use crate::{
-    pretty::{Document, Layout, Operator, Side, TypeAnnotated},
+    pretty::{Document, Layout, LayoutVariable, Operator, Side, TypeAnnotated},
     Pretty,
 };
 
@@ -40,13 +40,20 @@ impl Pretty for Term<'_> {
 impl Pretty for Variable<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         let id = ptr::from_ref(self);
-        TypeAnnotated::new(
-            WithId {
-                value: self.name,
-                id,
-            },
-            &self.typ,
-        )
-        .to_document(parent, layout)
+
+        if let (LayoutVariable::Value, VariableValue::Known { value }) =
+            (layout.variable, &self.value)
+        {
+            TypeAnnotated::new(WithId { id, value }, &self.typ()).to_document(parent, layout)
+        } else {
+            TypeAnnotated::new(
+                WithId {
+                    value: self.name,
+                    id,
+                },
+                &self.typ(),
+            )
+            .to_document(parent, layout)
+        }
     }
 }
