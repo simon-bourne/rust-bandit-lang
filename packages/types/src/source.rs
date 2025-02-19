@@ -141,28 +141,26 @@ impl<'src> TermVariants<'src> {
 
 impl<'src> GenericTerm<'src, Term<'src>> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Term<'src>> {
-        Ok(inference::Term::new(
-            0,
-            match self {
-                Self::TypeOfType => GenericTerm::TypeOfType,
-                Self::Constant { name, typ } => GenericTerm::Constant {
-                    name,
-                    typ: typ.link(ctx)?,
-                },
-                Self::Apply {
-                    function,
-                    argument,
-                    typ,
-                } => GenericTerm::Apply {
-                    function: function.link(ctx)?,
-                    argument: argument.link(ctx)?,
-                    typ: typ.link(ctx)?,
-                },
-                Self::Variable(Some(name)) => return ctx.lookup(name),
-                Self::Variable(None) => return Ok(inference::Term::unknown_value()),
-                Self::VariableBinding(binding) => GenericTerm::VariableBinding(binding.link(ctx)?),
-            },
-        ))
+        let new = |term| inference::Term::new(0, term);
+        Ok(match self {
+            Self::TypeOfType => new(GenericTerm::TypeOfType),
+            Self::Constant { name, typ } => new(GenericTerm::Constant {
+                name,
+                typ: typ.link(ctx)?,
+            }),
+            Self::Apply {
+                function,
+                argument,
+                typ,
+            } => new(GenericTerm::Apply {
+                function: function.link(ctx)?,
+                argument: argument.link(ctx)?,
+                typ: typ.link(ctx)?,
+            }),
+            Self::Variable(Some(name)) => ctx.lookup(name)?,
+            Self::Variable(None) => inference::Term::unknown_value(),
+            Self::VariableBinding(binding) => new(GenericTerm::VariableBinding(binding.link(ctx)?)),
+        })
     }
 }
 
