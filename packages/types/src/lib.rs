@@ -11,6 +11,7 @@ pub mod source;
 pub mod well_typed;
 
 pub use pretty::Pretty;
+use pretty::{Document, Layout, Operator, Side, TypeAnnotated};
 
 struct SharedMut<T>(Rc<RefCell<T>>);
 
@@ -57,6 +58,7 @@ pub struct InferenceError;
 
 pub trait TermReference<'src>: Pretty + Clone + Sized {
     type Variable: Pretty;
+    type VariableValue: TermReference<'src>;
 
     fn is_known(&self) -> bool;
 
@@ -79,7 +81,7 @@ enum GenericTerm<'src, Term: TermReference<'src>> {
 }
 
 impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
-    fn pi(name: Option<&'src str>, variable_value: Term, in_term: Term) -> Self {
+    fn pi(name: Option<&'src str>, variable_value: Term::VariableValue, in_term: Term) -> Self {
         Self::VariableBinding(VariableBinding {
             name,
             binder: Binder::Pi,
@@ -121,9 +123,43 @@ enum Binder {
     Lambda,
 }
 
-struct VariableBinding<'src, Term> {
+struct VariableBinding<'src, Term: TermReference<'src>> {
     name: Option<&'src str>,
     binder: Binder,
-    variable_value: Term,
+    variable_value: Term::VariableValue,
     in_term: Term,
+}
+
+#[derive(Clone)]
+pub enum VariableValue<Term> {
+    Known { value: Term },
+    Unknown { typ: Term },
+}
+
+impl<'src, Term: TermReference<'src>> TermReference<'src> for VariableValue<Term> {
+    type Variable = Term::Variable;
+    type VariableValue = Term::VariableValue;
+
+    fn is_known(&self) -> bool {
+        match self {
+            Self::Known { value } => value.is_known(),
+            Self::Unknown { .. } => false,
+        }
+    }
+
+    fn typ(&self) -> Self {
+        match self {
+            Self::Known { value } => Self::Known { value: value.typ() },
+            Self::Unknown { typ } => Self::Known { value: typ.clone() },
+        }
+    }
+}
+
+impl<'src, Term: TermReference<'src>> Pretty for VariableValue<Term> {
+    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
+        match self {
+            Self::Known { value } => value.to_document(parent, layout),
+            Self::Unknown { typ } => TypeAnnotated::new(None, typ).to_document(parent, layout),
+        }
+    }
 }

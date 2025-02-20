@@ -3,7 +3,7 @@ use std::rc::Rc;
 use super::pretty::{Document, Layout, Operator, Side};
 use crate::{
     context::Context, inference, pretty::TypeAnnotated, Binder, GenericTerm, Pretty, Result,
-    TermReference, VariableBinding,
+    TermReference, VariableBinding, VariableValue,
 };
 
 #[derive(Clone)]
@@ -11,6 +11,7 @@ pub struct Term<'src>(Rc<TermEnum<'src>>);
 
 impl<'src> TermReference<'src> for Term<'src> {
     type Variable = Option<&'src str>;
+    type VariableValue = VariableValue<Self>;
 
     fn is_known(&self) -> bool {
         self.0.is_known()
@@ -61,15 +62,32 @@ impl<'src> Term<'src> {
     }
 
     pub fn let_binding(name: &'src str, variable_value: Self, in_term: Self) -> Self {
-        Self::binding(Binder::Let, Some(name), variable_value, in_term)
+        Self::binding(
+            Binder::Let,
+            Some(name),
+            VariableValue::Known {
+                value: variable_value,
+            },
+            in_term,
+        )
     }
 
-    pub fn pi_type(name: Option<&'src str>, variable_value: Self, result_type: Self) -> Self {
-        Self::binding(Binder::Pi, name, variable_value, result_type)
+    pub fn pi_type(name: Option<&'src str>, binding_typ: Self, result_type: Self) -> Self {
+        Self::binding(
+            Binder::Pi,
+            name,
+            VariableValue::Unknown { typ: binding_typ },
+            result_type,
+        )
     }
 
-    pub fn lambda(name: &'src str, variable_value: Self, in_term: Self) -> Self {
-        Self::binding(Binder::Lambda, Some(name), variable_value, in_term)
+    pub fn lambda(name: &'src str, binding_typ: Self, in_term: Self) -> Self {
+        Self::binding(
+            Binder::Lambda,
+            Some(name),
+            VariableValue::Unknown { typ: binding_typ },
+            in_term,
+        )
     }
 
     pub fn has_type(self, typ: Self) -> Self {
@@ -103,7 +121,7 @@ impl<'src> Term<'src> {
     fn binding(
         binder: Binder,
         name: Option<&'src str>,
-        variable_value: Self,
+        variable_value: VariableValue<Self>,
         in_term: Self,
     ) -> Self {
         Self::value(GenericTerm::VariableBinding(VariableBinding {
@@ -169,10 +187,19 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         &self,
         ctx: &mut Context<'src>,
     ) -> Result<VariableBinding<'src, inference::Term<'src>>> {
-        let mut variable_value = self.variable_value.link(ctx)?;
+        let variable_value = match &self.variable_value {
+            VariableValue::Known { value } => {
+                let value = value.link(ctx)?;
+                if let Some(name) = self.name {
+                    inference::Term::variable(name, value)
+                } else {
+                    value
+                }
+            }
+            VariableValue::Unknown { typ } => inference::Term::unknown(self.name, typ.link(ctx)?),
+        };
 
         let in_term = if let Some(name) = self.name {
-            variable_value.set_variable_name(name);
             ctx.with_variable(name, variable_value.clone(), |ctx| self.in_term.link(ctx))?
         } else {
             self.in_term.link(ctx)

@@ -21,9 +21,7 @@ fn pi_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     separated_foldr1(
         function_applications(),
         NamedOperator::To,
-        |input_type, _, output_type| {
-            Term::pi_type(None, Term::unknown().has_type(input_type), output_type)
-        },
+        |input_type, _, output_type| Term::pi_type(None, input_type, output_type),
     )
 }
 
@@ -52,7 +50,7 @@ fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
         Keyword::Forall,
         separated_pair(variable_binding(), Token::SuchThat, term),
     )
-    .map(|((var, value), term)| Term::pi_type(Some(var), value, term))
+    .map(|((var, typ), term)| Term::pi_type(Some(var), typ, term))
 }
 
 fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
@@ -85,19 +83,17 @@ fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
         Token::Lambda,
         separated_pair(variable_binding(), Token::SuchThat, term),
     )
-    .map(|((var, value), term)| Term::lambda(var, value, term))
+    .map(|((var, typ), term)| Term::lambda(var, typ, term))
 }
 
 fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, Term<'src>)> {
     (
         identifier(),
         opt(preceded(NamedOperator::HasType, term)).map(|typ| {
-            let value = Term::unknown();
-
             if let Some(typ) = typ {
-                value.has_type(typ)
+                typ
             } else {
-                value
+                Term::unknown()
             }
         }),
     )

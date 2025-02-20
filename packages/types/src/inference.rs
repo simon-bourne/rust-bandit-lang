@@ -2,6 +2,7 @@ use std::{cell::RefMut, collections::HashMap, fmt, ops::ControlFlow};
 
 use crate::{
     GenericTerm, InferenceError, Pretty, Result, SharedMut, TermReference, VariableBinding,
+    VariableValue,
 };
 
 mod pretty;
@@ -22,44 +23,32 @@ enum TermEnum<'src> {
 type OldToNewVariable<'src> = HashMap<*mut TermEnum<'src>, Term<'src>>;
 
 impl<'src> Term<'src> {
-    pub fn unknown(typ: Self) -> Self {
+    pub fn unknown(name: Option<&'src str>, typ: Self) -> Self {
         Self::new(
             0,
             GenericTerm::Variable(Variable {
-                name: None,
+                name,
                 value: VariableValue::Unknown { typ },
             }),
         )
     }
 
     pub fn unknown_value() -> Self {
-        Self::unknown(Self::unknown_type())
+        Self::unknown(None, Self::unknown_type())
     }
 
     pub fn unknown_type() -> Self {
-        Self::unknown(Self::type_of_type(0))
+        Self::unknown(None, Self::type_of_type(0))
     }
 
-    // TODO: This is horrible and needs sorting out
-    pub fn set_variable_name(&mut self, name: &'src str) {
-        let mut value = self.value();
-
-        if let GenericTerm::Variable(variable) = &mut *value {
-            variable.name = Some(name);
-        } else {
-            drop(value);
-            let value = self.clone();
-
-            let variable = Self::new(
-                0,
-                GenericTerm::Variable(Variable {
-                    name: Some(name),
-                    value: VariableValue::Known { value },
-                }),
-            );
-
-            *self = variable;
-        }
+    pub fn variable(name: &'src str, value: Self) -> Self {
+        Self::new(
+            0,
+            GenericTerm::Variable(Variable {
+                name: Some(name),
+                value: VariableValue::Known { value },
+            }),
+        )
     }
 
     // TODO: The implementation of this is ugly and inefficient.
@@ -300,13 +289,7 @@ impl fmt::Debug for Term<'_> {
 
 pub struct Variable<'src> {
     name: Option<&'src str>,
-    value: VariableValue<'src>,
-}
-
-#[derive(Clone)]
-enum VariableValue<'src> {
-    Known { value: Term<'src> },
-    Unknown { typ: Term<'src> },
+    value: VariableValue<Term<'src>>,
 }
 
 impl<'src> Variable<'src> {
@@ -341,7 +324,7 @@ impl<'src> Variable<'src> {
     }
 }
 
-impl<'src> VariableValue<'src> {
+impl<'src> VariableValue<Term<'src>> {
     fn unify(&mut self, other: &mut Term<'src>) -> Result<()> {
         match self {
             Self::Known { value } => Term::unify(value, other),
@@ -352,6 +335,7 @@ impl<'src> VariableValue<'src> {
 
 impl<'src> TermReference<'src> for Term<'src> {
     type Variable = Variable<'src>;
+    type VariableValue = Self;
 
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
