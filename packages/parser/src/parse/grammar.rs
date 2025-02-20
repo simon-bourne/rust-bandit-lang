@@ -91,13 +91,7 @@ fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, Term<'src>)> {
     (
         identifier(),
-        opt(preceded(NamedOperator::HasType, term)).map(|typ| {
-            if let Some(typ) = typ {
-                typ
-            } else {
-                Term::unknown()
-            }
-        }),
+        opt(preceded(NamedOperator::HasType, term)).map(|typ| typ.unwrap_or_else(Term::unknown)),
     )
 }
 
