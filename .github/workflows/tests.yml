@@ -84,5 +84,5 @@ jobs:
         components: rustfmt
     - uses: Swatinem/rust-cache@v2
     - run: cargo fmt --all -- --check
-    - run: cargo install cargo-udeps --locked --version 0.1.53
+    - run: cargo install cargo-udeps --locked --version 0.1.55
     - run: cargo udeps --all-targets

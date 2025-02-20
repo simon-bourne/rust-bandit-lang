@@ -10,7 +10,7 @@ fn main() {
             StandardVersions {
                 rustc_stable_version: "1.85.0",
                 rustc_nightly_version: "nightly-2025-02-19",
-                udeps_version: "0.1.53",
+                udeps_version: "0.1.55",
             },
             &[],
         ),
