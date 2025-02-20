@@ -12,12 +12,14 @@ pub fn term<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> PResult<Term
 }
 
 fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    separated_foldr1(pi_types(), NamedOperator::HasType, |term, _op, typ| {
-        term.has_type(typ)
-    })
+    separated_foldr1(
+        function_types(),
+        NamedOperator::HasType,
+        |term, _op, typ| term.has_type(typ),
+    )
 }
 
-fn pi_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
+fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     separated_foldr1(
         function_applications(),
         NamedOperator::To,
