@@ -386,7 +386,8 @@ impl<'src> VariableBinding<'src, Term<'src>> {
 
         let variable_value = if let GenericTerm::Variable(variable) = &mut *value {
             // TODO: We need a debruijn level to see if `self` binds `self.variable_value`.
-            // It could have been unified to another bound variable.
+            // It could have been unified to another bound variable. Or could we store and
+            // check against the pointer address?
             let variable_value = Term::new(0, GenericTerm::Variable(variable.fresh(new_variables)));
             drop(value);
             let existing = new_variables.insert(key, variable_value.clone());
