@@ -1,7 +1,7 @@
 use winnow::{
+    PResult, Parser as _,
     combinator::{alt, delimited, opt, preceded, repeat, separated_foldr1, separated_pair},
     token::any,
-    PResult, Parser as _,
 };
 
 use super::{Parser, Term, TokenList};

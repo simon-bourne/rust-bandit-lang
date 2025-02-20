@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crate::{inference, source, InferenceError, Result};
+use crate::{InferenceError, Result, inference, source};
 
 pub type GlobalValues<'a> = HashMap<&'a str, source::Term<'a>>;
 

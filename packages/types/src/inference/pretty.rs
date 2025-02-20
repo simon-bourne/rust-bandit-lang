@@ -2,8 +2,8 @@ use std::ptr;
 
 use super::{Term, TermEnum, Variable, VariableValue};
 use crate::{
-    pretty::{Document, Layout, LayoutVariable, Operator, Side, TypeAnnotated},
     Pretty,
+    pretty::{Document, Layout, LayoutVariable, Operator, Side, TypeAnnotated},
 };
 
 struct WithId<Id, Value> {

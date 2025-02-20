@@ -1,6 +1,6 @@
 use bandit_types::source::Term;
 pub use grammar::term;
-use winnow::{error::ContextError, token::one_of, PResult};
+use winnow::{PResult, error::ContextError, token::one_of};
 
 use crate::lex::{Keyword, NamedOperator, SrcToken, Token};
 

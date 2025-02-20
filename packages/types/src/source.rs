@@ -2,8 +2,8 @@ use std::rc::Rc;
 
 use super::pretty::{Document, Layout, Operator, Side};
 use crate::{
-    context::Context, inference, pretty::TypeAnnotated, Binder, GenericTerm, Pretty, Result,
-    TermReference, VariableBinding, VariableValue,
+    Binder, GenericTerm, Pretty, Result, TermReference, VariableBinding, VariableValue,
+    context::Context, inference, pretty::TypeAnnotated,
 };
 
 #[derive(Clone)]

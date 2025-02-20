@@ -1,6 +1,7 @@
 use xtask_base::{
-    ci::{StandardVersions, CI},
-    generate_open_source_files, CommonCmds,
+    CommonCmds,
+    ci::{CI, StandardVersions},
+    generate_open_source_files,
 };
 
 fn main() {

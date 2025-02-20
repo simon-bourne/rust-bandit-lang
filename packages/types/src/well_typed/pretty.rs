@@ -1,7 +1,7 @@
 use super::Term;
 use crate::{
-    pretty::{Document, Layout, Operator, Side},
     Pretty,
+    pretty::{Document, Layout, Operator, Side},
 };
 
 impl Pretty for Term<'_> {
