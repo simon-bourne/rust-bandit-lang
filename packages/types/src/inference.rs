@@ -246,8 +246,7 @@ impl<'src> Term<'src> {
             | (GenericTerm::VariableBinding(_), _rhs) => Err(InferenceError)?,
         }
 
-        drop(x_ref);
-        drop(y_ref);
+        drop((x_ref, y_ref));
         x.replace_with(y);
 
         Ok(())
