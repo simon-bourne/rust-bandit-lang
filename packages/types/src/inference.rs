@@ -19,6 +19,10 @@ enum TermEnum<'src> {
 type OldToNewVariable<'src> = HashMap<*mut TermEnum<'src>, Term<'src>>;
 
 impl<'src> Term<'src> {
+    pub fn type_of_type() -> Self {
+        Self::new(GenericTerm::TypeOfType)
+    }
+
     pub fn unknown(name: Option<&'src str>, typ: Self) -> Self {
         Self::new(GenericTerm::Variable(Variable {
             name,
@@ -39,6 +43,37 @@ impl<'src> Term<'src> {
             name: Some(name),
             value: VariableValue::Known { value },
         }))
+    }
+
+    pub fn constant(name: &'src str, typ: Self) -> Result<Self> {
+        Term::unify(&mut typ.typ(), &mut Term::type_of_type())?;
+        Ok(Self::new(GenericTerm::Constant { name, typ }))
+    }
+
+    pub fn apply(function: Self, mut argument: Self, mut typ: Self) -> Result<Self> {
+        // TODO: Is this reasoning sound?
+        // We're creating a new bound variable (`argument`) here. If it's unknown, we
+        // want to infer it, so we don't want it to be fresh. Therefore we create fresh
+        // variables for `argument` and `typ`, not `pi_type`.
+        let pi_type = &mut Term::pi_type(argument.fresh_variables(), typ.fresh_variables());
+        Term::unify(pi_type, &mut function.typ().fresh_variables())?;
+        Term::unify(&mut typ.typ(), &mut Term::type_of_type())?;
+
+        Ok(Self::new(GenericTerm::Apply {
+            function,
+            argument,
+            typ,
+        }))
+    }
+
+    pub fn type_annotation(term: Self, mut typ: Self) -> Result<Self> {
+        Self::unify(&mut typ.typ(), &mut Self::type_of_type())?;
+        Self::unify(&mut term.typ(), &mut typ)?;
+        Ok(term)
+    }
+
+    pub(crate) fn binding(binding: VariableBinding<'src, Self>) -> Self {
+        Self::new(GenericTerm::VariableBinding(binding))
     }
 
     // TODO: The implementation of this is ugly and inefficient.
@@ -83,41 +118,6 @@ impl<'src> Term<'src> {
         };
 
         Self::new(generic_term)
-    }
-
-    pub fn type_of_type() -> Self {
-        Self::new(GenericTerm::TypeOfType)
-    }
-
-    pub fn constant(name: &'src str, typ: Self) -> Result<Self> {
-        Term::unify(&mut typ.typ(), &mut Term::type_of_type())?;
-        Ok(Self::new(GenericTerm::Constant { name, typ }))
-    }
-
-    pub fn apply(function: Self, mut argument: Self, mut typ: Self) -> Result<Self> {
-        // TODO: Is this reasoning sound?
-        // We're creating a new bound variable (`argument`) here. If it's unknown, we
-        // want to infer it, so we don't want it to be fresh. Therefore we create fresh
-        // variables for `argument` and `typ`, not `pi_type`.
-        let pi_type = &mut Term::pi_type(argument.fresh_variables(), typ.fresh_variables());
-        Term::unify(pi_type, &mut function.typ().fresh_variables())?;
-        Term::unify(&mut typ.typ(), &mut Term::type_of_type())?;
-
-        Ok(Self::new(GenericTerm::Apply {
-            function,
-            argument,
-            typ,
-        }))
-    }
-
-    pub fn type_annotation(term: Self, mut typ: Self) -> Result<Self> {
-        Self::unify(&mut typ.typ(), &mut Self::type_of_type())?;
-        Self::unify(&mut term.typ(), &mut typ)?;
-        Ok(term)
-    }
-
-    pub(crate) fn binding(binding: VariableBinding<'src, Self>) -> Self {
-        Self::new(GenericTerm::VariableBinding(binding))
     }
 
     fn pi_type(argument_value: Self, result_type: Self) -> Self {
