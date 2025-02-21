@@ -12,6 +12,7 @@ pub struct Term<'src>(SharedMut<TermEnum<'src>>);
 
 enum TermEnum<'src> {
     Value { term: GenericTerm<'src, Term<'src>> },
+    // TODO: Can links cause circular references?
     Link { target: Term<'src> },
 }
 
@@ -401,6 +402,9 @@ impl<'src> GenericTerm<'src, Term<'src>> {
                 argument.infer_types()?;
                 typ.infer_types()?;
             }
+            // TODO: We don't really want to recurse down for every reference of a variable. We
+            // could either not recurse here, and have a special case for the bound variable in
+            // `VariableBinding::infer_types`, or we could infer types as we build the expression.
             Self::Variable(variable) => variable.infer_types()?,
             Self::VariableBinding(binding) => binding.infer_types()?,
         }
