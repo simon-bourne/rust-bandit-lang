@@ -4,7 +4,7 @@ use bandit_parser::{
     lex::{SrcToken, Token},
     parse::term,
 };
-use bandit_types::{context::Context, inference, source::Term, InferenceError, Pretty};
+use bandit_types::{InferenceError, Pretty, context::Context, inference, source::Term};
 use winnow::Parser;
 
 fn parse(input: &str) -> Term<'_> {
