@@ -4,7 +4,7 @@ use bandit_parser::{
     lex::{SrcToken, Token},
     parse::term,
 };
-use bandit_types::{InferenceError, Pretty, context::Context, inference, source::Term};
+use bandit_types::{context::Context, inference, source::Term, InferenceError, Pretty};
 use winnow::Parser;
 
 fn parse(input: &str) -> Term<'_> {
@@ -125,7 +125,17 @@ fn restrict_type() {
     "let id2 = id ⇒ (id2 : Type -> Int -> Int)"
         .infers("let id2 : Type → Int → Int = id ⇒ id2 : Type → Int → Int")
     // TODO: This should be:
-    // .infers("let id2 : (∀a ⇒ a → a) = id ⇒ id : Type → Int → Int")
+    // `.infers("let id2 : (∀a ⇒ a → a) = id ⇒ id2 : Type → Int → Int")`
+}
+
+#[test]
+fn restrict_explicit_type() {
+    "let id2 : (∀a ⇒ a → a) = id ⇒ (id2 : Type -> Int -> Int)"
+        .infers("let id2 : Type → Int → Int = id ⇒ id2 : Type → Int → Int")
+    // TODO: This should be:
+    // `.infers("let id2 : (∀a ⇒ a → a) = id ⇒ id2 : Type → Int → Int")`
+    // It happens because both occurances of `id2` reference the same term in
+    // memory, so the 2 types get unified.
 }
 
 #[test]
