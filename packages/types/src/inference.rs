@@ -380,7 +380,10 @@ impl<'src> GenericTerm<'src, Term<'src>> {
     fn infer_types(&mut self) -> Result<()> {
         match self {
             Self::TypeOfType => (),
-            Self::Constant { typ, .. } => typ.infer_types(pass)?,
+            Self::Constant { typ, .. } => {
+                Term::unify(&mut typ.typ(), &mut Term::type_of_type())?;
+                typ.infer_types()?
+            }
             Self::Apply {
                 function,
                 argument,
