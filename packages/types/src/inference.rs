@@ -11,26 +11,18 @@ mod pretty;
 pub struct Term<'src>(SharedMut<TermEnum<'src>>);
 
 enum TermEnum<'src> {
-    Value {
-        pass: u64,
-        term: GenericTerm<'src, Term<'src>>,
-    },
-    Link {
-        target: Term<'src>,
-    },
+    Value { term: GenericTerm<'src, Term<'src>> },
+    Link { target: Term<'src> },
 }
 
 type OldToNewVariable<'src> = HashMap<*mut TermEnum<'src>, Term<'src>>;
 
 impl<'src> Term<'src> {
     pub fn unknown(name: Option<&'src str>, typ: Self) -> Self {
-        Self::new(
-            0,
-            GenericTerm::Variable(Variable {
-                name,
-                value: VariableValue::Unknown { typ },
-            }),
-        )
+        Self::new(GenericTerm::Variable(Variable {
+            name,
+            value: VariableValue::Unknown { typ },
+        }))
     }
 
     pub fn unknown_value() -> Self {
@@ -38,17 +30,14 @@ impl<'src> Term<'src> {
     }
 
     pub fn unknown_type() -> Self {
-        Self::unknown(None, Self::type_of_type(0))
+        Self::unknown(None, Self::type_of_type())
     }
 
     pub fn variable(name: &'src str, value: Self) -> Self {
-        Self::new(
-            0,
-            GenericTerm::Variable(Variable {
-                name: Some(name),
-                value: VariableValue::Known { value },
-            }),
-        )
+        Self::new(GenericTerm::Variable(Variable {
+            name: Some(name),
+            value: VariableValue::Known { value },
+        }))
     }
 
     // TODO: The implementation of this is ugly and inefficient.
@@ -92,35 +81,28 @@ impl<'src> Term<'src> {
             },
         };
 
-        Self::new(0, generic_term)
+        Self::new(generic_term)
     }
 
-    fn type_of_type(pass: u64) -> Self {
-        Self::new(pass, GenericTerm::TypeOfType)
+    fn type_of_type() -> Self {
+        Self::new(GenericTerm::TypeOfType)
     }
 
-    fn pi_type(pass: u64, argument_value: Self, result_type: Self) -> Self {
-        Self::new(pass, GenericTerm::pi(None, argument_value, result_type))
+    fn pi_type(argument_value: Self, result_type: Self) -> Self {
+        Self::new(GenericTerm::pi(None, argument_value, result_type))
     }
 
-    pub(crate) fn new(pass: u64, term: GenericTerm<'src, Self>) -> Self {
-        Self(SharedMut::new(TermEnum::Value { pass, term }))
+    pub(crate) fn new(term: GenericTerm<'src, Self>) -> Self {
+        Self(SharedMut::new(TermEnum::Value { term }))
     }
 
-    pub fn infer_types(&mut self, current_pass: u64) -> Result<()> {
-        Self::unify(&mut self.typ().typ(), &mut Self::type_of_type(current_pass))?;
+    pub fn infer_types(&mut self) -> Result<()> {
+        Self::unify(&mut self.typ().typ(), &mut Self::type_of_type())?;
 
         match &mut *self.0.try_borrow_mut()? {
-            TermEnum::Value { pass, term } => {
-                if current_pass <= *pass {
-                    *pass = current_pass + 1;
-                    term.infer_types(current_pass)?
-                }
-            }
-            TermEnum::Link { target } => target.infer_types(current_pass)?,
+            TermEnum::Value { term } => term.infer_types(),
+            TermEnum::Link { target } => target.infer_types(),
         }
-
-        Ok(())
     }
 
     fn unify_named_variable(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
@@ -312,10 +294,10 @@ impl<'src> Variable<'src> {
         }
     }
 
-    fn infer_types(&mut self, pass: u64) -> Result<()> {
+    fn infer_types(&mut self) -> Result<()> {
         match &mut self.value {
-            VariableValue::Known { value } => value.infer_types(pass),
-            VariableValue::Unknown { typ } => typ.infer_types(pass),
+            VariableValue::Known { value } => value.infer_types(),
+            VariableValue::Unknown { typ } => typ.infer_types(),
         }
     }
 }
@@ -348,16 +330,16 @@ impl<'src> TermReference<'src> for Term<'src> {
 
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            TermEnum::Value { pass, term, .. } => term.typ(|e| Self::new(*pass, e), Variable::typ),
+            TermEnum::Value { term, .. } => term.typ(Self::new, Variable::typ),
             TermEnum::Link { target } => target.typ(),
         }
     }
 }
 
 impl<'src> VariableBinding<'src, Term<'src>> {
-    fn infer_types(&mut self, pass: u64) -> Result<()> {
-        self.variable_value.infer_types(pass)?;
-        self.in_term.infer_types(pass)
+    fn infer_types(&mut self) -> Result<()> {
+        self.variable_value.infer_types()?;
+        self.in_term.infer_types()
     }
 
     fn make_fresh_variables(&mut self, new_variables: &mut OldToNewVariable<'src>) -> Self {
@@ -368,7 +350,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
             // TODO: We need a debruijn level to see if `self` binds `self.variable_value`.
             // It could have been unified to another bound variable. Or could we store and
             // check against the pointer address?
-            let variable_value = Term::new(0, GenericTerm::Variable(variable.fresh(new_variables)));
+            let variable_value = Term::new(GenericTerm::Variable(variable.fresh(new_variables)));
             drop(value);
             let existing = new_variables.insert(key, variable_value.clone());
             assert!(existing.is_none(), "Found out of scope variable");
@@ -395,7 +377,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
 }
 
 impl<'src> GenericTerm<'src, Term<'src>> {
-    fn infer_types(&mut self, pass: u64) -> Result<()> {
+    fn infer_types(&mut self) -> Result<()> {
         match self {
             Self::TypeOfType => (),
             Self::Constant { typ, .. } => typ.infer_types(pass)?,
@@ -404,21 +386,20 @@ impl<'src> GenericTerm<'src, Term<'src>> {
                 argument,
                 typ,
             } => {
-                Term::unify(&mut typ.typ(), &mut Term::type_of_type(pass))?;
+                Term::unify(&mut typ.typ(), &mut Term::type_of_type())?;
                 // TODO: Is this reasoning sound?
                 // We're creating a new bound variable (`argument`) here. If it's unknown, we
                 // want to infer it, so we don't want it to be fresh. Therefore we create fresh
                 // variables for `argument` and `typ`, not `pi_type`.
-                let pi_type =
-                    &mut Term::pi_type(pass, argument.fresh_variables(), typ.fresh_variables());
+                let pi_type = &mut Term::pi_type(argument.fresh_variables(), typ.fresh_variables());
                 Term::unify(pi_type, &mut function.typ().fresh_variables())?;
 
-                function.infer_types(pass)?;
-                argument.infer_types(pass)?;
-                typ.infer_types(pass)?;
+                function.infer_types()?;
+                argument.infer_types()?;
+                typ.infer_types()?;
             }
-            Self::Variable(variable) => variable.infer_types(pass)?,
-            Self::VariableBinding(binding) => binding.infer_types(pass)?,
+            Self::Variable(variable) => variable.infer_types()?,
+            Self::VariableBinding(binding) => binding.infer_types()?,
         }
 
         Ok(())

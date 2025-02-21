@@ -159,7 +159,7 @@ impl<'src> TermEnum<'src> {
 
 impl<'src> GenericTerm<'src, Term<'src>> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Term<'src>> {
-        let new = |term| inference::Term::new(0, term);
+        let new = inference::Term::new;
         Ok(match self {
             Self::TypeOfType => new(GenericTerm::TypeOfType),
             Self::Constant { name, typ } => new(GenericTerm::Constant {
