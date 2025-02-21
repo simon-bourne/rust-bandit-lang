@@ -108,10 +108,7 @@ impl<'src> Term<'src> {
     }
 
     pub fn infer_types(&mut self, current_pass: u64) -> Result<()> {
-        Self::unify(
-            &mut self.typ().typ().fresh_variables(),
-            &mut Self::type_of_type(current_pass),
-        )?;
+        Self::unify(&mut self.typ().typ(), &mut Self::type_of_type(current_pass))?;
 
         match &mut *self.0.try_borrow_mut()? {
             TermEnum::Value { pass, term } => {
@@ -407,10 +404,7 @@ impl<'src> GenericTerm<'src, Term<'src>> {
                 argument,
                 typ,
             } => {
-                Term::unify(
-                    &mut typ.typ().fresh_variables(),
-                    &mut Term::type_of_type(pass),
-                )?;
+                Term::unify(&mut typ.typ(), &mut Term::type_of_type(pass))?;
                 // TODO: Is this reasoning sound?
                 // We're creating a new bound variable (`argument`) here. If it's unknown, we
                 // want to infer it, so we don't want it to be fresh. Therefore we create fresh
