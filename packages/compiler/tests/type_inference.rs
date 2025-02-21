@@ -84,6 +84,7 @@ fn simple_lambda() {
 
 #[test]
 fn self_referential_type() {
+    // TODO: This creates an `Rc` cycle, as `x : x`.
     r"\x ⇒ x : x".infers(r#"\x : Type = Type ⇒ Type"#);
 }
 
