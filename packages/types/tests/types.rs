@@ -8,7 +8,7 @@ fn infer_kinds() {
     let m = Term::variable("m");
     let a = Term::variable("a");
     let ctx = &mut Context::new(HashMap::new());
-    let mut constructor_type = Term::lambda(
+    let constructor_type = Term::lambda(
         "m",
         Term::unknown(),
         Term::lambda("a", Term::unknown(), Term::apply(m, a)),
@@ -16,7 +16,6 @@ fn infer_kinds() {
     .link(ctx)
     .unwrap();
 
-    constructor_type.infer_types().unwrap();
     assert_eq!(
         constructor_type.to_pretty_string(80),
         r"\m : _ → _ ⇒ \a ⇒ (m : _ → _) a"

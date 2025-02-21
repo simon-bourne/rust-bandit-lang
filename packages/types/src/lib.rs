@@ -32,10 +32,6 @@ impl<T> SharedMut<T> {
         self.0.borrow_mut()
     }
 
-    pub fn try_borrow_mut(&self) -> Result<RefMut<'_, T>> {
-        self.0.try_borrow_mut().map_err(|_| InferenceError)
-    }
-
     pub fn as_ptr(&self) -> *mut T {
         self.0.as_ptr()
     }

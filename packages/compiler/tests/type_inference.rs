@@ -62,9 +62,7 @@ fn infer_types(input: &str) -> Result<inference::Term, InferenceError> {
         ],
     );
 
-    let mut term = parse(input).link(ctx).unwrap();
-    term.infer_types()?;
-    Ok(term)
+    parse(input).link(ctx)
 }
 
 #[test]

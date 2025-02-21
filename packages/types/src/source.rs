@@ -99,15 +99,12 @@ impl<'src> Term<'src> {
     }
 
     pub fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Term<'src>> {
-        Ok(match self.0.as_ref() {
-            TermEnum::Value { term } => term.link(ctx)?,
+        match self.0.as_ref() {
+            TermEnum::Value { term } => term.link(ctx),
             TermEnum::TypeAnnotation { term, typ } => {
-                let term = term.link(ctx)?;
-                let typ = &mut typ.link(ctx)?;
-                inference::Term::unify(&mut term.typ(), typ)?;
-                term
+                inference::Term::type_annotation(term.link(ctx)?, typ.link(ctx)?)
             }
-        })
+        }
     }
 
     fn new(term: TermEnum<'src>) -> Self {
@@ -159,25 +156,19 @@ impl<'src> TermEnum<'src> {
 
 impl<'src> GenericTerm<'src, Term<'src>> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Term<'src>> {
-        let new = inference::Term::new;
+        use inference::Term as Infer;
+
         Ok(match self {
-            Self::TypeOfType => new(GenericTerm::TypeOfType),
-            Self::Constant { name, typ } => new(GenericTerm::Constant {
-                name,
-                typ: typ.link(ctx)?,
-            }),
+            Self::TypeOfType => Infer::type_of_type(),
+            Self::Constant { name, typ } => Infer::constant(name, typ.link(ctx)?)?,
             Self::Apply {
                 function,
                 argument,
                 typ,
-            } => new(GenericTerm::Apply {
-                function: function.link(ctx)?,
-                argument: argument.link(ctx)?,
-                typ: typ.link(ctx)?,
-            }),
+            } => Infer::apply(function.link(ctx)?, argument.link(ctx)?, typ.link(ctx)?)?,
             Self::Variable(Some(name)) => ctx.lookup(name)?,
-            Self::Variable(None) => inference::Term::unknown_value(),
-            Self::VariableBinding(binding) => new(GenericTerm::VariableBinding(binding.link(ctx)?)),
+            Self::Variable(None) => Infer::unknown_value(),
+            Self::VariableBinding(binding) => Infer::binding(binding.link(ctx)?),
         })
     }
 }
