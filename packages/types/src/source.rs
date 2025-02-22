@@ -170,14 +170,9 @@ impl<'src> GenericTerm<'src, Term<'src>> {
 }
 
 impl<'src> VariableBinding<'src, Term<'src>> {
-    fn link(
-        &self,
-        ctx: &mut Context<'src>,
-    ) -> Result<VariableBinding<'src, linked::Term<'src>>> {
+    fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<'src, linked::Term<'src>>> {
         let variable_value = match &self.variable_value {
-            VariableValue::Known { value } => {
-                linked::Term::variable(self.name, value.link(ctx)?)
-            }
+            VariableValue::Known { value } => linked::Term::variable(self.name, value.link(ctx)?),
             VariableValue::Unknown { typ } => linked::Term::unknown(self.name, typ.link(ctx)?),
         };
 
