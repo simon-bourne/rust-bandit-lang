@@ -93,7 +93,7 @@ impl<'src> Term<'src> {
 
         let mut value = self.value();
 
-        let generic_term = match &mut *value {
+        Self::new(match &mut *value {
             GenericTerm::Variable(_) => {
                 drop(value);
                 return self.clone();
@@ -115,9 +115,7 @@ impl<'src> Term<'src> {
                 argument: argument.make_fresh_variables(new_variables),
                 typ: typ.make_fresh_variables(new_variables),
             },
-        };
-
-        Self::new(generic_term)
+        })
     }
 
     fn pi_type(argument_value: Self, result_type: Self) -> Self {
