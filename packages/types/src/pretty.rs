@@ -55,12 +55,12 @@ impl<'src, Term: TermReference<'src>> Pretty for VariableBinding<'src, Term> {
 
         parenthesize_if(
             parent.is_some(),
-            Document::concat([
+            [
                 Document::text(binder),
                 variable_definition(self.name, &self.variable_value, layout),
                 Document::text(" ⇒ "),
                 self.in_term.to_document(None, layout),
-            ]),
+            ],
         )
     }
 }
@@ -166,7 +166,9 @@ impl Pretty for Option<&str> {
     }
 }
 
-fn parenthesize_if(condition: bool, docs: Document) -> Document {
+fn parenthesize_if(condition: bool, docs: impl IntoIterator<Item = Document>) -> Document {
+    let docs = Document::concat(docs);
+
     if condition {
         Document::concat([Document::text("("), docs, Document::text(")")])
     } else {
@@ -201,7 +203,7 @@ impl Operator {
     ) -> Document {
         parenthesize_if(
             self.parenthesize(parent),
-            Document::concat([
+            [
                 left.to_document(Some((self, Side::Left)), left_layout),
                 Document::text(match self {
                     Self::Equals => " = ",
@@ -210,7 +212,7 @@ impl Operator {
                     Self::Apply => " ",
                 }),
                 right.to_document(Some((self, Side::Right)), right_layout),
-            ]),
+            ],
         )
     }
 
