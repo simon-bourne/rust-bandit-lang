@@ -28,10 +28,11 @@ impl<'a> Context<'a> {
             .or_default()
             .push(variable_value);
         let output = f(self);
-        // TODO: Remove empty vecs
-        self.local_variables.entry(name).and_modify(|vars| {
-            vars.pop();
-        });
+
+        if self.local_variables.get_mut(name).unwrap().pop().is_none() {
+            self.local_variables.remove(name);
+        }
+
         Ok(output)
     }
 
