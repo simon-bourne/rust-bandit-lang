@@ -27,7 +27,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub(crate) fn with_variable<Output>(
+    pub(crate) fn scope<Output>(
         &mut self,
         name: Option<&'a str>,
         variable_value: linked::Term<'a>,
