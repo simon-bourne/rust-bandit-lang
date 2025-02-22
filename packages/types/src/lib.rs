@@ -111,9 +111,6 @@ impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
 
 #[derive(Copy, Clone)]
 enum Binder {
-    /// `Let` is included so we can generalize explicitly using type
-    /// annotations. Otherwise, we could replace `let x = y in z` with `(\x =>
-    /// z) y`.
     Let,
     Pi,
     Lambda,
