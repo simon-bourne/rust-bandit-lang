@@ -32,9 +32,9 @@ impl<'a> Context<'a> {
         name: Option<&'a str>,
         variable_value: linked::Term<'a>,
         f: impl FnOnce(&mut Self) -> Output,
-    ) -> Result<Output> {
+    ) -> Output {
         let Some(name) = name else {
-            return Ok(f(self));
+            return f(self);
         };
 
         self.local_variables
@@ -47,7 +47,7 @@ impl<'a> Context<'a> {
             self.local_variables.remove(name);
         }
 
-        Ok(output)
+        output
     }
 
     pub(crate) fn lookup(&mut self, name: &'a str) -> Result<linked::Term<'a>> {

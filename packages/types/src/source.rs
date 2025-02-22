@@ -178,7 +178,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
 
         let in_term = ctx.with_variable(self.name, variable_value.clone(), |ctx| {
             self.in_term.link(ctx)
-        })??;
+        })?;
 
         Ok(VariableBinding {
             name: self.name,
