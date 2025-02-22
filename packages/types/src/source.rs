@@ -176,12 +176,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
     ) -> Result<VariableBinding<'src, inference::Term<'src>>> {
         let variable_value = match &self.variable_value {
             VariableValue::Known { value } => {
-                let value = value.link(ctx)?;
-                if let Some(name) = self.name {
-                    inference::Term::variable(name, value)
-                } else {
-                    value
-                }
+                inference::Term::variable(self.name, value.link(ctx)?)
             }
             VariableValue::Unknown { typ } => inference::Term::unknown(self.name, typ.link(ctx)?),
         };

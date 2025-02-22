@@ -38,9 +38,9 @@ impl<'src> Term<'src> {
         Self::unknown(None, Self::type_of_type())
     }
 
-    pub fn variable(name: &'src str, value: Self) -> Self {
+    pub fn variable(name: Option<&'src str>, value: Self) -> Self {
         Self::new(GenericTerm::Variable(Variable {
-            name: Some(name),
+            name,
             value: VariableValue::Known { value },
         }))
     }
