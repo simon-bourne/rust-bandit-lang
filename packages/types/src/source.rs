@@ -26,7 +26,7 @@ impl Pretty for Term<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self.0.as_ref() {
             TermEnum::Value { term } => term.to_document(parent, layout),
-            TermEnum::TypeAnnotation { term, typ } => {
+            TermEnum::HasType { term, typ } => {
                 TypeAnnotated::new(term, typ).to_document(parent, layout)
             }
         }
@@ -91,7 +91,7 @@ impl<'src> Term<'src> {
     }
 
     pub fn has_type(self, typ: Self) -> Self {
-        Self::new(TermEnum::TypeAnnotation { term: self, typ })
+        Self::new(TermEnum::HasType { term: self, typ })
     }
 
     pub fn variable(name: &'src str) -> Self {
@@ -101,9 +101,7 @@ impl<'src> Term<'src> {
     pub fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Term<'src>> {
         match self.0.as_ref() {
             TermEnum::Value { term } => term.link(ctx),
-            TermEnum::TypeAnnotation { term, typ } => {
-                inference::Term::type_annotation(term.link(ctx)?, typ.link(ctx)?)
-            }
+            TermEnum::HasType { term, typ } => term.link(ctx)?.has_type(typ.link(ctx)?),
         }
     }
 
@@ -132,7 +130,7 @@ impl<'src> Term<'src> {
 
 enum TermEnum<'src> {
     Value { term: GenericTerm<'src, Term<'src>> },
-    TypeAnnotation { term: Term<'src>, typ: Term<'src> },
+    HasType { term: Term<'src>, typ: Term<'src> },
 }
 
 impl<'src> TermEnum<'src> {
@@ -142,14 +140,14 @@ impl<'src> TermEnum<'src> {
                 term: GenericTerm::Variable(None),
             } => false,
             Self::Value { .. } => true,
-            Self::TypeAnnotation { term, .. } => term.is_known(),
+            Self::HasType { term, .. } => term.is_known(),
         }
     }
 
     fn typ(&self, new: impl FnOnce(GenericTerm<'src, Term<'src>>) -> Term<'src>) -> Term<'src> {
         match self {
             Self::Value { term } => term.typ(new, |_| Term::unknown()),
-            Self::TypeAnnotation { typ, .. } => typ.clone(),
+            Self::HasType { typ, .. } => typ.clone(),
         }
     }
 }

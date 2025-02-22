@@ -66,10 +66,10 @@ impl<'src> Term<'src> {
         }))
     }
 
-    pub fn type_annotation(term: Self, mut typ: Self) -> Result<Self> {
+    pub fn has_type(self, mut typ: Self) -> Result<Self> {
         Self::unify(&mut typ.typ(), &mut Self::type_of_type())?;
-        Self::unify(&mut term.typ(), &mut typ)?;
-        Ok(term)
+        Self::unify(&mut self.typ(), &mut typ)?;
+        Ok(self)
     }
 
     pub(crate) fn binding(binding: VariableBinding<'src, Self>) -> Self {
