@@ -152,19 +152,19 @@ impl<'src> TermEnum<'src> {
 
 impl<'src> GenericTerm<'src, Term<'src>> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<linked::Term<'src>> {
-        use linked::Term as Infer;
+        use linked::Term as Linked;
 
         Ok(match self {
-            Self::TypeOfType => Infer::type_of_type(),
-            Self::Constant { name, typ } => Infer::constant(name, typ.link(ctx)?)?,
+            Self::TypeOfType => Linked::type_of_type(),
+            Self::Constant { name, typ } => Linked::constant(name, typ.link(ctx)?)?,
             Self::Apply {
                 function,
                 argument,
                 typ,
-            } => Infer::apply(function.link(ctx)?, argument.link(ctx)?, typ.link(ctx)?)?,
+            } => Linked::apply(function.link(ctx)?, argument.link(ctx)?, typ.link(ctx)?)?,
             Self::Variable(Some(name)) => ctx.lookup(name)?,
-            Self::Variable(None) => Infer::unknown_value(),
-            Self::VariableBinding(binding) => Infer::binding(binding.link(ctx)?),
+            Self::Variable(None) => Linked::unknown_value(),
+            Self::VariableBinding(binding) => Linked::binding(binding.link(ctx)?),
         })
     }
 }
