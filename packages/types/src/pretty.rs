@@ -1,3 +1,5 @@
+use std::fmt;
+
 use pretty::RcDoc;
 
 use super::{GenericTerm, TermReference, VariableBinding};
@@ -18,11 +20,11 @@ pub trait Pretty {
             .to_string()
     }
 
-    fn debug(&self) -> String {
+    fn debug(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let width = 80;
         let terse = self.to_pretty_string(width);
         let verbose = self.to_verbose_string(width);
-        format!("{terse} {{-- {verbose} --}}")
+        write!(f, "{terse} {{-- {verbose} --}}")
     }
 }
 

@@ -282,7 +282,7 @@ impl<'src> Term<'src> {
 
 impl fmt::Debug for Term<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.debug())
+        self.debug(f)
     }
 }
 
