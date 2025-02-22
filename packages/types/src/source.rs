@@ -3,7 +3,7 @@ use std::rc::Rc;
 use super::pretty::{Document, Layout, Operator, Side};
 use crate::{
     Binder, GenericTerm, Pretty, Result, TermReference, VariableBinding, VariableValue,
-    context::Context, inference, pretty::has_type,
+    context::Context, linked, pretty::has_type,
 };
 
 #[derive(Clone)]
@@ -96,7 +96,7 @@ impl<'src> Term<'src> {
         Self::value(GenericTerm::Variable(Some(name)))
     }
 
-    pub fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Term<'src>> {
+    pub fn link(&self, ctx: &mut Context<'src>) -> Result<linked::Term<'src>> {
         match self.0.as_ref() {
             TermEnum::Value { term } => term.link(ctx),
             TermEnum::HasType { term, typ } => term.link(ctx)?.has_type(typ.link(ctx)?),
@@ -151,8 +151,8 @@ impl<'src> TermEnum<'src> {
 }
 
 impl<'src> GenericTerm<'src, Term<'src>> {
-    fn link(&self, ctx: &mut Context<'src>) -> Result<inference::Term<'src>> {
-        use inference::Term as Infer;
+    fn link(&self, ctx: &mut Context<'src>) -> Result<linked::Term<'src>> {
+        use linked::Term as Infer;
 
         Ok(match self {
             Self::TypeOfType => Infer::type_of_type(),
@@ -173,12 +173,12 @@ impl<'src> VariableBinding<'src, Term<'src>> {
     fn link(
         &self,
         ctx: &mut Context<'src>,
-    ) -> Result<VariableBinding<'src, inference::Term<'src>>> {
+    ) -> Result<VariableBinding<'src, linked::Term<'src>>> {
         let variable_value = match &self.variable_value {
             VariableValue::Known { value } => {
-                inference::Term::variable(self.name, value.link(ctx)?)
+                linked::Term::variable(self.name, value.link(ctx)?)
             }
-            VariableValue::Unknown { typ } => inference::Term::unknown(self.name, typ.link(ctx)?),
+            VariableValue::Unknown { typ } => linked::Term::unknown(self.name, typ.link(ctx)?),
         };
 
         let in_term = if let Some(name) = self.name {

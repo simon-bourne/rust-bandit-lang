@@ -2,7 +2,7 @@ use bandit_parser::{
     lex::{SrcToken, Token},
     parse::term,
 };
-use bandit_types::{InferenceError, Pretty, context::Context, inference, source::Term};
+use bandit_types::{InferenceError, Pretty, context::Context, linked, source::Term};
 use winnow::Parser;
 
 fn parse(input: &str) -> Term<'_> {
@@ -40,7 +40,7 @@ impl Test for &str {
     }
 }
 
-fn infer_types(input: &str) -> Result<inference::Term, InferenceError> {
+fn infer_types(input: &str) -> Result<linked::Term, InferenceError> {
     let ctx = &mut context(
         ["Bool", "Int", "Float"],
         [

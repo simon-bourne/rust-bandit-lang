@@ -5,7 +5,7 @@ use std::{
 };
 
 pub mod context;
-pub mod inference;
+pub mod linked;
 mod pretty;
 pub mod source;
 pub mod well_typed;

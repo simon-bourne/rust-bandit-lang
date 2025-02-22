@@ -1,16 +1,16 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{InferenceError, Result, inference, source};
+use crate::{InferenceError, Result, linked, source};
 
 #[derive(Clone)]
 enum Global<'a> {
-    Typed(inference::Term<'a>),
+    Typed(linked::Term<'a>),
     Source(source::Term<'a>),
 }
 pub type GlobalValues<'a> = HashMap<&'a str, source::Term<'a>>;
 
 pub struct Context<'a> {
-    local_variables: HashMap<&'a str, Vec<inference::Term<'a>>>,
+    local_variables: HashMap<&'a str, Vec<linked::Term<'a>>>,
     global_variables: Rc<HashMap<&'a str, RefCell<Global<'a>>>>,
 }
 
@@ -30,7 +30,7 @@ impl<'a> Context<'a> {
     pub(crate) fn with_variable<Output>(
         &mut self,
         name: &'a str,
-        variable_value: inference::Term<'a>,
+        variable_value: linked::Term<'a>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Result<Output> {
         self.local_variables
@@ -46,7 +46,7 @@ impl<'a> Context<'a> {
         Ok(output)
     }
 
-    pub(crate) fn lookup(&mut self, name: &'a str) -> Result<inference::Term<'a>> {
+    pub(crate) fn lookup(&mut self, name: &'a str) -> Result<linked::Term<'a>> {
         Ok(if let Some(local) = self.lookup_local(name) {
             local
         } else {
@@ -55,11 +55,11 @@ impl<'a> Context<'a> {
         .fresh_variables())
     }
 
-    fn lookup_local(&self, name: &'a str) -> Option<inference::Term<'a>> {
+    fn lookup_local(&self, name: &'a str) -> Option<linked::Term<'a>> {
         Some(self.local_variables.get(name)?.last()?.clone())
     }
 
-    fn global_value(&mut self, name: &'a str) -> Result<inference::Term<'a>> {
+    fn global_value(&mut self, name: &'a str) -> Result<linked::Term<'a>> {
         let mut global_ctx = Context {
             local_variables: HashMap::new(),
             global_variables: self.global_variables.clone(),
