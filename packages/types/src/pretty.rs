@@ -57,7 +57,7 @@ impl<'src, Term: TermReference<'src>> Pretty for VariableBinding<'src, Term> {
             parent.is_some(),
             Document::concat([
                 Document::text(binder),
-                variable_to_document(self.name, &self.variable_value, None, layout),
+                variable_definition(self.name, &self.variable_value, layout),
                 Document::text(" ⇒ "),
                 self.in_term.to_document(None, layout),
             ]),
@@ -100,10 +100,9 @@ impl<Value: Pretty, Type: Pretty> Pretty for TypeAnnotated<Value, Type> {
     }
 }
 
-pub fn variable_to_document<'src>(
+pub fn variable_definition<'src>(
     name: Option<&str>,
     value: &impl TermReference<'src>,
-    parent: Option<(Operator, Side)>,
     layout: Layout,
 ) -> Document {
     let typ = &value.typ();
@@ -111,14 +110,14 @@ pub fn variable_to_document<'src>(
 
     if value.is_known() || layout.show_unknown {
         Operator::Equals.to_document(
-            parent,
+            None,
             &type_annotated,
             value,
             layout,
             layout.without_types().variable_value(),
         )
     } else {
-        type_annotated.to_document(parent, layout)
+        type_annotated.to_document(None, layout)
     }
 }
 
