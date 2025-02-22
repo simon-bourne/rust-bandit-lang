@@ -51,7 +51,6 @@ impl<'src> Term<'src> {
     }
 
     pub fn apply(function: Self, mut argument: Self, mut typ: Self) -> Result<Self> {
-        // TODO: Is this reasoning sound?
         // We're creating a new bound variable (`argument`) here. If it's unknown, we
         // want to infer it, so we don't want it to be fresh. Therefore we create fresh
         // variables for `argument` and `typ`, not `pi_type`.
