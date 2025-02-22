@@ -65,6 +65,27 @@ impl<'src, Term: TermReference<'src>> Pretty for VariableBinding<'src, Term> {
     }
 }
 
+pub fn variable_definition<'src>(
+    name: Option<&str>,
+    value: &impl TermReference<'src>,
+    layout: Layout,
+) -> Document {
+    let typ = &value.typ();
+    let type_annotated = TypeAnnotated::new(name, typ);
+
+    if value.is_known() || layout.show_unknown {
+        Operator::Equals.to_document(
+            None,
+            &type_annotated,
+            value,
+            layout,
+            layout.without_types().variable_value(),
+        )
+    } else {
+        type_annotated.to_document(None, layout)
+    }
+}
+
 pub struct TypeAnnotated<Value: Pretty, Type: Pretty> {
     value: Value,
     typ: Option<Type>,
@@ -97,27 +118,6 @@ impl<Value: Pretty, Type: Pretty> Pretty for TypeAnnotated<Value, Type> {
             }
         }
         self.value.to_document(parent, layout)
-    }
-}
-
-pub fn variable_definition<'src>(
-    name: Option<&str>,
-    value: &impl TermReference<'src>,
-    layout: Layout,
-) -> Document {
-    let typ = &value.typ();
-    let type_annotated = TypeAnnotated::new(name, typ);
-
-    if value.is_known() || layout.show_unknown {
-        Operator::Equals.to_document(
-            None,
-            &type_annotated,
-            value,
-            layout,
-            layout.without_types().variable_value(),
-        )
-    } else {
-        type_annotated.to_document(None, layout)
     }
 }
 
