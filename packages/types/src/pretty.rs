@@ -36,36 +36,32 @@ impl<T: Pretty> Pretty for &'_ T {
 
 impl<'src, Term: TermReference<'src>> Pretty for VariableBinding<'src, Term> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        let to_doc = |kind| {
+        if matches!(self.binder, Binder::Pi) && self.name.is_none() {
+            let layout = layout.without_types();
+            return Operator::Arrow.to_document(
+                parent,
+                &self.variable_value.typ(),
+                &self.in_term,
+                layout,
+                layout,
+            );
+        }
+
+        let binder = match self.binder {
+            Binder::Let => "let ",
+            Binder::Pi => "∀",
+            Binder::Lambda => "\\",
+        };
+
+        parenthesize_if(
+            parent.is_some(),
             Document::concat([
-                kind,
+                Document::text(binder),
                 variable_to_document(self.name, &self.variable_value, None, layout),
                 Document::text(" ⇒ "),
                 self.in_term.to_document(None, layout),
-            ])
-        };
-
-        match self.binder {
-            Binder::Let => parenthesize_if(
-                parent.is_some(),
-                to_doc(Document::concat([Document::text("let"), Document::space()])),
-            ),
-            Binder::Pi => {
-                if self.name.is_some() {
-                    parenthesize_if(parent.is_some(), to_doc(Document::text("∀")))
-                } else {
-                    let layout = layout.without_types();
-                    Operator::Arrow.to_document(
-                        parent,
-                        &self.variable_value.typ(),
-                        &self.in_term,
-                        layout,
-                        layout,
-                    )
-                }
-            }
-            Binder::Lambda => parenthesize_if(parent.is_some(), to_doc(Document::text("\\"))),
-        }
+            ]),
+        )
     }
 }
 
