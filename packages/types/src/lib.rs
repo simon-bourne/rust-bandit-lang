@@ -11,7 +11,6 @@ pub mod source;
 pub mod well_typed;
 
 pub use pretty::Pretty;
-use pretty::{Document, Layout, Operator, Side, TypeAnnotated};
 
 struct SharedMut<T>(Rc<RefCell<T>>);
 
@@ -144,15 +143,6 @@ impl<'src, Term: TermReference<'src>> TermReference<'src> for VariableValue<Term
         match self {
             Self::Known { value } => Self::Known { value: value.typ() },
             Self::Unknown { typ } => Self::Known { value: typ.clone() },
-        }
-    }
-}
-
-impl<'src, Term: TermReference<'src>> Pretty for VariableValue<Term> {
-    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        match self {
-            Self::Known { value } => value.to_document(parent, layout),
-            Self::Unknown { typ } => TypeAnnotated::new(None, typ).to_document(parent, layout),
         }
     }
 }

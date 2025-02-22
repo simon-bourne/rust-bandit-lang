@@ -3,7 +3,7 @@ use std::fmt;
 use pretty::RcDoc;
 
 use super::{GenericTerm, TermReference, VariableBinding};
-use crate::Binder;
+use crate::{Binder, VariableValue};
 
 pub trait Pretty {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document;
@@ -141,6 +141,15 @@ impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
                 .to_document(parent, layout),
             Self::Variable(variable) => variable.to_document(parent, layout),
             Self::VariableBinding(binding) => binding.to_document(parent, layout),
+        }
+    }
+}
+
+impl<'src, Term: TermReference<'src>> Pretty for VariableValue<Term> {
+    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
+        match self {
+            Self::Known { value } => value.to_document(parent, layout),
+            Self::Unknown { typ } => TypeAnnotated::new(None, typ).to_document(parent, layout),
         }
     }
 }
