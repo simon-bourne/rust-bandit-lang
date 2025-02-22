@@ -3,7 +3,7 @@ use std::rc::Rc;
 use super::pretty::{Document, Layout, Operator, Side};
 use crate::{
     Binder, GenericTerm, Pretty, Result, TermReference, VariableBinding, VariableValue,
-    context::Context, inference, pretty::TypeAnnotated,
+    context::Context, inference, pretty::has_type,
 };
 
 #[derive(Clone)]
@@ -26,9 +26,7 @@ impl Pretty for Term<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self.0.as_ref() {
             TermEnum::Value { term } => term.to_document(parent, layout),
-            TermEnum::HasType { term, typ } => {
-                TypeAnnotated::new(term, typ).to_document(parent, layout)
-            }
+            TermEnum::HasType { term, typ } => has_type(term, typ).to_document(parent, layout),
         }
     }
 }

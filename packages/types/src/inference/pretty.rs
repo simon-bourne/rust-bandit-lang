@@ -3,7 +3,7 @@ use std::ptr;
 use super::{Term, TermEnum, Variable, VariableValue};
 use crate::{
     Pretty,
-    pretty::{Document, Layout, LayoutVariable, Operator, Side, TypeAnnotated},
+    pretty::{Document, Layout, LayoutVariable, Operator, Side, has_type},
 };
 
 struct WithId<Id, Value> {
@@ -44,9 +44,9 @@ impl Pretty for Variable<'_> {
         if let (LayoutVariable::Value, VariableValue::Known { value }) =
             (layout.variable, &self.value)
         {
-            TypeAnnotated::new(WithId { id, value }, &self.typ()).to_document(parent, layout)
+            has_type(WithId { id, value }, &self.typ()).to_document(parent, layout)
         } else {
-            TypeAnnotated::new(
+            has_type(
                 WithId {
                     value: self.name,
                     id,

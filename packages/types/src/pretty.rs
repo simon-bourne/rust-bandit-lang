@@ -71,7 +71,7 @@ pub fn variable_definition<'src>(
     layout: Layout,
 ) -> Document {
     let typ = &value.typ();
-    let type_annotated = TypeAnnotated::new(name, typ);
+    let type_annotated = has_type(name, typ);
 
     if value.is_known() || layout.show_unknown {
         Operator::Equals.to_document(
@@ -91,16 +91,17 @@ pub struct TypeAnnotated<Value: Pretty, Type: Pretty> {
     typ: Option<Type>,
 }
 
-impl<'a, 'src, Value, Type> TypeAnnotated<Value, &'a Type>
+pub fn has_type<'a, 'src, Value, Type>(
+    value: Value,
+    typ: &'a Type,
+) -> TypeAnnotated<Value, &'a Type>
 where
     Value: Pretty,
     Type: TermReference<'src> + 'a,
 {
-    pub fn new(value: Value, typ: &'a Type) -> Self {
-        Self {
-            value,
-            typ: typ.is_known().then_some(typ),
-        }
+    TypeAnnotated {
+        value,
+        typ: typ.is_known().then_some(typ),
     }
 }
 
@@ -125,14 +126,12 @@ impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self {
             Self::TypeOfType => Document::text("Type"),
-            Self::Constant { name, typ } => {
-                TypeAnnotated::new(*name, typ).to_document(parent, layout)
-            }
+            Self::Constant { name, typ } => has_type(*name, typ).to_document(parent, layout),
             Self::Apply {
                 function,
                 argument,
                 typ,
-            } => TypeAnnotated::new(BinaryOperator(function, Operator::Apply, argument), typ)
+            } => has_type(BinaryOperator(function, Operator::Apply, argument), typ)
                 .to_document(parent, layout),
             Self::Variable(variable) => variable.to_document(parent, layout),
             Self::VariableBinding(binding) => binding.to_document(parent, layout),
@@ -144,7 +143,7 @@ impl<'src, Term: TermReference<'src>> Pretty for VariableValue<Term> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self {
             Self::Known { value } => value.to_document(parent, layout),
-            Self::Unknown { typ } => TypeAnnotated::new(None, typ).to_document(parent, layout),
+            Self::Unknown { typ } => has_type(None, typ).to_document(parent, layout),
         }
     }
 }
