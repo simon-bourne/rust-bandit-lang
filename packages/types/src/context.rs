@@ -4,7 +4,7 @@ use crate::{InferenceError, Result, linked, source};
 
 #[derive(Clone)]
 enum Global<'a> {
-    Typed(linked::Term<'a>),
+    Linked(linked::Term<'a>),
     Source(source::Term<'a>),
 }
 pub type GlobalValues<'a> = HashMap<&'a str, source::Term<'a>>;
@@ -76,11 +76,11 @@ impl<'a> Context<'a> {
             .map_err(|_| InferenceError)?;
 
         let typed_term = match &mut *term {
-            Global::Typed(term) => term.clone(),
+            Global::Linked(term) => term.clone(),
             Global::Source(term) => term.link(&mut global_ctx)?,
         };
 
-        *term = Global::Typed(typed_term.clone());
+        *term = Global::Linked(typed_term.clone());
 
         Ok(typed_term)
     }
