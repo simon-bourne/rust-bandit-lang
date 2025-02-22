@@ -1,19 +1,29 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{InferenceError, Result, inference, source};
 
+#[derive(Clone)]
+enum Global<'a> {
+    Typed(inference::Term<'a>),
+    Source(source::Term<'a>),
+}
 pub type GlobalValues<'a> = HashMap<&'a str, source::Term<'a>>;
 
 pub struct Context<'a> {
     local_variables: HashMap<&'a str, Vec<inference::Term<'a>>>,
-    global_variables: Rc<GlobalValues<'a>>,
+    global_variables: Rc<HashMap<&'a str, RefCell<Global<'a>>>>,
 }
 
 impl<'a> Context<'a> {
-    pub fn new(global_variables: GlobalValues<'a>) -> Self {
+    pub fn new(global_variables: impl IntoIterator<Item = (&'a str, source::Term<'a>)>) -> Self {
         Self {
             local_variables: HashMap::new(),
-            global_variables: Rc::new(global_variables),
+            global_variables: Rc::new(
+                global_variables
+                    .into_iter()
+                    .map(|(name, value)| (name, RefCell::new(Global::Source(value))))
+                    .collect(),
+            ),
         }
     }
 
@@ -50,18 +60,24 @@ impl<'a> Context<'a> {
     }
 
     fn global_value(&mut self, name: &'a str) -> Result<inference::Term<'a>> {
-        // TODO: Cache each global var once it's linked
         let mut global_ctx = Context {
             local_variables: HashMap::new(),
             global_variables: self.global_variables.clone(),
         };
-        let value = self
+        let mut term = self
             .global_variables
             .get(name)
-            .cloned()
             .ok_or(InferenceError)?
-            .link(&mut global_ctx)?;
+            .try_borrow_mut()
+            .map_err(|_| InferenceError)?;
 
-        Ok(value)
+        let typed_term = match &mut *term {
+            Global::Typed(term) => term.clone(),
+            Global::Source(term) => term.link(&mut global_ctx)?,
+        };
+
+        *term = Global::Typed(typed_term.clone());
+
+        Ok(typed_term)
     }
 }

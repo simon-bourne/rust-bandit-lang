@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bandit_parser::{
     lex::{SrcToken, Token},
     parse::term,
@@ -16,17 +14,13 @@ fn context<'src>(
     types: impl IntoIterator<Item = &'src str>,
     items: impl IntoIterator<Item = (&'src str, &'src str)>,
 ) -> Context<'src> {
-    let mut global_items = HashMap::new();
-
-    for typ in types {
-        global_items.insert(typ, Term::type_constant(typ));
-    }
-
-    for (name, typ) in items {
-        global_items.insert(name, Term::constant(name, parse(typ)));
-    }
-
-    Context::new(global_items)
+    let types = types
+        .into_iter()
+        .map(|name| (name, Term::type_constant(name)));
+    let items = items
+        .into_iter()
+        .map(|(name, typ)| (name, Term::constant(name, parse(typ))));
+    Context::new(types.chain(items))
 }
 
 trait Test {

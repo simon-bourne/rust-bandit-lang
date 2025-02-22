@@ -7,7 +7,7 @@ fn infer_kinds() {
     // C : (m a)
     let m = Term::variable("m");
     let a = Term::variable("a");
-    let ctx = &mut Context::new(HashMap::new());
+    let ctx = &mut Context::new([]);
     let constructor_type = Term::lambda(
         "m",
         Term::unknown(),
