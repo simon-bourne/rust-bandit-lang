@@ -176,11 +176,9 @@ impl<'src> VariableBinding<'src, Term<'src>> {
             VariableValue::Unknown { typ } => linked::Term::unknown(self.name, typ.link(ctx)?),
         };
 
-        let in_term = if let Some(name) = self.name {
-            ctx.with_variable(name, variable_value.clone(), |ctx| self.in_term.link(ctx))?
-        } else {
+        let in_term = ctx.with_variable(self.name, variable_value.clone(), |ctx| {
             self.in_term.link(ctx)
-        }?;
+        })??;
 
         Ok(VariableBinding {
             name: self.name,

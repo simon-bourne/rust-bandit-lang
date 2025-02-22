@@ -29,10 +29,14 @@ impl<'a> Context<'a> {
 
     pub(crate) fn with_variable<Output>(
         &mut self,
-        name: &'a str,
+        name: Option<&'a str>,
         variable_value: linked::Term<'a>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Result<Output> {
+        let Some(name) = name else {
+            return Ok(f(self));
+        };
+
         self.local_variables
             .entry(name)
             .or_default()
