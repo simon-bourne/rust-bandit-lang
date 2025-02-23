@@ -5,6 +5,7 @@ use std::{
 };
 
 pub mod context;
+mod de_bruijn;
 pub mod linked;
 mod pretty;
 pub mod source;

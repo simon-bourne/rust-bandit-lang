@@ -177,7 +177,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
             VariableValue::Unknown { typ } => linked::Term::unknown(name, typ.link(ctx)?),
         };
 
-        let in_term = ctx.scope(name, variable_value.clone(), |ctx| self.in_term.link(ctx))?;
+        let in_term = ctx.in_scope(name, variable_value.clone(), |ctx| self.in_term.link(ctx))?;
 
         Ok(VariableBinding {
             name,
