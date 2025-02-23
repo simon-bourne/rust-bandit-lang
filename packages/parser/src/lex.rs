@@ -50,6 +50,10 @@ pub enum Token<'src> {
     #[token("while", |_| Keyword::While)]
     Keyword(Keyword),
 
+    /// We don't allow `λ` as an alternative because it's allowed in
+    /// identifiers. It doesn't make sense as a keyword, as we'd have to have a
+    /// space between it and a variable name. For example, does `λx` mean a
+    /// lambda that binds the variable `x`, or an identifier `λx`?
     #[token("\\")]
     Lambda,
 
