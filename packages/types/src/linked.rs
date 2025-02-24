@@ -289,7 +289,10 @@ pub struct VariableId<'src> {
 
 impl<'src> VariableId<'src> {
     pub fn new(name: &'src str, scope: Level) -> Self {
-        Self { name, _scope: scope }
+        Self {
+            name,
+            _scope: scope,
+        }
     }
 
     pub fn name(&self) -> &'src str {
@@ -361,8 +364,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
 
         let variable_value = match &mut *value {
             // TODO: Check variable id with a guard
-            GenericTerm::Variable(variable) =>
-            {
+            GenericTerm::Variable(variable) => {
                 let variable_value =
                     Term::new(GenericTerm::Variable(variable.fresh(new_variables)));
                 drop(value);
