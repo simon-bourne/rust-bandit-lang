@@ -1,6 +1,6 @@
 use std::ptr;
 
-use super::{Term, TermEnum, Variable, VariableValue};
+use super::{Term, TermEnum, Variable, VariableId, VariableValue};
 use crate::{
     Pretty,
     pretty::{Document, Layout, LayoutVariable, Operator, Side, has_type},
@@ -48,7 +48,7 @@ impl Pretty for Variable<'_> {
         } else {
             has_type(
                 WithId {
-                    value: self.name,
+                    value: self.id.as_ref().map(VariableId::name),
                     id,
                 },
                 &self.typ(),

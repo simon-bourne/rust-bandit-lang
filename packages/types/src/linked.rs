@@ -2,7 +2,7 @@ use std::{cell::RefMut, collections::HashMap, fmt, ops::ControlFlow};
 
 use crate::{
     GenericTerm, InferenceError, Pretty, Result, SharedMut, TermReference, VariableBinding,
-    VariableValue,
+    VariableValue, de_bruijn::Level,
 };
 
 mod pretty;
@@ -23,9 +23,9 @@ impl<'src> Term<'src> {
         Self::new(GenericTerm::TypeOfType)
     }
 
-    pub fn unknown(name: Option<&'src str>, typ: Self) -> Self {
+    pub fn unknown(id: Option<VariableId<'src>>, typ: Self) -> Self {
         Self::new(GenericTerm::Variable(Variable {
-            name,
+            id,
             value: VariableValue::Unknown { typ },
         }))
     }
@@ -38,9 +38,9 @@ impl<'src> Term<'src> {
         Self::unknown(None, Self::type_of_type())
     }
 
-    pub fn variable(name: Option<&'src str>, value: Self) -> Self {
+    pub fn variable(id: Option<VariableId<'src>>, value: Self) -> Self {
         Self::new(GenericTerm::Variable(Variable {
-            name,
+            id,
             value: VariableValue::Known { value },
         }))
     }
@@ -131,11 +131,8 @@ impl<'src> Term<'src> {
 
         Ok(match (&mut *self_ref, &mut *other_ref) {
             (
-                GenericTerm::Variable(Variable {
-                    name: Some(_),
-                    value,
-                }),
-                GenericTerm::Variable(Variable { name: None, .. }),
+                GenericTerm::Variable(Variable { id: Some(_), value }),
+                GenericTerm::Variable(Variable { id: None, .. }),
             ) => {
                 let mut value = value.clone();
                 drop((self_ref, other_ref));
@@ -144,13 +141,7 @@ impl<'src> Term<'src> {
 
                 ControlFlow::Break(())
             }
-            (
-                GenericTerm::Variable(Variable {
-                    name: Some(_),
-                    value,
-                }),
-                _,
-            ) => {
+            (GenericTerm::Variable(Variable { id: Some(_), value }), _) => {
                 // TODO: Prefer variables with smaller scope
                 let mut value = value.clone();
                 drop((self_ref, other_ref));
@@ -286,8 +277,24 @@ impl fmt::Debug for Term<'_> {
 }
 
 pub struct Variable<'src> {
-    name: Option<&'src str>,
+    id: Option<VariableId<'src>>,
     value: VariableValue<Term<'src>>,
+}
+
+#[derive(Copy, Clone)]
+pub struct VariableId<'src> {
+    name: &'src str,
+    scope: Level,
+}
+
+impl<'src> VariableId<'src> {
+    pub fn new(name: &'src str, scope: Level) -> Self {
+        Self { name, scope }
+    }
+
+    pub fn name(&self) -> &'src str {
+        self.name
+    }
 }
 
 impl<'src> Variable<'src> {
@@ -308,10 +315,7 @@ impl<'src> Variable<'src> {
             },
         };
 
-        Self {
-            name: self.name,
-            value,
-        }
+        Self { id: self.id, value }
     }
 }
 
@@ -353,19 +357,24 @@ impl<'src> VariableBinding<'src, Term<'src>> {
     fn make_fresh_variables(&mut self, new_variables: &mut OldToNewVariable<'src>) -> Self {
         let key = self.variable_value.fresh_key();
         let mut value = self.variable_value.value();
+        // TODO: Track current scope, and adjust scope on fresh terms
+        let current_scope = Level::top();
 
-        let variable_value = if let GenericTerm::Variable(variable) = &mut *value {
-            // TODO: We need a debruijn level to see if `self` binds `self.variable_value`.
-            // It could have been unified to another bound variable. Or could we store and
-            // check against the pointer address?
-            let variable_value = Term::new(GenericTerm::Variable(variable.fresh(new_variables)));
-            drop(value);
-            let existing = new_variables.insert(key, variable_value.clone());
-            assert!(existing.is_none(), "Found out of scope variable");
-            variable_value
-        } else {
-            drop(value);
-            self.variable_value.make_fresh_variables(new_variables)
+        let variable_value = match &mut *value {
+            GenericTerm::Variable(variable)
+                if variable.id.is_some_and(|id| id.scope == current_scope) =>
+            {
+                let variable_value =
+                    Term::new(GenericTerm::Variable(variable.fresh(new_variables)));
+                drop(value);
+                let existing = new_variables.insert(key, variable_value.clone());
+                assert!(existing.is_none(), "Found out of scope variable");
+                variable_value
+            }
+            _ => {
+                drop(value);
+                self.variable_value.make_fresh_variables(new_variables)
+            }
         };
 
         let in_term = self.in_term.make_fresh_variables(new_variables);
