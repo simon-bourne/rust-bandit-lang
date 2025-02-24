@@ -24,7 +24,7 @@ impl<'src> Term<'src> {
     }
 
     pub fn unknown(id: Option<VariableId<'src>>, typ: Self) -> Self {
-        Self::new(GenericTerm::Variable(Variable {
+        Self::new(GenericTerm::Variable(VariableReference {
             id,
             value: VariableValue::Unknown { typ },
         }))
@@ -39,7 +39,7 @@ impl<'src> Term<'src> {
     }
 
     pub fn variable(id: Option<VariableId<'src>>, value: Self) -> Self {
-        Self::new(GenericTerm::Variable(Variable {
+        Self::new(GenericTerm::Variable(VariableReference {
             id,
             value: VariableValue::Known { value },
         }))
@@ -131,8 +131,8 @@ impl<'src> Term<'src> {
 
         Ok(match (&mut *self_ref, &mut *other_ref) {
             (
-                GenericTerm::Variable(Variable { id: Some(_), value }),
-                GenericTerm::Variable(Variable { id: None, .. }),
+                GenericTerm::Variable(VariableReference { id: Some(_), value }),
+                GenericTerm::Variable(VariableReference { id: None, .. }),
             ) => {
                 let mut value = value.clone();
                 drop((self_ref, other_ref));
@@ -141,7 +141,7 @@ impl<'src> Term<'src> {
 
                 ControlFlow::Break(())
             }
-            (GenericTerm::Variable(Variable { id: Some(_), value }), _) => {
+            (GenericTerm::Variable(VariableReference { id: Some(_), value }), _) => {
                 // TODO: Prefer variables with smaller scope
                 let mut value = value.clone();
                 drop((self_ref, other_ref));
@@ -158,7 +158,7 @@ impl<'src> Term<'src> {
         let mut self_ref = self.value();
 
         Ok(
-            if let GenericTerm::Variable(Variable { value, .. }) = &mut *self_ref {
+            if let GenericTerm::Variable(VariableReference { value, .. }) = &mut *self_ref {
                 let mut value = value.clone();
                 drop(self_ref);
                 self.replace_with(other);
@@ -276,7 +276,7 @@ impl fmt::Debug for Term<'_> {
     }
 }
 
-pub struct Variable<'src> {
+pub struct VariableReference<'src> {
     id: Option<VariableId<'src>>,
     value: VariableValue<Term<'src>>,
 }
@@ -297,7 +297,7 @@ impl<'src> VariableId<'src> {
     }
 }
 
-impl<'src> Variable<'src> {
+impl<'src> VariableReference<'src> {
     fn typ(&self) -> Term<'src> {
         match &self.value {
             VariableValue::Known { value } => value.typ(),
@@ -329,14 +329,14 @@ impl<'src> VariableValue<Term<'src>> {
 }
 
 impl<'src> TermReference<'src> for Term<'src> {
-    type Variable = Variable<'src>;
+    type VariableReference = VariableReference<'src>;
     type VariableValue = Self;
 
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
             TermEnum::Value { term, .. } => !matches!(
                 term,
-                GenericTerm::Variable(Variable {
+                GenericTerm::Variable(VariableReference {
                     value: VariableValue::Unknown { .. },
                     ..
                 })
@@ -347,7 +347,7 @@ impl<'src> TermReference<'src> for Term<'src> {
 
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            TermEnum::Value { term, .. } => term.typ(Self::new, Variable::typ),
+            TermEnum::Value { term, .. } => term.typ(Self::new, VariableReference::typ),
             TermEnum::Link { target } => target.typ(),
         }
     }

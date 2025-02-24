@@ -53,7 +53,7 @@ pub type Result<T> = result::Result<T, InferenceError>;
 pub struct InferenceError;
 
 pub trait TermReference<'src>: Pretty + Clone + Sized {
-    type Variable: Pretty;
+    type VariableReference: Pretty;
     type VariableValue: TermReference<'src>;
 
     fn is_known(&self) -> bool;
@@ -72,7 +72,7 @@ enum GenericTerm<'src, Term: TermReference<'src>> {
         argument: Term,
         typ: Term,
     },
-    Variable(Term::Variable),
+    Variable(Term::VariableReference),
     VariableBinding(VariableBinding<'src, Term>),
 }
 
@@ -89,7 +89,7 @@ impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
     fn typ(
         &self,
         new: impl FnOnce(Self) -> Term,
-        variable_type: impl FnOnce(&Term::Variable) -> Term,
+        variable_type: impl FnOnce(&Term::VariableReference) -> Term,
     ) -> Term {
         match self {
             GenericTerm::TypeOfType => new(GenericTerm::TypeOfType),
@@ -130,7 +130,7 @@ pub enum VariableValue<Term> {
 }
 
 impl<'src, Term: TermReference<'src>> TermReference<'src> for VariableValue<Term> {
-    type Variable = Term::Variable;
+    type VariableReference = Term::VariableReference;
     type VariableValue = Term::VariableValue;
 
     fn is_known(&self) -> bool {

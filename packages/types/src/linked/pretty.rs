@@ -1,6 +1,6 @@
 use std::ptr;
 
-use super::{Term, TermEnum, Variable, VariableId, VariableValue};
+use super::{Term, TermEnum, VariableId, VariableReference, VariableValue};
 use crate::{
     Pretty,
     pretty::{Document, Layout, LayoutVariable, Operator, Side, has_type},
@@ -37,7 +37,7 @@ impl Pretty for Term<'_> {
     }
 }
 
-impl Pretty for Variable<'_> {
+impl Pretty for VariableReference<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         let id = ptr::from_ref(self);
 

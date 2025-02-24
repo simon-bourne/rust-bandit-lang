@@ -12,7 +12,7 @@ use crate::{
 pub struct Term<'src>(Rc<TermEnum<'src>>);
 
 impl<'src> TermReference<'src> for Term<'src> {
-    type Variable = Option<&'src str>;
+    type VariableReference = Option<&'src str>;
     type VariableValue = VariableValue<Self>;
 
     fn is_known(&self) -> bool {

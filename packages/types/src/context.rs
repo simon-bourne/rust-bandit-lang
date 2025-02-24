@@ -93,7 +93,7 @@ impl<'a> Context<'a> {
 
         Ok(typed_term)
     }
-    
+
     pub(crate) fn scope(&self) -> Level {
         self.scope
     }
