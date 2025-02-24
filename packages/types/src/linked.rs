@@ -284,12 +284,12 @@ pub struct VariableReference<'src> {
 #[derive(Copy, Clone)]
 pub struct VariableId<'src> {
     name: &'src str,
-    scope: Level,
+    _scope: Level,
 }
 
 impl<'src> VariableId<'src> {
     pub fn new(name: &'src str, scope: Level) -> Self {
-        Self { name, scope }
+        Self { name, _scope: scope }
     }
 
     pub fn name(&self) -> &'src str {
@@ -358,11 +358,10 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         let key = self.variable_value.fresh_key();
         let mut value = self.variable_value.value();
         // TODO: Track current scope, and adjust scope on fresh terms
-        let current_scope = Level::top();
 
         let variable_value = match &mut *value {
-            GenericTerm::Variable(variable)
-                if variable.id.is_some_and(|id| id.scope == current_scope) =>
+            // TODO: Check variable id with a guard
+            GenericTerm::Variable(variable) =>
             {
                 let variable_value =
                     Term::new(GenericTerm::Variable(variable.fresh(new_variables)));
