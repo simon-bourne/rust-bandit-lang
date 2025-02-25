@@ -55,10 +55,11 @@ pub struct InferenceError;
 pub trait TermReference<'src>: Pretty + Clone + Sized {
     type VariableReference: Pretty;
     type VariableValue: TermReference<'src>;
+    type Type: TermReference<'src>;
 
     fn is_known(&self) -> bool;
 
-    fn typ(&self) -> Self;
+    fn typ(&self) -> Self::Type;
 }
 
 enum GenericTerm<'src, Term: TermReference<'src>> {
@@ -76,7 +77,7 @@ enum GenericTerm<'src, Term: TermReference<'src>> {
     VariableBinding(VariableBinding<'src, Term>),
 }
 
-impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
+impl<'src, Term: TermReference<'src, Type = Term>> GenericTerm<'src, Term> {
     fn pi(name: Option<&'src str>, variable_value: Term::VariableValue, in_term: Term) -> Self {
         Self::VariableBinding(VariableBinding {
             name,
@@ -129,7 +130,8 @@ pub enum VariableValue<Term> {
     Unknown { typ: Term },
 }
 
-impl<'src, Term: TermReference<'src>> TermReference<'src> for VariableValue<Term> {
+impl<'src, Term: TermReference<'src, Type = Term>> TermReference<'src> for VariableValue<Term> {
+    type Type = Term::Type;
     type VariableReference = Term::VariableReference;
     type VariableValue = Term::VariableValue;
 
@@ -140,10 +142,10 @@ impl<'src, Term: TermReference<'src>> TermReference<'src> for VariableValue<Term
         }
     }
 
-    fn typ(&self) -> Self {
+    fn typ(&self) -> Self::Type {
         match self {
-            Self::Known { value } => Self::Known { value: value.typ() },
-            Self::Unknown { typ } => Self::Known { value: typ.clone() },
+            Self::Known { value } => value.typ(),
+            Self::Unknown { typ } => typ.clone(),
         }
     }
 }
