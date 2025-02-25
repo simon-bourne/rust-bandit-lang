@@ -60,6 +60,7 @@ impl<'src> Term<'src> {
 }
 
 impl<'src> TermReference<'src> for Term<'src> {
+    type Type = Self;
     type VariableReference = Self;
     type VariableValue = Self;
 
