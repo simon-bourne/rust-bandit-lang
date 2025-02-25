@@ -10,6 +10,7 @@ use crate::{
 pub struct Term<'src>(Rc<TermEnum<'src>>);
 
 impl<'src> TermReference<'src> for Term<'src> {
+    type Type = Self;
     type Variable = Option<&'src str>;
     type VariableValue = VariableValue<Self>;
 
