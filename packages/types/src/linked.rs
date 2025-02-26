@@ -85,10 +85,8 @@ impl<'src> Term<'src> {
 
         Self::new(match &mut *value {
             GenericTerm::Variable(variable) => {
-                let fresh = if let Some(new_variable) = variable
-                    .id
-                    .as_ref()
-                    .and_then(|id| new_variables.get(&id.key()))
+                let fresh = if let Some(new_variable) =
+                    variable.id().and_then(|id| new_variables.get(&id.key()))
                 {
                     new_variable.clone()
                 } else {
@@ -283,6 +281,10 @@ pub struct Variable<'src> {
 }
 
 impl<'src> Variable<'src> {
+    fn id(&self) -> Option<&VariableId<'src>> {
+        self.id.as_ref()
+    }
+
     fn typ(&self) -> Term<'src> {
         match &self.value {
             VariableValue::Known { value } => value.typ(),
@@ -301,7 +303,7 @@ impl<'src> Variable<'src> {
         };
 
         Self {
-            id: self.id.as_ref().map(VariableId::fresh),
+            id: self.id().map(VariableId::fresh),
             value,
         }
     }
