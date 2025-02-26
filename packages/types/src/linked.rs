@@ -376,20 +376,24 @@ impl<'src> VariableBinding<'src, Term<'src>> {
     fn make_fresh_variables(&mut self, new_variables: &mut OldToNewVariable<'src>) -> Self {
         let mut value = self.variable_value.value();
 
-        let (new_id, variable_value) = match (&self.id, &mut *value) {
-            (Some(id), GenericTerm::Variable(variable)) => {
+        let (new_id, variable_value) = match &mut *value {
+            GenericTerm::Variable(variable) => {
                 let new_variable = variable.fresh(new_variables);
                 let new_id = new_variable.id.clone();
                 let variable_value = Term::new(GenericTerm::Variable(new_variable));
                 drop(value);
-                let existing = new_variables.insert(id.key(), variable_value.clone());
-                assert!(existing.is_none(), "Found out of scope variable");
+
+                if let Some(id) = &self.id {
+                    let existing = new_variables.insert(id.key(), variable_value.clone());
+                    assert!(existing.is_none(), "Found out of scope variable");
+                }
+
                 (new_id, variable_value)
             }
-            (id, _) => {
+            _ => {
                 drop(value);
                 (
-                    id.clone(),
+                    self.id.clone(),
                     self.variable_value.make_fresh_variables(new_variables),
                 )
             }
