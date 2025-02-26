@@ -58,7 +58,7 @@ impl<'src, Term: TermReference<'src>> Pretty for VariableBinding<'src, Term> {
             [
                 Document::text(binder),
                 variable_definition(
-                    self.id.as_ref().map(|x| x.as_ref()),
+                    self.id.as_ref().map(Term::VariableId::as_ref),
                     &self.variable_value,
                     layout,
                 ),
