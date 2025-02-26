@@ -45,7 +45,7 @@ impl Pretty for Variable<'_> {
         } else {
             has_type(
                 WithId {
-                    value: self.id.as_ref().map(|id| id.as_ref()),
+                    value: self.id.as_ref().map(VariableId::as_ref),
                     id,
                 },
                 &self.typ(),
