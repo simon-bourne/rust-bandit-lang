@@ -125,11 +125,55 @@ struct VariableBinding<'src, Term: TermReference<'src>> {
 }
 
 #[derive(Clone)]
+pub struct Variable<'src, Term> {
+    name: Option<&'src str>,
+    value: SharedMut<VariableValue<Term>>,
+}
+
+impl<'src, Term> Variable<'src, Term> {
+    pub fn known(name: Option<&'src str>, value: Term) -> Self {
+        Self {
+            name,
+            value: SharedMut::new(VariableValue::Known { value }),
+        }
+    }
+
+    pub fn unknown(name: Option<&'src str>, typ: Term) -> Self {
+        Self {
+            name,
+            value: SharedMut::new(VariableValue::Unknown { typ }),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub enum VariableValue<Term> {
     Known { value: Term },
     Unknown { typ: Term },
 }
 
+impl<'src, Term: TermReference<'src, Type = Term>> TermReference<'src> for Variable<'src, Term> {
+    type Type = Term::Type;
+    type Variable = Term::Variable;
+    type VariableValue = Term::VariableValue;
+
+    fn is_known(&self) -> bool {
+        match &*self.value.borrow() {
+            VariableValue::Known { value } => value.is_known(),
+            VariableValue::Unknown { .. } => false,
+        }
+    }
+
+    fn typ(&self) -> Self::Type {
+        match &*self.value.borrow() {
+            VariableValue::Known { value } => value.typ(),
+            VariableValue::Unknown { typ } => typ.clone(),
+        }
+    }
+}
+
+// TODO: Use `VariableValue` for all term types (remove well_typed),then remove
+// this impl
 impl<'src, Term: TermReference<'src, Type = Term>> TermReference<'src> for VariableValue<Term> {
     type Type = Term::Type;
     type Variable = Term::Variable;

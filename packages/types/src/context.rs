@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{InferenceError, Result, de_bruijn::Level, linked, source};
+use crate::{de_bruijn::Level, linked, source, InferenceError, Result, Variable};
 
 #[derive(Clone)]
 enum Global<'a> {
@@ -31,10 +31,11 @@ impl<'a> Context<'a> {
 
     pub(crate) fn in_scope<Output>(
         &mut self,
-        name: Option<&'a str>,
-        variable_value: linked::Term<'a>,
+        variable_value: Variable<'a, linked::Term<'a>>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Output {
+        // TODO: name method
+        let name = variable_value.name;
         let current_scope = self.scope;
         self.scope = self.scope.open();
 
@@ -42,7 +43,7 @@ impl<'a> Context<'a> {
             self.local_variables
                 .entry(name)
                 .or_default()
-                .push(variable_value);
+                .push(linked::Term::variable(variable_value));
             let output = f(self);
 
             if self.local_variables.get_mut(name).unwrap().pop().is_none() {

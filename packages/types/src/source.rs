@@ -2,8 +2,8 @@ use std::rc::Rc;
 
 use super::pretty::{Document, Layout, Operator, Side};
 use crate::{
-    Binder, GenericTerm, Pretty, Result, TermReference, VariableBinding, VariableValue,
-    context::Context, linked, pretty::has_type,
+    Binder, GenericTerm, Pretty, Result, TermReference, Variable, VariableBinding,
+    VariableValue, context::Context, linked, pretty::has_type,
 };
 
 #[derive(Clone)]
@@ -174,11 +174,11 @@ impl<'src> VariableBinding<'src, Term<'src>> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<'src, linked::Term<'src>>> {
         let name = self.name;
         let variable_value = match &self.variable_value {
-            VariableValue::Known { value } => linked::Term::variable(name, value.link(ctx)?),
-            VariableValue::Unknown { typ } => linked::Term::unknown(name, typ.link(ctx)?),
+            VariableValue::Known { value } => Variable::known(name, value.link(ctx)?),
+            VariableValue::Unknown { typ } => Variable::unknown(name, typ.link(ctx)?),
         };
 
-        let in_term = ctx.in_scope(name, variable_value.clone(), |ctx| self.in_term.link(ctx))?;
+        let in_term = ctx.in_scope(variable_value.clone(), |ctx| self.in_term.link(ctx))?;
 
         Ok(VariableBinding {
             name,
