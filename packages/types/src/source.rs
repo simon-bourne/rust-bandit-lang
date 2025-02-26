@@ -3,7 +3,9 @@ use std::rc::Rc;
 use super::pretty::{Document, Layout, Operator, Side};
 use crate::{
     Binder, GenericTerm, Pretty, Result, TermReference, VariableBinding, VariableValue,
-    context::Context, linked, pretty::has_type,
+    context::Context,
+    linked::{self, VariableId},
+    pretty::has_type,
 };
 
 #[derive(Clone)]
@@ -174,15 +176,16 @@ impl<'src> GenericTerm<'src, Term<'src>> {
 impl<'src> VariableBinding<'src, Term<'src>> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<'src, linked::Term<'src>>> {
         let name = self.id;
+        let id = name.map(VariableId::new);
         let variable_value = match &self.variable_value {
-            VariableValue::Known { value } => linked::Term::variable(name, value.link(ctx)?),
-            VariableValue::Unknown { typ } => linked::Term::unknown(name, typ.link(ctx)?),
+            VariableValue::Known { value } => linked::Term::variable(id.clone(), value.link(ctx)?),
+            VariableValue::Unknown { typ } => linked::Term::unknown(id.clone(), typ.link(ctx)?),
         };
 
         let in_term = ctx.in_scope(name, variable_value.clone(), |ctx| self.in_term.link(ctx))?;
 
         Ok(VariableBinding {
-            id: name,
+            id,
             binder: self.binder,
             variable_value,
             in_term,
