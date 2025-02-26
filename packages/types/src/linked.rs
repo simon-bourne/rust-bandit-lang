@@ -326,6 +326,7 @@ impl<'src> VariableValue<Term<'src>> {
 
 impl<'src> TermReference<'src> for Term<'src> {
     type Type = Self;
+    type VariableId = &'src str;
     type VariableReference = Variable<'src>;
     type VariableValue = Self;
 
@@ -372,7 +373,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         let in_term = self.in_term.make_fresh_variables(new_variables);
 
         Self {
-            name: self.name,
+            id: self.id,
             binder: self.binder,
             variable_value,
             in_term,

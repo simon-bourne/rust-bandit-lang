@@ -36,7 +36,7 @@ impl<T: Pretty> Pretty for &'_ T {
 
 impl<'src, Term: TermReference<'src>> Pretty for VariableBinding<'src, Term> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        if matches!(self.binder, Binder::Pi) && self.name.is_none() {
+        if matches!(self.binder, Binder::Pi) && self.id.is_none() {
             let layout = layout.without_types();
             return Operator::Arrow.to_document(
                 parent,
@@ -57,7 +57,11 @@ impl<'src, Term: TermReference<'src>> Pretty for VariableBinding<'src, Term> {
             parent.is_some(),
             [
                 Document::text(binder),
-                variable_definition(self.name, &self.variable_value, layout),
+                variable_definition(
+                    self.id.as_ref().map(|x| x.as_ref()),
+                    &self.variable_value,
+                    layout,
+                ),
                 Document::text(" ⇒ "),
                 self.in_term.to_document(None, layout),
             ],

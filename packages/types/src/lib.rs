@@ -53,6 +53,7 @@ pub type Result<T> = result::Result<T, InferenceError>;
 pub struct InferenceError;
 
 pub trait TermReference<'src>: Pretty + Clone + Sized {
+    type VariableId: AsRef<str>;
     type VariableReference: Pretty;
     type VariableValue: TermReference<'src>;
     type Type: TermReference<'src>;
@@ -78,9 +79,13 @@ enum GenericTerm<'src, Term: TermReference<'src>> {
 }
 
 impl<'src, Term: TermReference<'src, Type = Term>> GenericTerm<'src, Term> {
-    fn pi(name: Option<&'src str>, variable_value: Term::VariableValue, in_term: Term) -> Self {
+    fn pi(
+        name: Option<Term::VariableId>,
+        variable_value: Term::VariableValue,
+        in_term: Term,
+    ) -> Self {
         Self::VariableBinding(VariableBinding {
-            name,
+            id: name,
             binder: Binder::Pi,
             variable_value,
             in_term,
@@ -118,7 +123,7 @@ enum Binder {
 }
 
 struct VariableBinding<'src, Term: TermReference<'src>> {
-    name: Option<&'src str>,
+    id: Option<Term::VariableId>,
     binder: Binder,
     variable_value: Term::VariableValue,
     in_term: Term,
@@ -132,6 +137,7 @@ pub enum VariableValue<Term> {
 
 impl<'src, Term: TermReference<'src, Type = Term>> TermReference<'src> for VariableValue<Term> {
     type Type = Term::Type;
+    type VariableId = Term::VariableId;
     type VariableReference = Term::VariableReference;
     type VariableValue = Term::VariableValue;
 

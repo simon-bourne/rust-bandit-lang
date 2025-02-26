@@ -11,6 +11,7 @@ pub struct Term<'src>(Rc<TermEnum<'src>>);
 
 impl<'src> TermReference<'src> for Term<'src> {
     type Type = Self;
+    type VariableId = &'src str;
     type VariableReference = Option<&'src str>;
     type VariableValue = VariableValue<Self>;
 
@@ -119,7 +120,7 @@ impl<'src> Term<'src> {
         in_term: Self,
     ) -> Self {
         Self::value(GenericTerm::VariableBinding(VariableBinding {
-            name,
+            id: name,
             binder,
             variable_value,
             in_term,
@@ -172,7 +173,7 @@ impl<'src> GenericTerm<'src, Term<'src>> {
 
 impl<'src> VariableBinding<'src, Term<'src>> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<'src, linked::Term<'src>>> {
-        let name = self.name;
+        let name = self.id;
         let variable_value = match &self.variable_value {
             VariableValue::Known { value } => linked::Term::variable(name, value.link(ctx)?),
             VariableValue::Unknown { typ } => linked::Term::unknown(name, typ.link(ctx)?),
@@ -181,7 +182,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         let in_term = ctx.in_scope(name, variable_value.clone(), |ctx| self.in_term.link(ctx))?;
 
         Ok(VariableBinding {
-            name,
+            id: name,
             binder: self.binder,
             variable_value,
             in_term,
