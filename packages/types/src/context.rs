@@ -59,11 +59,11 @@ impl<'a> Context<'a> {
     }
 
     pub(crate) fn lookup(&mut self, name: &'a str) -> Result<linked::Term<'a>> {
-        Ok(if let Some(local) = self.lookup_local(name) {
-            local
+        if let Some(local) = self.lookup_local(name) {
+            Ok(local)
         } else {
-            self.global_value(name)?
-        })
+            self.global_value(name)
+        }
     }
 
     fn lookup_local(&self, name: &'a str) -> Option<linked::Term<'a>> {
