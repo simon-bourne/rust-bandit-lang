@@ -52,7 +52,7 @@ fn infer_types(input: &str) -> Result<linked::Term, InferenceError> {
             ("id", "∀a ⇒ a → a"),
             ("float_to_int", "Float → Int"),
             ("polymorphic", "∀a ⇒ a"),
-            ("scoped", "∀a ⇒ (∀s ⇒ s -> a) -> a"),
+            ("scoped", "∀a ⇒ (∀s ⇒ s → a) → a"),
         ],
     );
 
@@ -71,7 +71,7 @@ fn simple_apply() {
 
 #[test]
 fn simple_lambda() {
-    r"(\x ⇒ x : Int) : Int -> Int".infers(r"\x : Int ⇒ x : Int");
+    r"(\x ⇒ x : Int) : Int → Int".infers(r"\x : Int ⇒ x : Int");
 }
 
 #[test]
@@ -115,13 +115,13 @@ fn multi_id() {
 
 #[test]
 fn restrict_type() {
-    "let id2 = id ⇒ (id2 : Type -> Int -> Int)"
+    "let id2 = id ⇒ (id2 : Type → Int → Int)"
         .infers("let id2 : Type → Int → Int = id ⇒ id2 : Type → Int → Int")
 }
 
 #[test]
 fn restrict_explicit_type() {
-    "let id2 : (∀a ⇒ a → a) = id ⇒ (id2 : Type -> Int -> Int)"
+    "let id2 : (∀a ⇒ a → a) = id ⇒ (id2 : Type → Int → Int)"
         .infers("let id2 : Type → Int → Int = id ⇒ id2 : Type → Int → Int")
 }
 
