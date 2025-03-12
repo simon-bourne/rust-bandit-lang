@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{InferenceError, Result, de_bruijn::Level, linked, source};
+use crate::{InferenceError, Result, linked, source};
 
 #[derive(Clone)]
 enum Global<'a> {
@@ -10,7 +10,6 @@ enum Global<'a> {
 pub type GlobalValues<'a> = HashMap<&'a str, source::Term<'a>>;
 
 pub struct Context<'a> {
-    scope: Level,
     local_variables: HashMap<&'a str, Vec<linked::Term<'a>>>,
     global_variables: Rc<HashMap<&'a str, RefCell<Global<'a>>>>,
 }
@@ -18,7 +17,6 @@ pub struct Context<'a> {
 impl<'a> Context<'a> {
     pub fn new(global_variables: impl IntoIterator<Item = (&'a str, source::Term<'a>)>) -> Self {
         Self {
-            scope: Level::top(),
             local_variables: HashMap::new(),
             global_variables: Rc::new(
                 global_variables
@@ -35,26 +33,20 @@ impl<'a> Context<'a> {
         variable_value: linked::Term<'a>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Output {
-        let current_scope = self.scope;
-        self.scope = self.scope.open();
-
-        let output = if let Some(name) = name {
-            self.local_variables
-                .entry(name)
-                .or_default()
-                .push(variable_value);
-            let output = f(self);
-
-            if self.local_variables.get_mut(name).unwrap().pop().is_none() {
-                self.local_variables.remove(name);
-            }
-
-            output
-        } else {
-            f(self)
+        let Some(name) = name else {
+            return f(self);
         };
 
-        self.scope = current_scope;
+        self.local_variables
+            .entry(name)
+            .or_default()
+            .push(variable_value);
+        let output = f(self);
+
+        if self.local_variables.get_mut(name).unwrap().pop().is_none() {
+            self.local_variables.remove(name);
+        }
+
         output
     }
 
@@ -72,7 +64,6 @@ impl<'a> Context<'a> {
 
     fn global_value(&mut self, name: &'a str) -> Result<linked::Term<'a>> {
         let mut global_ctx = Context {
-            scope: Level::top(),
             local_variables: HashMap::new(),
             global_variables: self.global_variables.clone(),
         };
