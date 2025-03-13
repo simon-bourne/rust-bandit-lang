@@ -189,15 +189,12 @@ impl<'src> Term<'src> {
         match (&mut *x_ref, &mut *y_ref) {
             (GenericTerm::TypeOfType, GenericTerm::TypeOfType) => (),
             (
-                GenericTerm::Constant {
-                    name: name0,
-                    typ: typ0,
-                },
+                GenericTerm::Constant { name, typ },
                 GenericTerm::Constant {
                     name: name1,
                     typ: typ1,
                 },
-            ) if name0 == name1 => Self::unify(typ0, typ1)?,
+            ) if name == name1 => Self::unify(typ, typ1)?,
             (
                 GenericTerm::Apply {
                     function,
@@ -215,17 +212,14 @@ impl<'src> Term<'src> {
                 Self::unify(typ, typ1)?;
             }
             (
-                GenericTerm::Let {
-                    value: value0,
-                    binding: binding0,
-                },
+                GenericTerm::Let { value, binding },
                 GenericTerm::Let {
                     value: value1,
                     binding: binding1,
                 },
             ) => {
-                Self::unify(value0, value1)?;
-                VariableBinding::unify(binding0, binding1)?
+                Self::unify(value, value1)?;
+                VariableBinding::unify(binding, binding1)?
             }
             (GenericTerm::Pi(binding0), GenericTerm::Pi(binding1)) => {
                 VariableBinding::unify(binding0, binding1)?
