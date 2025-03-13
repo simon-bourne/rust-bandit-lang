@@ -8,7 +8,6 @@ pub mod context;
 pub mod linked;
 mod pretty;
 pub mod source;
-pub mod well_typed;
 
 pub use pretty::Pretty;
 
@@ -70,7 +69,9 @@ enum GenericTerm<'src, Term: TermReference<'src>> {
         typ: Term,
     },
     Variable(Term::VariableReference),
-    VariableBinding(VariableBinding<'src, Term>),
+    Let(VariableBinding<'src, Term>),
+    Pi(VariableBinding<'src, Term>),
+    Lambda(VariableBinding<'src, Term>),
 }
 
 impl<'src, Term: TermReference<'src, Type = Term>> GenericTerm<'src, Term> {
@@ -79,9 +80,8 @@ impl<'src, Term: TermReference<'src, Type = Term>> GenericTerm<'src, Term> {
         variable_value: Term::VariableValue,
         in_term: Term,
     ) -> Self {
-        Self::VariableBinding(VariableBinding {
+        Self::Pi(VariableBinding {
             id: name,
-            binder: Binder::Pi,
             variable_value,
             in_term,
         })
@@ -97,29 +97,19 @@ impl<'src, Term: TermReference<'src, Type = Term>> GenericTerm<'src, Term> {
             GenericTerm::Constant { typ, .. } => typ.clone(),
             GenericTerm::Apply { typ, .. } => typ.clone(),
             GenericTerm::Variable(variable) => variable_type(variable),
-            GenericTerm::VariableBinding(binding) => match binding.binder {
-                Binder::Let => binding.in_term.typ(),
-                Binder::Pi => new(GenericTerm::TypeOfType),
-                Binder::Lambda => new(GenericTerm::pi(
-                    None,
-                    binding.variable_value.clone(),
-                    binding.in_term.typ(),
-                )),
-            },
+            GenericTerm::Let(binding) => binding.in_term.typ(),
+            GenericTerm::Pi(_) => new(GenericTerm::TypeOfType),
+            GenericTerm::Lambda(binding) => new(GenericTerm::pi(
+                None,
+                binding.variable_value.clone(),
+                binding.in_term.typ(),
+            )),
         }
     }
 }
 
-#[derive(Copy, Clone)]
-enum Binder {
-    Let,
-    Pi,
-    Lambda,
-}
-
 struct VariableBinding<'src, Term: TermReference<'src>> {
     id: Option<Term::VariableId>,
-    binder: Binder,
     variable_value: Term::VariableValue,
     in_term: Term,
 }

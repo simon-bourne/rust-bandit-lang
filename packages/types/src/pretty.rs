@@ -3,7 +3,7 @@ use std::fmt;
 use pretty::RcDoc;
 
 use super::{GenericTerm, TermReference, VariableBinding};
-use crate::{Binder, VariableValue};
+use crate::VariableValue;
 
 pub trait Pretty {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document;
@@ -34,9 +34,21 @@ impl<T: Pretty> Pretty for &'_ T {
     }
 }
 
-impl<'src, Term: TermReference<'src>> Pretty for VariableBinding<'src, Term> {
-    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        if matches!(self.binder, Binder::Pi) && self.id.is_none() {
+#[derive(Copy, Clone)]
+enum Binder {
+    Let,
+    Pi,
+    Lambda,
+}
+
+impl<'src, Term: TermReference<'src>> VariableBinding<'src, Term> {
+    fn to_document(
+        &self,
+        binder: Binder,
+        parent: Option<(Operator, Side)>,
+        layout: Layout,
+    ) -> Document {
+        if matches!(binder, Binder::Pi) && self.id.is_none() {
             let layout = layout.without_types();
             return Operator::Arrow.to_document(
                 parent,
@@ -47,7 +59,7 @@ impl<'src, Term: TermReference<'src>> Pretty for VariableBinding<'src, Term> {
             );
         }
 
-        let binder = match self.binder {
+        let binder = match binder {
             Binder::Let => "let ",
             Binder::Pi => "∀",
             Binder::Lambda => "\\",
@@ -138,7 +150,9 @@ impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
             } => has_type(BinaryOperator(function, Operator::Apply, argument), typ)
                 .to_document(parent, layout),
             Self::Variable(variable) => variable.to_document(parent, layout),
-            Self::VariableBinding(binding) => binding.to_document(parent, layout),
+            Self::Let(binding) => binding.to_document(Binder::Let, parent, layout),
+            Self::Pi(binding) => binding.to_document(Binder::Pi, parent, layout),
+            Self::Lambda(binding) => binding.to_document(Binder::Lambda, parent, layout),
         }
     }
 }

@@ -76,8 +76,16 @@ impl<'src> Term<'src> {
         Ok(self)
     }
 
-    pub(crate) fn binding(binding: VariableBinding<'src, Self>) -> Self {
-        Self::new(GenericTerm::VariableBinding(binding))
+    pub(crate) fn let_binding(binding: VariableBinding<'src, Self>) -> Self {
+        Self::new(GenericTerm::Let(binding))
+    }
+
+    pub(crate) fn pi(binding: VariableBinding<'src, Self>) -> Self {
+        Self::new(GenericTerm::Pi(binding))
+    }
+
+    pub(crate) fn lambda(binding: VariableBinding<'src, Self>) -> Self {
+        Self::new(GenericTerm::Lambda(binding))
     }
 
     // TODO: The implementation of this is ugly and inefficient.
@@ -101,8 +109,14 @@ impl<'src> Term<'src> {
 
                 return fresh;
             }
-            GenericTerm::VariableBinding(binding) => {
-                GenericTerm::VariableBinding(binding.make_fresh_variables(new_variables))
+            GenericTerm::Let(binding) => {
+                GenericTerm::Let(binding.make_fresh_variables(new_variables))
+            }
+            GenericTerm::Pi(binding) => {
+                GenericTerm::Pi(binding.make_fresh_variables(new_variables))
+            }
+            GenericTerm::Lambda(binding) => {
+                GenericTerm::Lambda(binding.make_fresh_variables(new_variables))
             }
             GenericTerm::TypeOfType => GenericTerm::TypeOfType,
             GenericTerm::Constant { name, typ } => GenericTerm::Constant {
@@ -201,7 +215,13 @@ impl<'src> Term<'src> {
                 Self::unify(argument, argument1)?;
                 Self::unify(typ, typ1)?;
             }
-            (GenericTerm::VariableBinding(binding0), GenericTerm::VariableBinding(binding1)) => {
+            (GenericTerm::Let(binding0), GenericTerm::Let(binding1)) => {
+                VariableBinding::unify(binding0, binding1)?
+            }
+            (GenericTerm::Pi(binding0), GenericTerm::Pi(binding1)) => {
+                VariableBinding::unify(binding0, binding1)?
+            }
+            (GenericTerm::Lambda(binding0), GenericTerm::Lambda(binding1)) => {
                 VariableBinding::unify(binding0, binding1)?
             }
             // It's safer to explicitly ignore each variant
@@ -209,7 +229,9 @@ impl<'src> Term<'src> {
             | (GenericTerm::Constant { .. }, _rhs)
             | (GenericTerm::Apply { .. }, _rhs)
             | (GenericTerm::Variable(_), _rhs)
-            | (GenericTerm::VariableBinding(_), _rhs) => Err(InferenceError)?,
+            | (GenericTerm::Let(_), _rhs)
+            | (GenericTerm::Pi(_), _rhs)
+            | (GenericTerm::Lambda(_), _rhs) => Err(InferenceError)?,
         }
 
         drop((x_ref, y_ref));
@@ -387,7 +409,6 @@ impl<'src> VariableBinding<'src, Term<'src>> {
 
         Self {
             id: new_id,
-            binder: self.binder,
             variable_value,
             in_term,
         }

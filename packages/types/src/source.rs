@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use super::pretty::{Document, Layout, Operator, Side};
 use crate::{
-    Binder, GenericTerm, Pretty, Result, TermReference, VariableBinding, VariableValue,
+    GenericTerm, Pretty, Result, TermReference, VariableBinding, VariableValue,
     context::Context,
     linked::{self, VariableId},
     pretty::has_type,
@@ -64,32 +64,29 @@ impl<'src> Term<'src> {
     }
 
     pub fn let_binding(name: &'src str, variable_value: Self, in_term: Self) -> Self {
-        Self::binding(
-            Binder::Let,
-            Some(name),
-            VariableValue::Known {
+        Self::value(GenericTerm::Let(VariableBinding {
+            id: Some(name),
+            variable_value: VariableValue::Known {
                 value: variable_value,
             },
             in_term,
-        )
+        }))
     }
 
     pub fn pi_type(name: Option<&'src str>, binding_typ: Self, result_type: Self) -> Self {
-        Self::binding(
-            Binder::Pi,
-            name,
-            VariableValue::Unknown { typ: binding_typ },
-            result_type,
-        )
+        Self::value(GenericTerm::Pi(VariableBinding {
+            id: name,
+            variable_value: VariableValue::Unknown { typ: binding_typ },
+            in_term: result_type,
+        }))
     }
 
     pub fn lambda(name: &'src str, binding_typ: Self, in_term: Self) -> Self {
-        Self::binding(
-            Binder::Lambda,
-            Some(name),
-            VariableValue::Unknown { typ: binding_typ },
+        Self::value(GenericTerm::Lambda(VariableBinding {
+            id: Some(name),
+            variable_value: VariableValue::Unknown { typ: binding_typ },
             in_term,
-        )
+        }))
     }
 
     pub fn has_type(self, typ: Self) -> Self {
@@ -113,20 +110,6 @@ impl<'src> Term<'src> {
 
     fn value(term: GenericTerm<'src, Self>) -> Self {
         Self::new(TermEnum::Value { term })
-    }
-
-    fn binding(
-        binder: Binder,
-        name: Option<&'src str>,
-        variable_value: VariableValue<Self>,
-        in_term: Self,
-    ) -> Self {
-        Self::value(GenericTerm::VariableBinding(VariableBinding {
-            id: name,
-            binder,
-            variable_value,
-            in_term,
-        }))
     }
 }
 
@@ -168,7 +151,9 @@ impl<'src> GenericTerm<'src, Term<'src>> {
             } => Linked::apply(function.link(ctx)?, argument.link(ctx)?, typ.link(ctx)?)?,
             Self::Variable(Some(name)) => ctx.lookup(name)?,
             Self::Variable(None) => Linked::unknown_value(),
-            Self::VariableBinding(binding) => Linked::binding(binding.link(ctx)?),
+            Self::Let(binding) => Linked::let_binding(binding.link(ctx)?),
+            Self::Pi(binding) => Linked::pi(binding.link(ctx)?),
+            Self::Lambda(binding) => Linked::lambda(binding.link(ctx)?),
         })
     }
 }
@@ -186,7 +171,6 @@ impl<'src> VariableBinding<'src, Term<'src>> {
 
         Ok(VariableBinding {
             id,
-            binder: self.binder,
             variable_value,
             in_term,
         })
