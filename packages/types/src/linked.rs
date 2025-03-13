@@ -129,40 +129,14 @@ impl<'src> Term<'src> {
         Self(SharedMut::new(TermEnum::Value { term }))
     }
 
-    fn unify_named_variable(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
-        let mut self_ref = self.value();
-        let mut other_ref = other.value();
-
-        Ok(match (&mut *self_ref, &mut *other_ref) {
-            (
-                GenericTerm::Variable(Variable { id: Some(_), value }),
-                GenericTerm::Variable(Variable { id: None, .. }),
-            ) => {
-                let mut value = value.clone();
-                drop((self_ref, other_ref));
-                other.replace_with(self);
-                value.unify(other)?;
-
-                ControlFlow::Break(())
-            }
-            (GenericTerm::Variable(Variable { id: Some(_), value }), _) => {
-                // TODO: Prefer variables with smaller scope
-                let mut value = value.clone();
-                drop((self_ref, other_ref));
-                self.replace_with(other);
-                value.unify(other)?;
-
-                ControlFlow::Break(())
-            }
-            _ => ControlFlow::Continue(()),
-        })
-    }
-
-    fn unify_variable(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
+    fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
         let mut self_ref = self.value();
 
         Ok(
-            if let GenericTerm::Variable(Variable { value, .. }) = &mut *self_ref {
+            if let GenericTerm::Variable(Variable {
+                id: None, value, ..
+            }) = &mut *self_ref
+            {
                 let mut value = value.clone();
                 drop(self_ref);
                 self.replace_with(other);
@@ -180,10 +154,8 @@ impl<'src> Term<'src> {
         y.collapse_links();
 
         if SharedMut::is_same(&x.0, &y.0)
-            || x.unify_named_variable(y)?.is_break()
-            || y.unify_named_variable(x)?.is_break()
-            || x.unify_variable(y)?.is_break()
-            || y.unify_variable(x)?.is_break()
+            || x.unify_unknown(y)?.is_break()
+            || y.unify_unknown(x)?.is_break()
         {
             return Ok(());
         }
@@ -422,7 +394,13 @@ impl<'src> VariableBinding<'src, Term<'src>> {
     }
 
     fn unify(binding0: &mut Self, binding1: &mut Self) -> Result<()> {
-        Term::unify(&mut binding0.variable_value, &mut binding1.variable_value)?;
+        Term::unify(
+            &mut binding0.variable_value.typ(),
+            &mut binding1.variable_value.typ(),
+        )?;
+        binding0
+            .variable_value
+            .replace_with(&binding1.variable_value);
         Term::unify(&mut binding0.in_term, &mut binding1.in_term)
     }
 }
