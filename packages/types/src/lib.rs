@@ -69,7 +69,10 @@ enum GenericTerm<'src, Term: TermReference<'src>> {
         typ: Term,
     },
     Variable(Term::VariableReference),
-    Let(VariableBinding<'src, Term>),
+    Let {
+        value: Term,
+        binding: VariableBinding<'src, Term>,
+    },
     Pi(VariableBinding<'src, Term>),
     Lambda(VariableBinding<'src, Term>),
 }
@@ -97,7 +100,7 @@ impl<'src, Term: TermReference<'src, Type = Term>> GenericTerm<'src, Term> {
             GenericTerm::Constant { typ, .. } => typ.clone(),
             GenericTerm::Apply { typ, .. } => typ.clone(),
             GenericTerm::Variable(variable) => variable_type(variable),
-            GenericTerm::Let(binding) => binding.in_term.typ(),
+            GenericTerm::Let { binding, .. } => binding.in_term.typ(),
             GenericTerm::Pi(_) => new(GenericTerm::TypeOfType),
             GenericTerm::Lambda(binding) => new(GenericTerm::pi(
                 None,

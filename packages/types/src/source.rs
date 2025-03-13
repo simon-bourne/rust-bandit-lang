@@ -64,13 +64,16 @@ impl<'src> Term<'src> {
     }
 
     pub fn let_binding(name: &'src str, variable_value: Self, in_term: Self) -> Self {
-        Self::value(GenericTerm::Let(VariableBinding {
-            id: Some(name),
-            variable_value: VariableValue::Known {
-                value: variable_value,
+        Self::value(GenericTerm::Let {
+            value: variable_value.clone(),
+            binding: VariableBinding {
+                id: Some(name),
+                variable_value: VariableValue::Known {
+                    value: variable_value,
+                },
+                in_term,
             },
-            in_term,
-        }))
+        })
     }
 
     pub fn pi_type(name: Option<&'src str>, binding_typ: Self, result_type: Self) -> Self {
@@ -151,7 +154,9 @@ impl<'src> GenericTerm<'src, Term<'src>> {
             } => Linked::apply(function.link(ctx)?, argument.link(ctx)?, typ.link(ctx)?)?,
             Self::Variable(Some(name)) => ctx.lookup(name)?,
             Self::Variable(None) => Linked::unknown_value(),
-            Self::Let(binding) => Linked::let_binding(binding.link(ctx)?),
+            Self::Let { value, binding } => {
+                Linked::let_binding(value.link(ctx)?, binding.link(ctx)?)?
+            }
             Self::Pi(binding) => Linked::pi(binding.link(ctx)?),
             Self::Lambda(binding) => Linked::lambda(binding.link(ctx)?),
         })

@@ -76,8 +76,9 @@ impl<'src> Term<'src> {
         Ok(self)
     }
 
-    pub(crate) fn let_binding(binding: VariableBinding<'src, Self>) -> Self {
-        Self::new(GenericTerm::Let(binding))
+    pub(crate) fn let_binding(value: Self, binding: VariableBinding<'src, Self>) -> Result<Self> {
+        Self::unify(&mut value.typ(), &mut binding.variable_value.typ())?;
+        Ok(Self::new(GenericTerm::Let { value, binding }))
     }
 
     pub(crate) fn pi(binding: VariableBinding<'src, Self>) -> Self {
@@ -109,9 +110,10 @@ impl<'src> Term<'src> {
 
                 return fresh;
             }
-            GenericTerm::Let(binding) => {
-                GenericTerm::Let(binding.make_fresh_variables(new_variables))
-            }
+            GenericTerm::Let { value, binding } => GenericTerm::Let {
+                value: value.make_fresh_variables(new_variables),
+                binding: binding.make_fresh_variables(new_variables),
+            },
             GenericTerm::Pi(binding) => {
                 GenericTerm::Pi(binding.make_fresh_variables(new_variables))
             }
@@ -147,10 +149,7 @@ impl<'src> Term<'src> {
         let mut self_ref = self.value();
 
         Ok(
-            if let GenericTerm::Variable(Variable {
-                id: None, value, ..
-            }) = &mut *self_ref
-            {
+            if let GenericTerm::Variable(Variable { id: None, value }) = &mut *self_ref {
                 let mut value = value.clone();
                 drop(self_ref);
                 self.replace_with(other);
@@ -215,7 +214,17 @@ impl<'src> Term<'src> {
                 Self::unify(argument, argument1)?;
                 Self::unify(typ, typ1)?;
             }
-            (GenericTerm::Let(binding0), GenericTerm::Let(binding1)) => {
+            (
+                GenericTerm::Let {
+                    value: value0,
+                    binding: binding0,
+                },
+                GenericTerm::Let {
+                    value: value1,
+                    binding: binding1,
+                },
+            ) => {
+                Self::unify(value0, value1)?;
                 VariableBinding::unify(binding0, binding1)?
             }
             (GenericTerm::Pi(binding0), GenericTerm::Pi(binding1)) => {
@@ -229,7 +238,7 @@ impl<'src> Term<'src> {
             | (GenericTerm::Constant { .. }, _rhs)
             | (GenericTerm::Apply { .. }, _rhs)
             | (GenericTerm::Variable(_), _rhs)
-            | (GenericTerm::Let(_), _rhs)
+            | (GenericTerm::Let { .. }, _rhs)
             | (GenericTerm::Pi(_), _rhs)
             | (GenericTerm::Lambda(_), _rhs) => Err(InferenceError)?,
         }
@@ -419,9 +428,18 @@ impl<'src> VariableBinding<'src, Term<'src>> {
             &mut binding0.variable_value.typ(),
             &mut binding1.variable_value.typ(),
         )?;
-        binding0
-            .variable_value
-            .replace_with(&binding1.variable_value);
+
+        // Keep the name if we can
+        if binding0.id.is_some() {
+            binding0
+                .variable_value
+                .replace_with(&binding1.variable_value);
+        } else {
+            binding1
+                .variable_value
+                .replace_with(&binding0.variable_value);
+        }
+
         Term::unify(&mut binding0.in_term, &mut binding1.in_term)
     }
 }

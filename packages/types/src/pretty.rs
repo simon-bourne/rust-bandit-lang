@@ -34,71 +34,24 @@ impl<T: Pretty> Pretty for &'_ T {
     }
 }
 
-#[derive(Copy, Clone)]
-enum Binder {
-    Let,
-    Pi,
-    Lambda,
-}
-
 impl<'src, Term: TermReference<'src>> VariableBinding<'src, Term> {
     fn to_document(
         &self,
-        binder: Binder,
+        binder: &str,
         parent: Option<(Operator, Side)>,
         layout: Layout,
     ) -> Document {
-        if matches!(binder, Binder::Pi) && self.id.is_none() {
-            let layout = layout.without_types();
-            return Operator::Arrow.to_document(
-                parent,
-                &self.variable_value.typ(),
-                &self.in_term,
-                layout,
-                layout,
-            );
-        }
-
-        let binder = match binder {
-            Binder::Let => "let ",
-            Binder::Pi => "∀",
-            Binder::Lambda => "\\",
-        };
+        let name = self.id.as_ref().map(Term::VariableId::as_ref);
 
         parenthesize_if(
             parent.is_some(),
             [
-                Document::text(binder),
-                variable_definition(
-                    self.id.as_ref().map(Term::VariableId::as_ref),
-                    &self.variable_value,
-                    layout,
-                ),
+                Document::as_string(binder),
+                has_type(name, &self.variable_value.typ()).to_document(None, layout),
                 Document::text(" ⇒ "),
                 self.in_term.to_document(None, layout),
             ],
         )
-    }
-}
-
-pub fn variable_definition<'src>(
-    name: Option<&str>,
-    value: &impl TermReference<'src>,
-    layout: Layout,
-) -> Document {
-    let typ = &value.typ();
-    let type_annotated = has_type(name, typ);
-
-    if value.is_known() || layout.show_unknown {
-        Operator::Equals.to_document(
-            None,
-            &type_annotated,
-            value,
-            layout,
-            layout.without_types().variable_value(),
-        )
-    } else {
-        type_annotated.to_document(None, layout)
     }
 }
 
@@ -150,9 +103,43 @@ impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
             } => has_type(BinaryOperator(function, Operator::Apply, argument), typ)
                 .to_document(parent, layout),
             Self::Variable(variable) => variable.to_document(parent, layout),
-            Self::Let(binding) => binding.to_document(Binder::Let, parent, layout),
-            Self::Pi(binding) => binding.to_document(Binder::Pi, parent, layout),
-            Self::Lambda(binding) => binding.to_document(Binder::Lambda, parent, layout),
+            Self::Let { value, binding } => {
+                let name = binding.id.as_ref().map(Term::VariableId::as_ref);
+                let typ = &value.typ();
+
+                let assignment = Operator::Equals.to_document(
+                    None,
+                    &has_type(name, typ),
+                    value,
+                    layout,
+                    layout.without_types().variable_value(),
+                );
+
+                parenthesize_if(
+                    parent.is_some(),
+                    [
+                        Document::text("let "),
+                        assignment,
+                        Document::text(" ⇒ "),
+                        binding.in_term.to_document(None, layout),
+                    ],
+                )
+            }
+            Self::Pi(binding) => {
+                if binding.id.is_none() {
+                    let layout = layout.without_types();
+                    return Operator::Arrow.to_document(
+                        parent,
+                        &binding.variable_value.typ(),
+                        &binding.in_term,
+                        layout,
+                        layout,
+                    );
+                } else {
+                    binding.to_document("∀", parent, layout)
+                }
+            }
+            Self::Lambda(binding) => binding.to_document(r"\", parent, layout),
         }
     }
 }
