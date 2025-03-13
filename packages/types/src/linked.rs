@@ -242,6 +242,7 @@ impl<'src> Term<'src> {
     }
 
     fn replace_with(&mut self, other: &Self) {
+        self.collapse_links();
         self.0.replace_with(TermEnum::Link {
             target: other.clone(),
         });
