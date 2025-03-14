@@ -44,7 +44,7 @@ impl<'src, Term: TermReference<'src>> VariableBinding<'src, Term> {
             parent.is_some(),
             [
                 Document::as_string(binder),
-                has_type(self.name, &self.variable.typ()).to_document(None, layout),
+                has_type(self.name, &self.binding_type()).to_document(None, layout),
                 Document::text(" ⇒ "),
                 self.in_term.to_document(None, layout),
             ],
@@ -131,7 +131,7 @@ impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
                     let layout = layout.without_types();
                     Operator::Arrow.to_document(
                         parent,
-                        &binding.variable.typ(),
+                        &binding.binding_type(),
                         &binding.in_term,
                         layout,
                         layout,

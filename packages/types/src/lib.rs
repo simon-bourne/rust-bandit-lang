@@ -116,3 +116,9 @@ struct VariableBinding<'src, Term: TermReference<'src>> {
     variable: Term,
     in_term: Term,
 }
+
+impl<'src, Term: TermReference<'src>> VariableBinding<'src, Term> {
+    fn binding_type(&self) -> Term {
+        self.variable.typ()
+    }
+}

@@ -71,7 +71,7 @@ impl<'src> Term<'src> {
             value: variable_value.clone(),
             binding: VariableBinding {
                 name: Some(name),
-                variable: variable_value.typ(),
+                variable: Self::bound_variable(variable_value.typ()),
                 in_term,
             },
         })
@@ -80,7 +80,7 @@ impl<'src> Term<'src> {
     pub fn pi_type(name: Option<&'src str>, binding_typ: Self, result_type: Self) -> Self {
         Self::value(GenericTerm::Pi(VariableBinding {
             name,
-            variable: binding_typ,
+            variable: Self::bound_variable(binding_typ),
             in_term: result_type,
         }))
     }
@@ -88,7 +88,7 @@ impl<'src> Term<'src> {
     pub fn lambda(name: &'src str, binding_typ: Self, in_term: Self) -> Self {
         Self::value(GenericTerm::Lambda(VariableBinding {
             name: Some(name),
-            variable: binding_typ,
+            variable: Self::bound_variable(binding_typ),
             in_term,
         }))
     }
@@ -102,6 +102,10 @@ impl<'src> Term<'src> {
             name,
             typ: Self::unknown_type(),
         })
+    }
+
+    fn bound_variable(typ: Self) -> Self {
+        Self::unknown(typ)
     }
 
     pub fn link(&self, ctx: &mut Context<'src>) -> Result<linked::Term<'src>> {
@@ -167,13 +171,11 @@ impl<'src> GenericTerm<'src, Term<'src>> {
 impl<'src> VariableBinding<'src, Term<'src>> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<'src, linked::Term<'src>>> {
         let name = self.name;
-        let variable = linked::Term::variable(name, self.variable.link(ctx)?);
+        let variable = linked::Term::variable(name, self.variable.typ().link(ctx)?);
         let in_term = ctx.in_scope(name, variable.clone(), |ctx| self.in_term.link(ctx))?;
 
         Ok(VariableBinding {
             name,
-            // TODO: Rename `variable_value`. In `source` it's the variable type. In `linked` it's
-            // the variable.
             variable,
             in_term,
         })
