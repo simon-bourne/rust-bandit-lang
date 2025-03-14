@@ -75,6 +75,11 @@ fn simple_lambda() {
 }
 
 #[test]
+fn bad_type_annotation() {
+    "let id2 = id ⇒ (id2 : Type → Int → Int)".fails()
+}
+
+#[test]
 // TODO: Need to think about this one.
 // We can't currently unify `x` with `Type` as `x` is a bound variable. `x` will evaluate to `Type`,
 // so maybe we shouldn't try to unify it until it's evaluated.
