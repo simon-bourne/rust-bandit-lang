@@ -91,12 +91,13 @@ fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, Term<'src>)> {
     (
         identifier(),
-        opt(preceded(NamedOperator::HasType, term)).map(|typ| typ.unwrap_or_else(Term::unknown)),
+        opt(preceded(NamedOperator::HasType, term))
+            .map(|typ| typ.unwrap_or_else(Term::unknown_value)),
     )
 }
 
 fn unknown<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    Token::Unknown.map(|_| Term::unknown())
+    Token::Unknown.map(|_| Term::unknown_value())
 }
 
 fn variable<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {

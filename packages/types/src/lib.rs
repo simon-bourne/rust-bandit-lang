@@ -47,14 +47,11 @@ pub type Result<T> = result::Result<T, InferenceError>;
 pub struct InferenceError;
 
 pub trait TermReference<'src>: Pretty + Clone + Sized {
-    type VariableId: AsRef<str>;
-    type VariableReference: Pretty;
-    type VariableValue: TermReference<'src>;
-    type Type: TermReference<'src>;
+    type VariableName: Pretty;
 
     fn is_known(&self) -> bool;
 
-    fn typ(&self) -> Self::Type;
+    fn typ(&self) -> Self;
 }
 
 enum GenericTerm<'src, Term: TermReference<'src>> {
@@ -68,7 +65,13 @@ enum GenericTerm<'src, Term: TermReference<'src>> {
         argument: Term,
         typ: Term,
     },
-    Variable(Term::VariableReference),
+    Variable {
+        name: Term::VariableName,
+        typ: Term,
+    },
+    Unknown {
+        typ: Term,
+    },
     Let {
         value: Term,
         binding: VariableBinding<'src, Term>,
@@ -77,34 +80,31 @@ enum GenericTerm<'src, Term: TermReference<'src>> {
     Lambda(VariableBinding<'src, Term>),
 }
 
-impl<'src, Term: TermReference<'src, Type = Term>> GenericTerm<'src, Term> {
-    fn pi(
-        name: Option<Term::VariableId>,
-        variable_value: Term::VariableValue,
-        in_term: Term,
-    ) -> Self {
+impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
+    fn pi(name: Option<&'src str>, variable: Term, in_term: Term) -> Self {
         Self::Pi(VariableBinding {
-            id: name,
-            variable_value,
+            name,
+            variable,
             in_term,
         })
     }
 
-    fn typ(
-        &self,
-        new: impl FnOnce(Self) -> Term,
-        variable_type: impl FnOnce(&Term::VariableReference) -> Term,
-    ) -> Term {
+    fn is_known(&self) -> bool {
+        !matches!(self, Self::Unknown { .. })
+    }
+
+    fn typ(&self, new: impl FnOnce(Self) -> Term) -> Term {
         match self {
-            GenericTerm::TypeOfType => new(GenericTerm::TypeOfType),
-            GenericTerm::Constant { typ, .. } => typ.clone(),
-            GenericTerm::Apply { typ, .. } => typ.clone(),
-            GenericTerm::Variable(variable) => variable_type(variable),
-            GenericTerm::Let { binding, .. } => binding.in_term.typ(),
-            GenericTerm::Pi(_) => new(GenericTerm::TypeOfType),
-            GenericTerm::Lambda(binding) => new(GenericTerm::pi(
+            Self::TypeOfType => new(Self::TypeOfType),
+            Self::Constant { typ, .. }
+            | Self::Apply { typ, .. }
+            | Self::Variable { typ, .. }
+            | Self::Unknown { typ } => typ.clone(),
+            Self::Let { binding, .. } => binding.in_term.typ(),
+            Self::Pi(_) => new(Self::TypeOfType),
+            Self::Lambda(binding) => new(Self::pi(
                 None,
-                binding.variable_value.clone(),
+                binding.variable.clone(),
                 binding.in_term.typ(),
             )),
         }
@@ -112,34 +112,7 @@ impl<'src, Term: TermReference<'src, Type = Term>> GenericTerm<'src, Term> {
 }
 
 struct VariableBinding<'src, Term: TermReference<'src>> {
-    id: Option<Term::VariableId>,
-    variable_value: Term::VariableValue,
+    name: Option<&'src str>,
+    variable: Term,
     in_term: Term,
-}
-
-#[derive(Clone)]
-pub enum VariableValue<Term> {
-    Known { value: Term },
-    Unknown { typ: Term },
-}
-
-impl<'src, Term: TermReference<'src, Type = Term>> TermReference<'src> for VariableValue<Term> {
-    type Type = Term::Type;
-    type VariableId = Term::VariableId;
-    type VariableReference = Term::VariableReference;
-    type VariableValue = Term::VariableValue;
-
-    fn is_known(&self) -> bool {
-        match self {
-            Self::Known { value } => value.is_known(),
-            Self::Unknown { .. } => false,
-        }
-    }
-
-    fn typ(&self) -> Self::Type {
-        match self {
-            Self::Known { value } => value.typ(),
-            Self::Unknown { typ } => typ.clone(),
-        }
-    }
 }

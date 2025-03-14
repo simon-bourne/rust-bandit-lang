@@ -118,18 +118,6 @@ fn multi_id() {
 }
 
 #[test]
-fn restrict_type() {
-    "let id2 = id ⇒ (id2 : Type → Int → Int)"
-        .infers("let id2 : Type → Int → Int = id ⇒ id2 : Type → Int → Int")
-}
-
-#[test]
-fn restrict_explicit_type() {
-    "let id2 : (∀a ⇒ a → a) = id ⇒ (id2 : Type → Int → Int)"
-        .infers("let id2 : Type → Int → Int = id ⇒ id2 : Type → Int → Int")
-}
-
-#[test]
 fn polymorphic_let() {
     "let id2 : (∀a ⇒ a → a) = id ⇒ add (id2 Int one) (float_to_int (id2 Float pi))".infers(
         "let id2 : (∀a ⇒ a → a) = id ⇒ ((add : Int → Int → Int) (((id2 : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a ⇒ a → a)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"

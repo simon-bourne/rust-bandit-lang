@@ -1,8 +1,7 @@
-use std::{cell::RefMut, collections::HashMap, fmt, ops::ControlFlow, rc::Rc};
+use std::{cell::RefMut, collections::HashMap, fmt, ops::ControlFlow};
 
 use crate::{
     GenericTerm, InferenceError, Pretty, Result, SharedMut, TermReference, VariableBinding,
-    VariableValue,
 };
 
 mod pretty;
@@ -16,37 +15,31 @@ enum TermEnum<'src> {
     Link { target: Term<'src> },
 }
 
-type OldToNewVariable<'src> = HashMap<*const (), Term<'src>>;
+type OldToNewVariable<'src> = HashMap<*const GenericTerm<'src, Term<'src>>, Term<'src>>;
 
 impl<'src> Term<'src> {
     pub fn type_of_type() -> Self {
         Self::new(GenericTerm::TypeOfType)
     }
 
-    pub fn unknown(id: Option<VariableId<'src>>, typ: Self) -> Self {
-        Self::new(GenericTerm::Variable(Variable {
-            id,
-            value: VariableValue::Unknown { typ },
-        }))
+    pub fn unknown(typ: Self) -> Self {
+        Self::new(GenericTerm::Unknown { typ })
     }
 
     pub fn unknown_value() -> Self {
-        Self::unknown(None, Self::unknown_type())
+        Self::unknown(Self::unknown_type())
     }
 
     pub fn unknown_type() -> Self {
-        Self::unknown(None, Self::type_of_type())
+        Self::unknown(Self::type_of_type())
     }
 
-    pub fn variable(id: Option<VariableId<'src>>, value: Self) -> Self {
-        Self::new(GenericTerm::Variable(Variable {
-            id,
-            value: VariableValue::Known { value },
-        }))
+    pub fn variable(name: Option<&'src str>, typ: Self) -> Self {
+        Self::new(GenericTerm::Variable { name, typ })
     }
 
     pub fn constant(name: &'src str, typ: Self) -> Result<Self> {
-        Term::unify(&mut typ.typ(), &mut Term::type_of_type())?;
+        Self::unify(&mut typ.typ(), &mut Term::type_of_type())?;
         Ok(Self::new(GenericTerm::Constant { name, typ }))
     }
 
@@ -54,14 +47,14 @@ impl<'src> Term<'src> {
         let mut extract_arg = Self::unknown_value();
         let mut extract_result = Self::unknown_type();
         let pi_type = &mut Term::pi_type(extract_arg.clone(), extract_result.clone());
-        Term::unify(pi_type, &mut function.typ().fresh_variables())?;
+        Self::unify(pi_type, &mut function.typ().fresh_variables())?;
 
         // TODO: Only do this for variables (assert?):
         Self::unify(&mut extract_arg.typ(), &mut argument.typ())?;
         extract_arg.replace_with(&argument);
 
         Self::unify(&mut typ.fresh_variables(), &mut extract_result)?;
-        Term::unify(&mut typ.typ(), &mut Term::type_of_type())?;
+        Self::unify(&mut typ.typ(), &mut Term::type_of_type())?;
 
         Ok(Self::new(GenericTerm::Apply {
             function,
@@ -77,7 +70,7 @@ impl<'src> Term<'src> {
     }
 
     pub(crate) fn let_binding(value: Self, binding: VariableBinding<'src, Self>) -> Result<Self> {
-        Self::unify(&mut value.typ(), &mut binding.variable_value.typ())?;
+        Self::unify(&mut value.typ(), &mut binding.variable.typ())?;
         Ok(Self::new(GenericTerm::Let { value, binding }))
     }
 
@@ -96,19 +89,16 @@ impl<'src> Term<'src> {
 
     fn make_fresh_variables(&mut self, new_variables: &mut OldToNewVariable<'src>) -> Self {
         let mut value = self.value();
+        let id: *const GenericTerm<'src, Self> = &*value;
+
+        if let Some(new_variable) = new_variables.get(&id) {
+            return new_variable.clone();
+        }
 
         Self::new(match &mut *value {
-            GenericTerm::Variable(variable) => {
-                let fresh = if let Some(new_variable) =
-                    variable.id().and_then(|id| new_variables.get(&id.key()))
-                {
-                    new_variable.clone()
-                } else {
-                    drop(value);
-                    self.clone()
-                };
-
-                return fresh;
+            GenericTerm::Variable { .. } | GenericTerm::Unknown { .. } => {
+                drop(value);
+                return self.clone();
             }
             GenericTerm::Let { value, binding } => GenericTerm::Let {
                 value: value.make_fresh_variables(new_variables),
@@ -148,18 +138,16 @@ impl<'src> Term<'src> {
     fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
         let mut self_ref = self.value();
 
-        Ok(
-            if let GenericTerm::Variable(Variable { id: None, value }) = &mut *self_ref {
-                let mut value = value.clone();
-                drop(self_ref);
-                self.replace_with(other);
-                value.unify(other)?;
+        Ok(if let GenericTerm::Unknown { typ } = &mut *self_ref {
+            let mut typ = typ.clone();
+            drop(self_ref);
+            self.replace_with(other);
+            Self::unify(&mut typ, &mut other.typ())?;
 
-                ControlFlow::Break(())
-            } else {
-                ControlFlow::Continue(())
-            },
-        )
+            ControlFlow::Break(())
+        } else {
+            ControlFlow::Continue(())
+        })
     }
 
     fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
@@ -231,7 +219,8 @@ impl<'src> Term<'src> {
             (GenericTerm::TypeOfType, _rhs)
             | (GenericTerm::Constant { .. }, _rhs)
             | (GenericTerm::Apply { .. }, _rhs)
-            | (GenericTerm::Variable(_), _rhs)
+            | (GenericTerm::Variable { .. }, _rhs)
+            | (GenericTerm::Unknown { .. }, _rhs)
             | (GenericTerm::Let { .. }, _rhs)
             | (GenericTerm::Pi(_), _rhs)
             | (GenericTerm::Lambda(_), _rhs) => Err(InferenceError)?,
@@ -278,106 +267,19 @@ impl fmt::Debug for Term<'_> {
     }
 }
 
-pub struct Variable<'src> {
-    id: Option<VariableId<'src>>,
-    value: VariableValue<Term<'src>>,
-}
-
-impl<'src> Variable<'src> {
-    fn id(&self) -> Option<&VariableId<'src>> {
-        self.id.as_ref()
-    }
-
-    fn typ(&self) -> Term<'src> {
-        match &self.value {
-            VariableValue::Known { value } => value.typ(),
-            VariableValue::Unknown { typ } => typ.clone(),
-        }
-    }
-
-    fn fresh(&mut self, new_variables: &mut OldToNewVariable<'src>) -> Self {
-        let value = match &mut self.value {
-            VariableValue::Known { value } => VariableValue::Known {
-                value: value.make_fresh_variables(new_variables),
-            },
-            VariableValue::Unknown { typ } => VariableValue::Unknown {
-                typ: typ.make_fresh_variables(new_variables),
-            },
-        };
-
-        Self {
-            id: self.id().map(VariableId::fresh),
-            value,
-        }
-    }
-}
-
-impl<'src> VariableValue<Term<'src>> {
-    fn unify(&mut self, other: &mut Term<'src>) -> Result<()> {
-        match self {
-            Self::Known { value } => Term::unify(value, other),
-            Self::Unknown { typ } => Term::unify(typ, &mut other.typ()),
-        }
-    }
-}
-
-#[derive(Clone, Eq)]
-pub struct VariableId<'src> {
-    name: &'src str,
-    id: Rc<()>,
-}
-
-impl PartialEq for VariableId<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && Rc::ptr_eq(&self.id, &other.id)
-    }
-}
-
-impl<'src> VariableId<'src> {
-    pub fn new(name: &'src str) -> Self {
-        Self {
-            name,
-            id: Rc::new(()),
-        }
-    }
-
-    fn fresh(&self) -> Self {
-        Self::new(self.name)
-    }
-
-    fn key(&self) -> *const () {
-        Rc::as_ptr(&self.id)
-    }
-}
-
-impl AsRef<str> for VariableId<'_> {
-    fn as_ref(&self) -> &str {
-        self.name
-    }
-}
-
 impl<'src> TermReference<'src> for Term<'src> {
-    type Type = Self;
-    type VariableId = VariableId<'src>;
-    type VariableReference = Variable<'src>;
-    type VariableValue = Self;
+    type VariableName = Option<&'src str>;
 
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
-            TermEnum::Value { term, .. } => !matches!(
-                term,
-                GenericTerm::Variable(Variable {
-                    value: VariableValue::Unknown { .. },
-                    ..
-                })
-            ),
+            TermEnum::Value { term, .. } => term.is_known(),
             TermEnum::Link { target } => target.is_known(),
         }
     }
 
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            TermEnum::Value { term, .. } => term.typ(Self::new, Variable::typ),
+            TermEnum::Value { term, .. } => term.typ(Self::new),
             TermEnum::Link { target } => target.typ(),
         }
     }
@@ -385,53 +287,41 @@ impl<'src> TermReference<'src> for Term<'src> {
 
 impl<'src> VariableBinding<'src, Term<'src>> {
     fn make_fresh_variables(&mut self, new_variables: &mut OldToNewVariable<'src>) -> Self {
-        let mut value = self.variable_value.value();
-        let new_id;
-        let variable_value;
+        let mut value = self.variable.value();
 
-        match &mut *value {
-            GenericTerm::Variable(variable) if self.id == variable.id => {
-                let new_variable = variable.fresh(new_variables);
-                new_id = new_variable.id.clone();
-                variable_value = Term::new(GenericTerm::Variable(new_variable));
-                drop(value);
+        let variable = if let GenericTerm::Variable { name, typ } = &mut *value {
+            let variable = Term::new(GenericTerm::Variable {
+                name: *name,
+                typ: typ.make_fresh_variables(new_variables),
+            });
+            let key: *const GenericTerm<'src, Term<'src>> = &*value;
+            drop(value);
 
-                if let Some(id) = &self.id {
-                    let existing = new_variables.insert(id.key(), variable_value.clone());
-                    assert!(existing.is_none(), "Found out of scope variable");
-                }
-            }
-            _ => {
-                drop(value);
-                new_id = self.id.clone();
-                variable_value = self.variable_value.make_fresh_variables(new_variables);
-            }
+            let existing = new_variables.insert(key, variable.clone());
+            assert!(existing.is_none(), "Variable scope error");
+            variable
+        } else {
+            drop(value);
+            self.variable.make_fresh_variables(new_variables)
         };
 
         let in_term = self.in_term.make_fresh_variables(new_variables);
 
         Self {
-            id: new_id,
-            variable_value,
+            name: self.name,
+            variable,
             in_term,
         }
     }
 
     fn unify(binding0: &mut Self, binding1: &mut Self) -> Result<()> {
-        Term::unify(
-            &mut binding0.variable_value.typ(),
-            &mut binding1.variable_value.typ(),
-        )?;
+        Term::unify(&mut binding0.variable.typ(), &mut binding1.variable.typ())?;
 
         // Keep the name if we can
-        if binding0.id.is_some() {
-            binding0
-                .variable_value
-                .replace_with(&binding1.variable_value);
+        if binding0.name.is_some() {
+            binding0.variable.replace_with(&binding1.variable);
         } else {
-            binding1
-                .variable_value
-                .replace_with(&binding0.variable_value);
+            binding1.variable.replace_with(&binding0.variable);
         }
 
         Term::unify(&mut binding0.in_term, &mut binding1.in_term)

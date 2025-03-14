@@ -10,8 +10,8 @@ fn infer_kinds() {
     let ctx = &mut Context::new([]);
     let constructor_type = Term::lambda(
         "m",
-        Term::unknown(),
-        Term::lambda("a", Term::unknown(), Term::apply(m, a)),
+        Term::unknown_value(),
+        Term::lambda("a", Term::unknown_value(), Term::apply(m, a)),
     )
     .link(ctx)
     .unwrap();

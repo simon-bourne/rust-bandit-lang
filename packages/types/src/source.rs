@@ -2,9 +2,7 @@ use std::rc::Rc;
 
 use super::pretty::{Document, Layout, Operator, Side};
 use crate::{
-    GenericTerm, Pretty, Result, TermReference, VariableBinding, VariableValue,
-    context::Context,
-    linked::{self, VariableId},
+    GenericTerm, Pretty, Result, TermReference, VariableBinding, context::Context, linked,
     pretty::has_type,
 };
 
@@ -12,10 +10,7 @@ use crate::{
 pub struct Term<'src>(Rc<TermEnum<'src>>);
 
 impl<'src> TermReference<'src> for Term<'src> {
-    type Type = Self;
-    type VariableId = &'src str;
-    type VariableReference = Option<&'src str>;
-    type VariableValue = VariableValue<Self>;
+    type VariableName = &'src str;
 
     fn is_known(&self) -> bool {
         self.0.is_known()
@@ -40,8 +35,16 @@ impl<'src> Term<'src> {
         Self::value(GenericTerm::TypeOfType)
     }
 
-    pub fn unknown() -> Self {
-        Self::value(GenericTerm::Variable(None))
+    pub fn unknown(typ: Self) -> Self {
+        Self::value(GenericTerm::Unknown { typ })
+    }
+
+    pub fn unknown_type() -> Self {
+        Self::unknown(Self::type_of_type())
+    }
+
+    pub fn unknown_value() -> Self {
+        Self::unknown(Self::unknown_type())
     }
 
     pub fn type_constant(name: &'src str) -> Self {
@@ -59,7 +62,7 @@ impl<'src> Term<'src> {
         Self::value(GenericTerm::Apply {
             function: self,
             argument,
-            typ: Self::unknown(),
+            typ: Self::unknown_type(),
         })
     }
 
@@ -67,10 +70,8 @@ impl<'src> Term<'src> {
         Self::value(GenericTerm::Let {
             value: variable_value.clone(),
             binding: VariableBinding {
-                id: Some(name),
-                variable_value: VariableValue::Known {
-                    value: variable_value,
-                },
+                name: Some(name),
+                variable: variable_value.typ(),
                 in_term,
             },
         })
@@ -78,16 +79,16 @@ impl<'src> Term<'src> {
 
     pub fn pi_type(name: Option<&'src str>, binding_typ: Self, result_type: Self) -> Self {
         Self::value(GenericTerm::Pi(VariableBinding {
-            id: name,
-            variable_value: VariableValue::Unknown { typ: binding_typ },
+            name,
+            variable: binding_typ,
             in_term: result_type,
         }))
     }
 
     pub fn lambda(name: &'src str, binding_typ: Self, in_term: Self) -> Self {
         Self::value(GenericTerm::Lambda(VariableBinding {
-            id: Some(name),
-            variable_value: VariableValue::Unknown { typ: binding_typ },
+            name: Some(name),
+            variable: binding_typ,
             in_term,
         }))
     }
@@ -97,7 +98,10 @@ impl<'src> Term<'src> {
     }
 
     pub fn variable(name: &'src str) -> Self {
-        Self::value(GenericTerm::Variable(Some(name)))
+        Self::value(GenericTerm::Variable {
+            name,
+            typ: Self::unknown_type(),
+        })
     }
 
     pub fn link(&self, ctx: &mut Context<'src>) -> Result<linked::Term<'src>> {
@@ -124,17 +128,14 @@ enum TermEnum<'src> {
 impl<'src> TermEnum<'src> {
     fn is_known(&self) -> bool {
         match self {
-            Self::Value {
-                term: GenericTerm::Variable(None),
-            } => false,
-            Self::Value { .. } => true,
+            Self::Value { term } => term.is_known(),
             Self::HasType { term, .. } => term.is_known(),
         }
     }
 
     fn typ(&self, new: impl FnOnce(GenericTerm<'src, Term<'src>>) -> Term<'src>) -> Term<'src> {
         match self {
-            Self::Value { term } => term.typ(new, |_| Term::unknown()),
+            Self::Value { term } => term.typ(new),
             Self::HasType { typ, .. } => typ.clone(),
         }
     }
@@ -152,8 +153,8 @@ impl<'src> GenericTerm<'src, Term<'src>> {
                 argument,
                 typ,
             } => Linked::apply(function.link(ctx)?, argument.link(ctx)?, typ.link(ctx)?)?,
-            Self::Variable(Some(name)) => ctx.lookup(name)?,
-            Self::Variable(None) => Linked::unknown_value(),
+            Self::Variable { name, typ } => ctx.lookup(name)?.has_type(typ.link(ctx)?)?,
+            Self::Unknown { typ } => Linked::unknown(typ.link(ctx)?),
             Self::Let { value, binding } => {
                 Linked::let_binding(value.link(ctx)?, binding.link(ctx)?)?
             }
@@ -165,18 +166,15 @@ impl<'src> GenericTerm<'src, Term<'src>> {
 
 impl<'src> VariableBinding<'src, Term<'src>> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<'src, linked::Term<'src>>> {
-        let name = self.id;
-        let id = name.map(VariableId::new);
-        let variable_value = match &self.variable_value {
-            VariableValue::Known { value } => linked::Term::variable(id.clone(), value.link(ctx)?),
-            VariableValue::Unknown { typ } => linked::Term::unknown(id.clone(), typ.link(ctx)?),
-        };
-
-        let in_term = ctx.in_scope(name, variable_value.clone(), |ctx| self.in_term.link(ctx))?;
+        let name = self.name;
+        let variable = linked::Term::variable(name, self.variable.link(ctx)?);
+        let in_term = ctx.in_scope(name, variable.clone(), |ctx| self.in_term.link(ctx))?;
 
         Ok(VariableBinding {
-            id,
-            variable_value,
+            name,
+            // TODO: Rename `variable_value`. In `source` it's the variable type. In `linked` it's
+            // the variable.
+            variable,
             in_term,
         })
     }

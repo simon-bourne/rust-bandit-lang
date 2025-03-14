@@ -3,7 +3,6 @@ use std::fmt;
 use pretty::RcDoc;
 
 use super::{GenericTerm, TermReference, VariableBinding};
-use crate::VariableValue;
 
 pub trait Pretty {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document;
@@ -41,13 +40,11 @@ impl<'src, Term: TermReference<'src>> VariableBinding<'src, Term> {
         parent: Option<(Operator, Side)>,
         layout: Layout,
     ) -> Document {
-        let name = self.id.as_ref().map(Term::VariableId::as_ref);
-
         parenthesize_if(
             parent.is_some(),
             [
                 Document::as_string(binder),
-                has_type(name, &self.variable_value.typ()).to_document(None, layout),
+                has_type(self.name, &self.variable.typ()).to_document(None, layout),
                 Document::text(" ⇒ "),
                 self.in_term.to_document(None, layout),
             ],
@@ -102,14 +99,18 @@ impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
                 typ,
             } => has_type(BinaryOperator(function, Operator::Apply, argument), typ)
                 .to_document(parent, layout),
-            Self::Variable(variable) => variable.to_document(parent, layout),
+            Self::Variable { name, typ } => {
+                has_type(WithId::new(self, name), typ).to_document(parent, layout)
+            }
+            Self::Unknown { typ } => {
+                has_type(WithId::new(self, None), typ).to_document(parent, layout)
+            }
             Self::Let { value, binding } => {
-                let name = binding.id.as_ref().map(Term::VariableId::as_ref);
                 let typ = &value.typ();
 
                 let assignment = Operator::Equals.to_document(
                     None,
-                    &has_type(name, typ),
+                    &has_type(binding.name, typ),
                     value,
                     layout,
                     layout.without_types().variable_value(),
@@ -126,29 +127,20 @@ impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
                 )
             }
             Self::Pi(binding) => {
-                if binding.id.is_none() {
+                if binding.name.is_none() {
                     let layout = layout.without_types();
-                    return Operator::Arrow.to_document(
+                    Operator::Arrow.to_document(
                         parent,
-                        &binding.variable_value.typ(),
+                        &binding.variable.typ(),
                         &binding.in_term,
                         layout,
                         layout,
-                    );
+                    )
                 } else {
                     binding.to_document("∀", parent, layout)
                 }
             }
             Self::Lambda(binding) => binding.to_document(r"\", parent, layout),
-        }
-    }
-}
-
-impl<'src, Term: TermReference<'src>> Pretty for VariableValue<Term> {
-    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        match self {
-            Self::Known { value } => value.to_document(parent, layout),
-            Self::Unknown { typ } => has_type(None, typ).to_document(parent, layout),
         }
     }
 }
@@ -322,6 +314,34 @@ impl Default for Layout {
             show_id: false,
             show_unknown: false,
             variable: LayoutVariable::Name,
+        }
+    }
+}
+
+struct WithId<Id, Value> {
+    id: *const Id,
+    value: Value,
+}
+
+impl<Id, Value> WithId<Id, Value> {
+    fn new(id: *const Id, value: Value) -> Self {
+        Self { id, value }
+    }
+}
+
+impl<Id, Value: Pretty> Pretty for WithId<Id, Value> {
+    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
+        let name_doc = self.value.to_document(parent, layout);
+
+        if layout.show_id {
+            Document::concat([
+                name_doc,
+                Document::text("["),
+                Document::text(format!("{:?}", self.id)),
+                Document::text("]"),
+            ])
+        } else {
+            name_doc
         }
     }
 }
