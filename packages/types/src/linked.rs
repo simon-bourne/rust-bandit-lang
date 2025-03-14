@@ -50,7 +50,10 @@ impl<'src> Term<'src> {
         Self::unify(pi_type, &mut function.typ().fresh_variables())?;
 
         // TODO: Only do this for variables (assert?):
-        Self::unify(&mut extract_arg.typ(), &mut argument.typ())?;
+        Self::unify(
+            &mut extract_arg.typ(),
+            &mut argument.typ().fresh_variables(),
+        )?;
         extract_arg.replace_with(&argument);
 
         Self::unify(&mut typ.fresh_variables(), &mut extract_result)?;
