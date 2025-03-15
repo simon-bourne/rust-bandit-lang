@@ -1,4 +1,4 @@
-use std::{cell::RefMut, collections::HashMap, fmt, ops::ControlFlow};
+use std::{cell::RefMut, fmt, ops::ControlFlow};
 
 use crate::{
     GenericTerm, InferenceError, Pretty, Result, SharedMut, TermReference, VariableBinding,
@@ -14,8 +14,6 @@ enum TermEnum<'src> {
     // TODO: Can links cause circular references?
     Link { target: Term<'src> },
 }
-
-type OldToNewVariable<'src> = HashMap<*const GenericTerm<'src, Term<'src>>, Term<'src>>;
 
 impl<'src> Term<'src> {
     pub fn type_of_type() -> Self {
@@ -35,7 +33,10 @@ impl<'src> Term<'src> {
     }
 
     pub fn variable(name: Option<&'src str>, typ: Self) -> Self {
-        Self::new(GenericTerm::Variable { name, typ })
+        Self::new(GenericTerm::Variable {
+            name: VariableName::new(name),
+            typ,
+        })
     }
 
     pub fn constant(name: &'src str, typ: Self) -> Result<Self> {
@@ -85,47 +86,41 @@ impl<'src> Term<'src> {
         Self::new(GenericTerm::Lambda(binding))
     }
 
-    // TODO: The implementation of this is ugly and inefficient.
-    pub fn fresh_variables(&mut self) -> Self {
-        self.make_fresh_variables(&mut HashMap::new())
-    }
-
-    fn make_fresh_variables(&mut self, new_variables: &mut OldToNewVariable<'src>) -> Self {
+    fn fresh_variables(&mut self) -> Self {
         let mut value = self.value();
-        let id: *const GenericTerm<'src, Self> = &*value;
-
-        if let Some(new_variable) = new_variables.get(&id) {
-            return new_variable.clone();
-        }
 
         Self::new(match &mut *value {
+            GenericTerm::Variable {
+                name: VariableName {
+                    fresh: Some(fresh), ..
+                },
+                ..
+            } => {
+                return fresh.clone();
+            }
             GenericTerm::Variable { .. } | GenericTerm::Unknown { .. } => {
                 drop(value);
                 return self.clone();
             }
             GenericTerm::Let { value, binding } => GenericTerm::Let {
-                value: value.make_fresh_variables(new_variables),
-                binding: binding.make_fresh_variables(new_variables),
+                value: value.fresh_variables(),
+                binding: binding.fresh_variables(),
             },
-            GenericTerm::Pi(binding) => {
-                GenericTerm::Pi(binding.make_fresh_variables(new_variables))
-            }
-            GenericTerm::Lambda(binding) => {
-                GenericTerm::Lambda(binding.make_fresh_variables(new_variables))
-            }
+            GenericTerm::Pi(binding) => GenericTerm::Pi(binding.fresh_variables()),
+            GenericTerm::Lambda(binding) => GenericTerm::Lambda(binding.fresh_variables()),
             GenericTerm::TypeOfType => GenericTerm::TypeOfType,
             GenericTerm::Constant { name, typ } => GenericTerm::Constant {
                 name,
-                typ: typ.make_fresh_variables(new_variables),
+                typ: typ.fresh_variables(),
             },
             GenericTerm::Apply {
                 function,
                 argument,
                 typ,
             } => GenericTerm::Apply {
-                function: function.make_fresh_variables(new_variables),
-                argument: argument.make_fresh_variables(new_variables),
-                typ: typ.make_fresh_variables(new_variables),
+                function: function.fresh_variables(),
+                argument: argument.fresh_variables(),
+                typ: typ.fresh_variables(),
             },
         })
     }
@@ -270,8 +265,19 @@ impl fmt::Debug for Term<'_> {
     }
 }
 
+pub struct VariableName<'src> {
+    name: Option<&'src str>,
+    fresh: Option<Term<'src>>,
+}
+
+impl<'src> VariableName<'src> {
+    pub fn new(name: Option<&'src str>) -> Self {
+        Self { name, fresh: None }
+    }
+}
+
 impl<'src> TermReference<'src> for Term<'src> {
-    type VariableName = Option<&'src str>;
+    type VariableName = VariableName<'src>;
 
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
@@ -289,31 +295,40 @@ impl<'src> TermReference<'src> for Term<'src> {
 }
 
 impl<'src> VariableBinding<'src, Term<'src>> {
-    fn make_fresh_variables(&mut self, new_variables: &mut OldToNewVariable<'src>) -> Self {
-        let mut value = self.variable.value();
-
-        let variable = if let GenericTerm::Variable { name, typ } = &mut *value {
-            let variable = Term::new(GenericTerm::Variable {
-                name: *name,
-                typ: typ.make_fresh_variables(new_variables),
-            });
-            let key: *const GenericTerm<'src, Term<'src>> = &*value;
-            drop(value);
-
-            let existing = new_variables.insert(key, variable.clone());
-            assert!(existing.is_none(), "Variable scope error");
-            variable
-        } else {
-            drop(value);
-            self.variable.make_fresh_variables(new_variables)
-        };
-
-        let in_term = self.in_term.make_fresh_variables(new_variables);
+    fn fresh_variables(&mut self) -> Self {
+        let variable = self.allocate_fresh_variable();
+        let in_term = self.in_term.fresh_variables();
+        self.free_fresh_variable();
 
         Self {
             name: self.name,
             variable,
             in_term,
+        }
+    }
+
+    fn allocate_fresh_variable(&mut self) -> Term<'src> {
+        let mut value = self.variable.value();
+
+        if let GenericTerm::Variable { name, typ } = &mut *value {
+            let variable = Term::new(GenericTerm::Variable {
+                name: VariableName::new(name.name),
+                typ: typ.fresh_variables(),
+            });
+
+            assert!(name.fresh.is_none());
+            name.fresh = Some(variable.clone());
+            drop(value);
+            variable
+        } else {
+            drop(value);
+            self.variable.fresh_variables()
+        }
+    }
+
+    fn free_fresh_variable(&mut self) {
+        if let GenericTerm::Variable { name, .. } = &mut *self.variable.value() {
+            name.fresh = None;
         }
     }
 
