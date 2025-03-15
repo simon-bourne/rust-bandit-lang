@@ -271,7 +271,7 @@ pub struct VariableName<'src> {
 }
 
 impl<'src> VariableName<'src> {
-    pub fn new(name: Option<&'src str>) -> Self {
+    fn new(name: Option<&'src str>) -> Self {
         Self { name, fresh: None }
     }
 }
