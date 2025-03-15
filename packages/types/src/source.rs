@@ -171,7 +171,7 @@ impl<'src> GenericTerm<'src, Term<'src>> {
 impl<'src> VariableBinding<'src, Term<'src>> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<'src, linked::Term<'src>>> {
         let name = self.name;
-        let variable = linked::Term::variable(name, self.variable.typ().link(ctx)?);
+        let variable = linked::Term::variable(name, self.binding_type().link(ctx)?);
         let in_term = ctx.in_scope(name, variable.clone(), |ctx| self.in_term.link(ctx))?;
 
         Ok(VariableBinding {
