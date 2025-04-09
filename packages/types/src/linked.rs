@@ -308,22 +308,18 @@ impl<'src> VariableBinding<'src, Term<'src>> {
     }
 
     fn allocate_fresh_variable(&mut self) -> Term<'src> {
-        let mut value = self.variable.value();
+        let GenericTerm::Variable { name, typ } = &mut *self.variable.value() else {
+            return self.variable.fresh_variables();
+        };
 
-        if let GenericTerm::Variable { name, typ } = &mut *value {
-            let variable = Term::new(GenericTerm::Variable {
-                name: VariableName::new(name.name),
-                typ: typ.fresh_variables(),
-            });
+        let variable = Term::new(GenericTerm::Variable {
+            name: VariableName::new(name.name),
+            typ: typ.fresh_variables(),
+        });
 
-            assert!(name.fresh.is_none());
-            name.fresh = Some(variable.clone());
-            drop(value);
-            variable
-        } else {
-            drop(value);
-            self.variable.fresh_variables()
-        }
+        assert!(name.fresh.is_none());
+        name.fresh = Some(variable.clone());
+        variable
     }
 
     fn free_fresh_variable(&mut self) {
