@@ -45,8 +45,8 @@ impl<'src> Term<'src> {
     }
 
     pub fn apply(function: Self, mut argument: Self, mut typ: Self) -> Result<Self> {
-        let pi_type = &mut Term::pi_type(argument.fresh_variables(), typ.fresh_variables());
-        Self::unify(pi_type, &mut function.typ().fresh_variables())?;
+        let function_type = &mut Term::pi_type(argument.fresh_variables(), typ.fresh_variables());
+        Self::unify(function_type, &mut function.typ().fresh_variables())?;
         Self::unify(&mut typ.typ(), &mut Term::type_of_type())?;
 
         Ok(Self::new(GenericTerm::Apply {
