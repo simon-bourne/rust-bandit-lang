@@ -40,14 +40,14 @@ impl<'src> Term<'src> {
     }
 
     pub fn constant(name: &'src str, typ: Self) -> Result<Self> {
-        Self::unify(&mut typ.typ(), &mut Term::type_of_type())?;
+        typ.unify_type()?;
         Ok(Self::new(GenericTerm::Constant { name, typ }))
     }
 
     pub fn apply(function: Self, mut argument: Self, mut typ: Self) -> Result<Self> {
         let function_type = &mut Term::pi_type(argument.fresh_variables(), typ.fresh_variables());
         Self::unify(function_type, &mut function.typ().fresh_variables())?;
-        Self::unify(&mut typ.typ(), &mut Term::type_of_type())?;
+        typ.unify_type()?;
 
         Ok(Self::new(GenericTerm::Apply {
             function,
@@ -57,7 +57,7 @@ impl<'src> Term<'src> {
     }
 
     pub fn has_type(self, mut typ: Self) -> Result<Self> {
-        Self::unify(&mut typ.typ(), &mut Self::type_of_type())?;
+        typ.unify_type()?;
         Self::unify(&mut self.typ(), &mut typ)?;
         Ok(self)
     }
@@ -120,6 +120,10 @@ impl<'src> Term<'src> {
 
     fn new(term: GenericTerm<'src, Self>) -> Self {
         Self(SharedMut::new(TermEnum::Value { term }))
+    }
+
+    fn unify_type(&self) -> Result<()> {
+        Self::unify(&mut self.typ(), &mut Self::type_of_type())
     }
 
     fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
