@@ -136,7 +136,7 @@ fn simple_polymorphic_lambda() {
 
 #[test]
 fn simple_polymorphic_let() {
-    "let x : (∀b ⇒ b) = polymorphic ⇒ x".infers("let x : (∀b ⇒ b) = polymorphic ⇒ x : (∀b ⇒ b)");
+    "let x : (∀b ⇒ b) = polymorphic ⇒ x".infers("let x : (∀a ⇒ a) = polymorphic ⇒ x : (∀a ⇒ a)");
 }
 
 #[test]

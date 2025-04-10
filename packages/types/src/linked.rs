@@ -337,9 +337,11 @@ impl<'src> VariableBinding<'src, Term<'src>> {
 
         // Keep the name if we can
         if binding0.name.is_some() {
-            binding0.variable.replace_with(&binding1.variable);
-        } else {
             binding1.variable.replace_with(&binding0.variable);
+            binding1.name = binding0.name;
+        } else {
+            binding0.variable.replace_with(&binding1.variable);
+            binding0.name = binding1.name;
         }
 
         Term::unify(&mut binding0.in_term, &mut binding1.in_term)

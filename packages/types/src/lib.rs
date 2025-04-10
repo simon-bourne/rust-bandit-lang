@@ -103,7 +103,7 @@ impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
             Self::Let { binding, .. } => binding.in_term.typ(),
             Self::Pi(_) => new(Self::TypeOfType),
             Self::Lambda(binding) => new(Self::pi(
-                None,
+                binding.name,
                 binding.variable.clone(),
                 binding.in_term.typ(),
             )),
