@@ -46,8 +46,7 @@ impl<'src> Term<'src> {
 
     pub fn apply(function: Self, argument: Self, mut typ: Self) -> Result<Self> {
         let mut extract_arg = Self::unknown_value();
-        let mut extract_result = Self::unknown_type();
-        let pi_type = &mut Term::pi_type(extract_arg.clone(), extract_result.clone());
+        let pi_type = &mut Term::pi_type(extract_arg.clone(), typ.fresh_variables());
         Self::unify(pi_type, &mut function.typ().fresh_variables())?;
 
         // TODO: Only do this for variables (assert?):
@@ -56,8 +55,6 @@ impl<'src> Term<'src> {
             &mut argument.typ().fresh_variables(),
         )?;
         extract_arg.replace_with(&argument);
-
-        Self::unify(&mut typ.fresh_variables(), &mut extract_result)?;
         typ.unify_type()?;
 
         Ok(Self::new(GenericTerm::Apply {
