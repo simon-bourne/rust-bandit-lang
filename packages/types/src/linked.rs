@@ -165,6 +165,12 @@ impl<'src> Term<'src> {
 
         // TODO: Application evaluation:
         //
+        // Can we use `Future`s to manage all of this for us? `unify` and `evaluate`
+        // would be `async`. `unify` would `await` `evaluate`, and `evaluate` would
+        // `await` for `Unknown` values to change. `TermEnum::Value` would need to wrap
+        // its term in a `tokio::sync::watch`, or contain a `tokio::sync::Notify` or
+        // something similar.
+        //
         // - If all types are known, and the term is `Reducible::Maybe`:
         //      - Evaluate the term as much as possible.
         // - Otherwise add to a list of deferred unifications.
