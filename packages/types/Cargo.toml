@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 publish = false
 
+[package.metadata.cargo-udeps.ignore]
+# Only used in docs
+normal = ["katexit"]
+
 [dependencies]
 katexit.workspace = true
 pretty.workspace = true
