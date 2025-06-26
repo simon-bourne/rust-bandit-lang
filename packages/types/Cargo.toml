@@ -5,4 +5,5 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+katexit.workspace = true
 pretty.workspace = true

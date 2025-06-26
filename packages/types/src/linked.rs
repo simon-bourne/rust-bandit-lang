@@ -1,5 +1,8 @@
 use std::{cell::RefMut, fmt, ops::ControlFlow};
 
+#[cfg(doc)]
+use katexit::katexit;
+
 use crate::{
     GenericTerm, InferenceError, Pretty, Result, SharedMut, TermReference, VariableBinding,
 };
@@ -44,6 +47,21 @@ impl<'src> Term<'src> {
         Ok(Self::new(GenericTerm::Constant { name, typ }))
     }
 
+    #[cfg_attr(doc, katexit)]
+    /// # Application
+    ///
+    /// This is the elimination rule for $\lambda$ abstraction:
+    ///
+    /// $$
+    /// \dfrac{
+    ///     \Gamma \vdash f : \Pi x : A . \: B \qquad \Gamma \vdash a : A
+    /// } {
+    ///     \Gamma \vdash f \: a : B[a/x]
+    /// }
+    /// $$
+    ///
+    /// The term $B[a/x]$ means replace $x$ with $a$ in $B$ (which is necessary
+    /// as $B$ depends on $x$ in the premise).
     pub fn apply(function: Self, argument: Self, mut typ: Self) -> Result<Self> {
         let mut extract_arg = Self::unknown_value();
         let pi_type = &mut Term::pi_type(extract_arg.clone(), typ.fresh_variables());
@@ -70,15 +88,53 @@ impl<'src> Term<'src> {
         Ok(self)
     }
 
+    #[cfg_attr(doc, katexit)]
+    /// # Let
+    ///
+    /// $$
+    /// \dfrac{
+    ///     \Gamma \vdash a : A \qquad \Gamma, x : A \vdash e : B
+    /// }{
+    ///     \Gamma \vdash \text{let } x : A = a \text{ in } e : B[a/x]
+    /// }
+    /// $$
     pub(crate) fn let_binding(value: Self, binding: VariableBinding<'src, Self>) -> Result<Self> {
         Self::unify(&mut value.typ(), &mut binding.variable.typ())?;
         Ok(Self::new(GenericTerm::Let { value, binding }))
     }
 
+    #[cfg_attr(doc, katexit)]
+    /// # $\Pi$ Type Introduction
+    ///
+    /// $\Pi \: Type$s are not analyzed in standard dependent type theory, so
+    /// they don't have an elimination rule.
+    ///
+    /// $$
+    /// \dfrac{
+    ///     \Gamma \vdash A : \text{Type}_i \qquad \Gamma, x : A \vdash B :
+    /// \text{Type}_i } {
+    ///     \Gamma \vdash \Pi x : A . \: B : \text{Type}_i
+    /// }
+    /// $$
+    ///
+    /// We don't use indexed type universes, as this isn't a theorem proving
+    /// language.
     pub(crate) fn pi(binding: VariableBinding<'src, Self>) -> Self {
         Self::new(GenericTerm::Pi(binding))
     }
 
+    #[cfg_attr(doc, katexit)]
+    /// # Abstraction
+    ///
+    /// The introduction rule for $\lambda$ abstractions:
+    ///
+    /// $$
+    /// \dfrac{
+    ///     \Gamma, x : A \vdash e : B
+    /// } {
+    ///     \Gamma \vdash \lambda x : A . \: e : \Pi x : A . \: B
+    /// }
+    /// $$
     pub(crate) fn lambda(binding: VariableBinding<'src, Self>) -> Self {
         Self::new(GenericTerm::Lambda(binding))
     }
