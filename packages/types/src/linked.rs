@@ -54,9 +54,9 @@ impl<'src> Term<'src> {
     ///
     /// $$
     /// \dfrac{
-    ///     \Gamma \vdash f : \Pi x : A . \: B \qquad \Gamma \vdash a : A
+    ///     \Gamma \vdash f : \Pi x : A . \\: B \qquad \Gamma \vdash a : A
     /// } {
-    ///     \Gamma \vdash f \: a : B[a/x]
+    ///     \Gamma \vdash f \\: a : B[a/x]
     /// }
     /// $$
     ///
@@ -106,14 +106,14 @@ impl<'src> Term<'src> {
     #[cfg_attr(doc, katexit)]
     /// # $\Pi$ Type Introduction
     ///
-    /// $\Pi \: Type$s are not analyzed in standard dependent type theory, so
+    /// $\Pi \\: Type$s are not analyzed in standard dependent type theory, so
     /// they don't have an elimination rule.
     ///
     /// $$
     /// \dfrac{
     ///     \Gamma \vdash A : \text{Type}_i \qquad \Gamma, x : A \vdash B :
     /// \text{Type}_i } {
-    ///     \Gamma \vdash \Pi x : A . \: B : \text{Type}_i
+    ///     \Gamma \vdash \Pi x : A . \\: B : \text{Type}_i
     /// }
     /// $$
     ///
@@ -132,7 +132,7 @@ impl<'src> Term<'src> {
     /// \dfrac{
     ///     \Gamma, x : A \vdash e : B
     /// } {
-    ///     \Gamma \vdash \lambda x : A . \: e : \Pi x : A . \: B
+    ///     \Gamma \vdash \lambda x : A . \\: e : \Pi x : A . \\: B
     /// }
     /// $$
     pub(crate) fn lambda(binding: VariableBinding<'src, Self>) -> Self {
