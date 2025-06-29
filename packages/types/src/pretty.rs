@@ -73,16 +73,16 @@ where
 
 impl<Value: Pretty, Type: Pretty> Pretty for TypeAnnotated<Value, Type> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        if layout.annotate_type {
-            if let Some(typ) = self.typ.as_ref() {
-                return Operator::HasType.to_document(
-                    parent,
-                    &self.value,
-                    &typ,
-                    layout,
-                    layout.without_types(),
-                );
-            }
+        if layout.annotate_type
+            && let Some(typ) = self.typ.as_ref()
+        {
+            return Operator::HasType.to_document(
+                parent,
+                &self.value,
+                &typ,
+                layout,
+                layout.without_types(),
+            );
         }
         self.value.to_document(parent, layout)
     }
