@@ -93,6 +93,10 @@ impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
         !matches!(self, Self::Unknown { .. })
     }
 
+    fn is_variable(&self) -> bool {
+        matches!(self, Self::Variable { .. })
+    }
+
     fn typ(&self, new: impl FnOnce(Self) -> Term) -> Term {
         match self {
             Self::TypeOfType => new(Self::TypeOfType),

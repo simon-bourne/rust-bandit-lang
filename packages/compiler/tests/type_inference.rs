@@ -100,8 +100,6 @@ fn simple_id() {
 }
 
 #[test]
-// TODO: This test should pass (i.e. inference should fail)
-#[should_panic]
 fn scope_escape() {
     "scoped _ id".fails()
 }
