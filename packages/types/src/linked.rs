@@ -191,6 +191,10 @@ impl<'src> Term<'src> {
     }
 
     fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
+        if other.value().is_variable() {
+            return Ok(ControlFlow::Continue(()));
+        }
+
         let mut self_ref = self.value();
 
         Ok(if let GenericTerm::Unknown { typ } = &mut *self_ref {
