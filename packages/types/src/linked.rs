@@ -229,7 +229,10 @@ impl<'src> Term<'src> {
         // would be `async`. `unify` would `await` `evaluate`, and `evaluate` would
         // `await` for `Unknown` values to change. `TermEnum::Value` would need to wrap
         // its term in a `tokio::sync::watch`, or contain a `tokio::sync::Notify` or
-        // something similar.
+        // something similar. We could box this and make it optional for efficiency. We
+        // need to consider whether this should be on `TermEnum::Value`or
+        // `GenericTerm::Unknown`. Any `GenericTerm` variant could be updated when we
+        // unify a compile time application.
         //
         // - If all types are known, and the term is `Reducible::Maybe`:
         //      - Evaluate the term as much as possible.
