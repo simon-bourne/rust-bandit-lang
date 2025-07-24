@@ -4,7 +4,7 @@
 // and `∀x : T ⇒ U`
 use bandit_types::Evaluation;
 use winnow::{
-    Result, Parser as _,
+    Parser as _, Result,
     combinator::{
         alt, delimited, opt, preceded, repeat, separated_foldl1, separated_foldr1, separated_pair,
     },
