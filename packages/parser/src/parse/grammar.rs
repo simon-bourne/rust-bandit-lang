@@ -4,7 +4,7 @@
 // and `∀x : T ⇒ U`
 use bandit_types::Evaluation;
 use winnow::{
-    PResult, Parser as _,
+    Result, Parser as _,
     combinator::{
         alt, delimited, opt, preceded, repeat, separated_foldl1, separated_foldr1, separated_pair,
     },
@@ -14,7 +14,7 @@ use winnow::{
 use super::{Parser, Term, TokenList};
 use crate::lex::{Grouping, Keyword, NamedOperator, SrcToken, Token};
 
-pub fn term<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> PResult<Term<'src>> {
+pub fn term<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> Result<Term<'src>> {
     type_annotations().parse_next(input)
 }
 

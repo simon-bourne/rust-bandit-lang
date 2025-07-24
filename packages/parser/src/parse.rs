@@ -1,6 +1,6 @@
 use bandit_types::source::Term;
 pub use grammar::term;
-use winnow::{PResult, error::ContextError, token::one_of};
+use winnow::{Result, error::ContextError, token::one_of};
 
 use crate::lex::{Keyword, NamedOperator, SrcToken, Token};
 
@@ -21,7 +21,7 @@ impl<'tok, 'src: 'tok, Out, T> Parser<'tok, 'src, Out> for T where
 impl<'tok, 'src: 'tok> winnow::Parser<TokenList<'tok, 'src>, Token<'src>, ContextError>
     for Token<'src>
 {
-    fn parse_next(&mut self, input: &mut TokenList<'tok, 'src>) -> PResult<Self> {
+    fn parse_next(&mut self, input: &mut TokenList<'tok, 'src>) -> Result<Self> {
         one_of(|t: SrcToken| t.0 == *self)
             .value(*self)
             .parse_next(input)
@@ -31,13 +31,13 @@ impl<'tok, 'src: 'tok> winnow::Parser<TokenList<'tok, 'src>, Token<'src>, Contex
 impl<'tok, 'src: 'tok> winnow::Parser<TokenList<'tok, 'src>, NamedOperator, ContextError>
     for NamedOperator
 {
-    fn parse_next(&mut self, input: &mut TokenList<'tok, 'src>) -> PResult<NamedOperator> {
+    fn parse_next(&mut self, input: &mut TokenList<'tok, 'src>) -> Result<NamedOperator> {
         Token::Operator(*self).value(*self).parse_next(input)
     }
 }
 
 impl<'tok, 'src: 'tok> winnow::Parser<TokenList<'tok, 'src>, Keyword, ContextError> for Keyword {
-    fn parse_next(&mut self, input: &mut TokenList<'tok, 'src>) -> PResult<Keyword> {
+    fn parse_next(&mut self, input: &mut TokenList<'tok, 'src>) -> Result<Keyword> {
         Token::Keyword(*self).value(*self).parse_next(input)
     }
 }
