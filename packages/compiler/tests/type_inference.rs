@@ -96,12 +96,12 @@ fn partial_add() {
 
 #[test]
 fn simple_id() {
-    "id _ one".infers("((id : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int");
+    "id @ _ one".infers("((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int");
 }
 
 #[test]
 fn scope_escape() {
-    "scoped _ id".fails()
+    "scoped @ _ id".fails()
 }
 
 #[test]
@@ -115,15 +115,15 @@ fn occurs_check() {
 
 #[test]
 fn multi_id() {
-    "add (id Int one) (float_to_int (id Float pi))".infers(
-        "((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a ⇒ a → a)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
+    "add (id @ Int one) (float_to_int (id @ Float pi))".infers(
+        "((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a ⇒ a → a)) @ (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
 }
 
 #[test]
 fn polymorphic_let() {
-    "let id2 : (∀a ⇒ a → a) = id ⇒ add (id2 Int one) (float_to_int (id2 Float pi))".infers(
-        "let id2 : (∀a ⇒ a → a) = id ⇒ ((add : Int → Int → Int) (((id2 : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a ⇒ a → a)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
+    "let id2 : (∀a ⇒ a → a) = id ⇒ add (id2 @ Int one) (float_to_int (id2 @ Float pi))".infers(
+        "let id2 : (∀a ⇒ a → a) = id ⇒ ((add : Int → Int → Int) (((id2 : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a ⇒ a → a)) @ (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
 }
 
@@ -139,7 +139,7 @@ fn simple_polymorphic_let() {
 
 #[test]
 fn polymorphic_lambda() {
-    r"\id2 : (∀a ⇒ a → a) ⇒ add (id2 Int one) (float_to_int (id2 Float pi))".infers(
-        r"\id2 : (∀a ⇒ a → a) ⇒ ((add : Int → Int → Int) (((id2 : (∀a ⇒ a → a)) (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a ⇒ a → a)) (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int",
+    r"\id2 : (∀a ⇒ a → a) ⇒ add (id2 @ Int one) (float_to_int (id2 @ Float pi))".infers(
+        r"\id2 : (∀a ⇒ a → a) ⇒ ((add : Int → Int → Int) (((id2 : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a ⇒ a → a)) @ (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int",
     );
 }

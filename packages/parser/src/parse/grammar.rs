@@ -1,6 +1,13 @@
+// TODO: `static x = 3 * 4`
+// TODO: Newline to separate let binding and expression.
+// TODO: Static and dynamic type construction `T → U`, `T ⇒ U`, `∀x : T → U`,
+// and `∀x : T ⇒ U`
+use bandit_types::Evaluation;
 use winnow::{
     PResult, Parser as _,
-    combinator::{alt, delimited, opt, preceded, repeat, separated_foldr1, separated_pair},
+    combinator::{
+        alt, delimited, opt, preceded, repeat, separated_foldl1, separated_foldr1, separated_pair,
+    },
     token::any,
 };
 
@@ -23,12 +30,22 @@ fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     separated_foldr1(
         function_applications(),
         NamedOperator::To,
-        |input_type, _, output_type| Term::pi_type(None, input_type, output_type),
+        |input_type, _, output_type| {
+            Term::pi_type(None, input_type, output_type, Evaluation::Dynamic)
+        },
     )
 }
 
 fn function_applications<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    repeat(1.., primary()).map(|es: Vec<_>| es.into_iter().reduce(Term::apply).unwrap())
+    repeat(1.., static_apply()).map(|es: Vec<_>| es.into_iter().reduce(Term::apply).unwrap())
+}
+
+fn static_apply<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
+    separated_foldl1(
+        primary(),
+        NamedOperator::StaticApply,
+        |input_type, _, output_type| Term::static_apply(input_type, output_type),
+    )
 }
 
 fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
@@ -52,7 +69,7 @@ fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
         Keyword::Forall,
         separated_pair(variable_binding(), Token::SuchThat, term),
     )
-    .map(|((var, typ), term)| Term::pi_type(Some(var), typ, term))
+    .map(|((var, typ), term)| Term::pi_type(Some(var), typ, term, Evaluation::Static))
 }
 
 fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {

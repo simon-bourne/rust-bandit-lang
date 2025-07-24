@@ -2,8 +2,8 @@ use std::rc::Rc;
 
 use super::pretty::{Document, Layout, Operator, Side};
 use crate::{
-    GenericTerm, Pretty, Result, TermReference, VariableBinding, context::Context, linked,
-    pretty::has_type,
+    Evaluation, GenericTerm, Pretty, Result, TermReference, VariableBinding, context::Context,
+    linked, pretty::has_type,
 };
 
 #[derive(Clone)]
@@ -63,6 +63,16 @@ impl<'src> Term<'src> {
             function: self,
             argument,
             typ: Self::unknown_type(),
+            evaluation: Evaluation::Dynamic,
+        })
+    }
+
+    pub fn static_apply(self, argument: Self) -> Self {
+        Self::value(GenericTerm::Apply {
+            function: self,
+            argument,
+            typ: Self::unknown_type(),
+            evaluation: Evaluation::Static,
         })
     }
 
@@ -73,15 +83,22 @@ impl<'src> Term<'src> {
                 name: Some(name),
                 variable: Self::bound_variable(variable_value.typ()),
                 in_term,
+                evaluation: Evaluation::Dynamic,
             },
         })
     }
 
-    pub fn pi_type(name: Option<&'src str>, binding_typ: Self, result_type: Self) -> Self {
+    pub fn pi_type(
+        name: Option<&'src str>,
+        binding_typ: Self,
+        result_type: Self,
+        evaluation: Evaluation,
+    ) -> Self {
         Self::value(GenericTerm::Pi(VariableBinding {
             name,
             variable: Self::bound_variable(binding_typ),
             in_term: result_type,
+            evaluation,
         }))
     }
 
@@ -90,6 +107,7 @@ impl<'src> Term<'src> {
             name: Some(name),
             variable: Self::bound_variable(binding_typ),
             in_term,
+            evaluation: Evaluation::Dynamic,
         }))
     }
 
@@ -156,7 +174,13 @@ impl<'src> GenericTerm<'src, Term<'src>> {
                 function,
                 argument,
                 typ,
-            } => Linked::apply(function.link(ctx)?, argument.link(ctx)?, typ.link(ctx)?)?,
+                evaluation,
+            } => Linked::apply(
+                function.link(ctx)?,
+                argument.link(ctx)?,
+                typ.link(ctx)?,
+                *evaluation,
+            )?,
             Self::Variable { name, typ } => ctx.lookup(name)?.has_type(typ.link(ctx)?)?,
             Self::Unknown { typ } => Linked::unknown(typ.link(ctx)?),
             Self::Let { value, binding } => {
@@ -178,6 +202,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
             name,
             variable,
             in_term,
+            evaluation: self.evaluation,
         })
     }
 }

@@ -4,7 +4,8 @@ use std::{cell::RefMut, fmt, ops::ControlFlow};
 use katexit::katexit;
 
 use crate::{
-    GenericTerm, InferenceError, Pretty, Result, SharedMut, TermReference, VariableBinding,
+    Evaluation, GenericTerm, InferenceError, Pretty, Result, SharedMut, TermReference,
+    VariableBinding,
 };
 
 mod pretty;
@@ -62,9 +63,14 @@ impl<'src> Term<'src> {
     ///
     /// The term $B[a/x]$ means replace $x$ with $a$ in $B$ (which is necessary
     /// as $B$ depends on $x$ in the premise).
-    pub fn apply(function: Self, argument: Self, mut typ: Self) -> Result<Self> {
+    pub fn apply(
+        function: Self,
+        argument: Self,
+        mut typ: Self,
+        evaluation: Evaluation,
+    ) -> Result<Self> {
         let mut extract_arg = Self::unknown_value();
-        let pi_type = &mut Term::pi_type(extract_arg.clone(), typ.fresh_variables());
+        let pi_type = &mut Term::pi_type(extract_arg.clone(), typ.fresh_variables(), evaluation);
         Self::unify(pi_type, &mut function.typ().fresh_variables())?;
 
         // TODO: Only do this for variables (assert?):
@@ -79,6 +85,7 @@ impl<'src> Term<'src> {
             function,
             argument,
             typ,
+            evaluation,
         }))
     }
 
@@ -170,16 +177,23 @@ impl<'src> Term<'src> {
                 function,
                 argument,
                 typ,
+                evaluation,
             } => GenericTerm::Apply {
                 function: function.fresh_variables(),
                 argument: argument.fresh_variables(),
                 typ: typ.fresh_variables(),
+                evaluation: *evaluation,
             },
         })
     }
 
-    fn pi_type(argument_value: Self, result_type: Self) -> Self {
-        Self::new(GenericTerm::pi(None, argument_value, result_type))
+    fn pi_type(argument_value: Self, result_type: Self, evaluation: Evaluation) -> Self {
+        Self::new(GenericTerm::pi(
+            None,
+            argument_value,
+            result_type,
+            evaluation,
+        ))
     }
 
     fn new(term: GenericTerm<'src, Self>) -> Self {
@@ -256,13 +270,15 @@ impl<'src> Term<'src> {
                     function,
                     argument,
                     typ,
+                    evaluation,
                 },
                 GenericTerm::Apply {
                     function: function1,
                     argument: argument1,
                     typ: typ1,
+                    evaluation: evaluation1,
                 },
-            ) => {
+            ) if evaluation == evaluation1 => {
                 Self::unify(function, function1)?;
                 Self::unify(argument, argument1)?;
                 Self::unify(typ, typ1)?;
@@ -374,6 +390,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
             name: self.name,
             variable,
             in_term,
+            evaluation: self.evaluation,
         }
     }
 
@@ -399,6 +416,10 @@ impl<'src> VariableBinding<'src, Term<'src>> {
     }
 
     fn unify(binding0: &mut Self, binding1: &mut Self) -> Result<()> {
+        if binding0.evaluation != binding1.evaluation {
+            return Err(InferenceError);
+        }
+
         Term::unify(&mut binding0.variable.typ(), &mut binding1.variable.typ())?;
 
         // Keep the name if we can

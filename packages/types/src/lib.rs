@@ -54,6 +54,12 @@ pub trait TermReference<'src>: Pretty + Clone + Sized {
     fn typ(&self) -> Self;
 }
 
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum Evaluation {
+    Static,
+    Dynamic,
+}
+
 enum GenericTerm<'src, Term: TermReference<'src>> {
     TypeOfType,
     Constant {
@@ -64,6 +70,7 @@ enum GenericTerm<'src, Term: TermReference<'src>> {
         function: Term,
         argument: Term,
         typ: Term,
+        evaluation: Evaluation,
     },
     Variable {
         name: Term::VariableName,
@@ -81,11 +88,12 @@ enum GenericTerm<'src, Term: TermReference<'src>> {
 }
 
 impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
-    fn pi(name: Option<&'src str>, variable: Term, in_term: Term) -> Self {
+    fn pi(name: Option<&'src str>, variable: Term, in_term: Term, evaluation: Evaluation) -> Self {
         Self::Pi(VariableBinding {
             name,
             variable,
             in_term,
+            evaluation,
         })
     }
 
@@ -110,6 +118,7 @@ impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
                 binding.name,
                 binding.variable.clone(),
                 binding.in_term.typ(),
+                binding.evaluation,
             )),
         }
     }
@@ -119,6 +128,7 @@ struct VariableBinding<'src, Term: TermReference<'src>> {
     name: Option<&'src str>,
     variable: Term,
     in_term: Term,
+    evaluation: Evaluation,
 }
 
 impl<'src, Term: TermReference<'src>> VariableBinding<'src, Term> {

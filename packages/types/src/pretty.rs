@@ -3,6 +3,7 @@ use std::fmt;
 use pretty::RcDoc;
 
 use super::{GenericTerm, TermReference, VariableBinding};
+use crate::Evaluation;
 
 pub trait Pretty {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document;
@@ -97,8 +98,12 @@ impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
                 function,
                 argument,
                 typ,
-            } => has_type(BinaryOperator(function, Operator::Apply, argument), typ)
-                .to_document(parent, layout),
+                evaluation,
+            } => has_type(
+                BinaryOperator(function, Operator::Apply(*evaluation), argument),
+                typ,
+            )
+            .to_document(parent, layout),
             Self::Variable { name, typ } => {
                 has_type(WithId::new(self, name), typ).to_document(parent, layout)
             }
@@ -116,10 +121,16 @@ impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
                     layout.without_types().variable_value(),
                 );
 
+                let symbol = match binding.evaluation {
+                    Evaluation::Static => "static",
+                    Evaluation::Dynamic => "let",
+                };
+
                 parenthesize_if(
                     parent.is_some(),
                     [
-                        Document::text("let "),
+                        Document::text(symbol),
+                        Document::text(" "),
                         assignment,
                         Document::text(" ⇒ "),
                         binding.in_term.to_document(None, layout),
@@ -129,7 +140,7 @@ impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
             Self::Pi(binding) => {
                 if binding.name.is_none() {
                     let layout = layout.without_types();
-                    Operator::Arrow.to_document(
+                    Operator::Arrow(binding.evaluation).to_document(
                         parent,
                         &binding.binding_type(),
                         &binding.in_term,
@@ -140,6 +151,7 @@ impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
                     binding.to_document("∀", parent, layout)
                 }
             }
+            // TODO: Static (`=>`) and dynamic (`->`) bindings
             Self::Lambda(binding) => binding.to_document(r"\", parent, layout),
         }
     }
@@ -185,11 +197,22 @@ impl<Left: Pretty, Right: Pretty> Pretty for BinaryOperator<Left, Right> {
 pub enum Operator {
     Equals,
     HasType,
-    Arrow,
-    Apply,
+    Arrow(Evaluation),
+    Apply(Evaluation),
 }
 
 impl Operator {
+    pub fn symbol(self) -> &'static str {
+        match self {
+            Self::Equals => " = ",
+            Self::HasType => " : ",
+            Self::Arrow(Evaluation::Dynamic) => " → ",
+            Self::Arrow(Evaluation::Static) => " ⇒ ",
+            Self::Apply(Evaluation::Dynamic) => " ",
+            Self::Apply(Evaluation::Static) => " @ ",
+        }
+    }
+
     pub fn to_document(
         self,
         parent: Option<(Operator, Side)>,
@@ -202,12 +225,7 @@ impl Operator {
             self.parenthesize(parent),
             [
                 left.to_document(Some((self, Side::Left)), left_layout),
-                Document::text(match self {
-                    Self::Equals => " = ",
-                    Self::HasType => " : ",
-                    Self::Arrow => " → ",
-                    Self::Apply => " ",
-                }),
+                Document::text(self.symbol()),
                 right.to_document(Some((self, Side::Right)), right_layout),
             ],
         )
@@ -245,8 +263,9 @@ impl Operator {
         match self {
             Self::Equals => 0,
             Self::HasType => 1,
-            Self::Arrow => 2,
-            Self::Apply => 3,
+            Self::Arrow(_) => 2,
+            Self::Apply(Evaluation::Dynamic) => 3,
+            Self::Apply(Evaluation::Static) => 4,
         }
     }
 
@@ -254,8 +273,8 @@ impl Operator {
         match self {
             Self::Equals => Side::Right,
             Self::HasType => Side::Right,
-            Self::Arrow => Side::Right,
-            Self::Apply => Side::Left,
+            Self::Arrow(_) => Side::Right,
+            Self::Apply(_) => Side::Left,
         }
     }
 }

@@ -68,6 +68,7 @@ pub enum Token<'src> {
     Unknown,
 
     // ASCII operators
+    #[token("@", |_| NamedOperator::StaticApply)]
     #[token("and", |_| NamedOperator::And)]
     #[token("or", |_| NamedOperator::Or)]
     #[token("not", |_| NamedOperator::Not)]
@@ -219,6 +220,7 @@ pub enum NamedOperator {
     GreaterOrEqual,
 
     Apply,
+    StaticApply,
     Assign,
     HasType,
     To,
@@ -227,26 +229,27 @@ pub enum NamedOperator {
 impl NamedOperator {
     pub fn as_str(self) -> &'static str {
         match self {
-            NamedOperator::And => "and",
-            NamedOperator::Or => "or",
-            NamedOperator::Not => "not",
+            Self::And => "and",
+            Self::Or => "or",
+            Self::Not => "not",
 
-            NamedOperator::Plus => "+",
-            NamedOperator::Minus => "-",
-            NamedOperator::Multiply => "*",
-            NamedOperator::Divide => "/",
+            Self::Plus => "+",
+            Self::Minus => "-",
+            Self::Multiply => "*",
+            Self::Divide => "/",
 
-            NamedOperator::Equal => "==",
-            NamedOperator::NotEqual => "/=",
-            NamedOperator::LessThan => "<",
-            NamedOperator::GreaterThan => ">",
-            NamedOperator::LessOrEqual => "<=",
-            NamedOperator::GreaterOrEqual => ">=",
+            Self::Equal => "==",
+            Self::NotEqual => "/=",
+            Self::LessThan => "<",
+            Self::GreaterThan => ">",
+            Self::LessOrEqual => "<=",
+            Self::GreaterOrEqual => ">=",
 
-            NamedOperator::HasType => ":",
-            NamedOperator::Assign => "=",
-            NamedOperator::Apply => "<-",
-            NamedOperator::To => "->",
+            Self::HasType => ":",
+            Self::Assign => "=",
+            Self::Apply => "<-",
+            Self::StaticApply => "@",
+            Self::To => "->",
         }
     }
 }
