@@ -230,12 +230,17 @@ impl<'src> Term<'src> {
             return Ok(ControlFlow::Continue(()));
         }
 
+        let mut self_ref = self.value();
+
         Ok(
-            if let GenericTerm::Pi(binding) = &mut *self.value()
+            if let GenericTerm::Pi(binding) = &mut *self_ref
                 && binding.evaluation == Evaluation::Static
             {
                 binding.variable.replace_with(&Self::unknown_value());
                 Self::unify(&mut binding.in_term, other)?;
+                drop(self_ref);
+                // We replaced the variable, so make sure we don't leave the binding around
+                self.replace_with(other);
                 ControlFlow::Break(())
             } else {
                 ControlFlow::Continue(())
