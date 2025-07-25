@@ -293,7 +293,9 @@ impl<'src> Term<'src> {
                 Self::unify(value, value1)?;
                 VariableBinding::unify(binding, binding1)?
             }
-            (GenericTerm::Pi(binding0), GenericTerm::Pi(binding1)) => {
+            (GenericTerm::Pi(binding0), GenericTerm::Pi(binding1))
+                if binding0.evaluation == binding1.evaluation =>
+            {
                 VariableBinding::unify(binding0, binding1)?
             }
             (GenericTerm::Lambda(binding0), GenericTerm::Lambda(binding1)) => {
