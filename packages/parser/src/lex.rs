@@ -64,31 +64,31 @@ pub enum Token<'src> {
     Unknown,
 
     // ASCII operators
-    #[token("@", |_| NamedOperator::StaticApply)]
-    #[token("and", |_| NamedOperator::And)]
-    #[token("or", |_| NamedOperator::Or)]
-    #[token("not", |_| NamedOperator::Not)]
-    #[token("+", |_| NamedOperator::Plus)]
-    #[token("-", |_| NamedOperator::Minus)]
-    #[token("*", |_| NamedOperator::Multiply)]
-    #[token("/", |_| NamedOperator::Divide)]
-    #[token("==", |_| NamedOperator::Equal)]
-    #[token("/=", |_| NamedOperator::NotEqual)]
-    #[token("<", |_| NamedOperator::LessThan)]
-    #[token(">", |_| NamedOperator::GreaterThan)]
-    #[token("<=", |_| NamedOperator::LessOrEqual)]
-    #[token(">=", |_| NamedOperator::GreaterOrEqual)]
-    #[token("=", |_| NamedOperator::Assign)]
-    #[token(":", |_| NamedOperator::HasType)]
-    #[token("->", |_| NamedOperator::To)]
-    #[token("=>", |_| NamedOperator::Implies)]
+    #[token("@", |_| Operator::StaticApply)]
+    #[token("and", |_| Operator::And)]
+    #[token("or", |_| Operator::Or)]
+    #[token("not", |_| Operator::Not)]
+    #[token("+", |_| Operator::Plus)]
+    #[token("-", |_| Operator::Minus)]
+    #[token("*", |_| Operator::Multiply)]
+    #[token("/", |_| Operator::Divide)]
+    #[token("==", |_| Operator::Equal)]
+    #[token("/=", |_| Operator::NotEqual)]
+    #[token("<", |_| Operator::LessThan)]
+    #[token(">", |_| Operator::GreaterThan)]
+    #[token("<=", |_| Operator::LessOrEqual)]
+    #[token(">=", |_| Operator::GreaterOrEqual)]
+    #[token("=", |_| Operator::Assign)]
+    #[token(":", |_| Operator::HasType)]
+    #[token("->", |_| Operator::To)]
+    #[token("=>", |_| Operator::Implies)]
     // Unicode operators
-    #[token("≠", |_| NamedOperator::NotEqual)]
-    #[token("≤", |_| NamedOperator::LessOrEqual)]
-    #[token("≥", |_| NamedOperator::GreaterOrEqual)]
-    #[token("→", |_| NamedOperator::To)]
-    #[token("⇒", |_| NamedOperator::Implies)]
-    Operator(NamedOperator),
+    #[token("≠", |_| Operator::NotEqual)]
+    #[token("≤", |_| Operator::LessOrEqual)]
+    #[token("≥", |_| Operator::GreaterOrEqual)]
+    #[token("→", |_| Operator::To)]
+    #[token("⇒", |_| Operator::Implies)]
+    Operator(Operator),
 
     #[regex(r"\.(?&ident)")]
     NamedOperator(&'src str),
@@ -200,7 +200,7 @@ impl Keyword {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum NamedOperator {
+pub enum Operator {
     And,
     Or,
     Not,
@@ -225,7 +225,7 @@ pub enum NamedOperator {
     Implies
 }
 
-impl NamedOperator {
+impl Operator {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::And => "and",

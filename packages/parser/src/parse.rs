@@ -2,7 +2,7 @@ use bandit_types::source::Term;
 pub use grammar::term;
 use winnow::{Result, error::ContextError, token::one_of};
 
-use crate::lex::{Keyword, NamedOperator, SrcToken, Token};
+use crate::lex::{Keyword, Operator, SrcToken, Token};
 
 mod grammar;
 
@@ -28,10 +28,10 @@ impl<'tok, 'src: 'tok> winnow::Parser<TokenList<'tok, 'src>, Token<'src>, Contex
     }
 }
 
-impl<'tok, 'src: 'tok> winnow::Parser<TokenList<'tok, 'src>, NamedOperator, ContextError>
-    for NamedOperator
+impl<'tok, 'src: 'tok> winnow::Parser<TokenList<'tok, 'src>, Operator, ContextError>
+    for Operator
 {
-    fn parse_next(&mut self, input: &mut TokenList<'tok, 'src>) -> Result<NamedOperator> {
+    fn parse_next(&mut self, input: &mut TokenList<'tok, 'src>) -> Result<Operator> {
         Token::Operator(*self).value(*self).parse_next(input)
     }
 }

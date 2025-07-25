@@ -12,7 +12,7 @@ use winnow::{
 };
 
 use super::{Parser, Term, TokenList};
-use crate::lex::{Grouping, Keyword, NamedOperator, SrcToken, Token};
+use crate::lex::{Grouping, Keyword, Operator, SrcToken, Token};
 
 pub fn term<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> Result<Term<'src>> {
     type_annotations().parse_next(input)
@@ -21,7 +21,7 @@ pub fn term<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> Result<Term<
 fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     separated_foldr1(
         function_types(),
-        NamedOperator::HasType,
+        Operator::HasType,
         |term, _op, typ| term.has_type(typ),
     )
 }
@@ -29,7 +29,7 @@ fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     separated_foldr1(
         function_applications(),
-        NamedOperator::To,
+        Operator::To,
         |input_type, _, output_type| {
             Term::pi_type(None, input_type, output_type, Evaluation::Dynamic)
         },
@@ -43,7 +43,7 @@ fn function_applications<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'sr
 fn static_apply<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     separated_foldl1(
         primary(),
-        NamedOperator::StaticApply,
+        Operator::StaticApply,
         |input_type, _, output_type| Term::static_apply(input_type, output_type),
     )
 }
@@ -67,7 +67,7 @@ fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(
         Keyword::Forall,
-        separated_pair(variable_binding(), NamedOperator::Implies, term),
+        separated_pair(variable_binding(), Operator::Implies, term),
     )
     .map(|((var, typ), term)| Term::pi_type(Some(var), typ, term, Evaluation::Static))
 }
@@ -77,10 +77,10 @@ fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
         Keyword::Let,
         (
             identifier(),
-            opt(preceded(NamedOperator::HasType, term)),
-            NamedOperator::Assign,
+            opt(preceded(Operator::HasType, term)),
+            Operator::Assign,
             term,
-            NamedOperator::Implies,
+            Operator::Implies,
             term,
         ),
     )
@@ -100,7 +100,7 @@ fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(
         Token::Lambda,
-        separated_pair(variable_binding(), NamedOperator::Implies, term),
+        separated_pair(variable_binding(), Operator::Implies, term),
     )
     .map(|((var, typ), term)| Term::lambda(var, typ, term))
 }
@@ -108,7 +108,7 @@ fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, Term<'src>)> {
     (
         identifier(),
-        opt(preceded(NamedOperator::HasType, term))
+        opt(preceded(Operator::HasType, term))
             .map(|typ| typ.unwrap_or_else(Term::unknown_type)),
     )
 }
