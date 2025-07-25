@@ -19,11 +19,9 @@ pub fn term<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> Result<Term<
 }
 
 fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    separated_foldr1(
-        function_types(),
-        Operator::HasType,
-        |term, _op, typ| term.has_type(typ),
-    )
+    separated_foldr1(function_types(), Operator::HasType, |term, _op, typ| {
+        term.has_type(typ)
+    })
 }
 
 fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
@@ -108,8 +106,7 @@ fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, Term<'src>)> {
     (
         identifier(),
-        opt(preceded(Operator::HasType, term))
-            .map(|typ| typ.unwrap_or_else(Term::unknown_type)),
+        opt(preceded(Operator::HasType, term)).map(|typ| typ.unwrap_or_else(Term::unknown_type)),
     )
 }
 

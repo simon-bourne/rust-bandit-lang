@@ -222,7 +222,7 @@ pub enum Operator {
     Assign,
     HasType,
     To,
-    Implies
+    Implies,
 }
 
 impl Operator {
@@ -249,7 +249,7 @@ impl Operator {
             Self::Apply => "<-",
             Self::StaticApply => "@",
             Self::To => "->",
-            Self::Implies => "=>"
+            Self::Implies => "=>",
         }
     }
 }

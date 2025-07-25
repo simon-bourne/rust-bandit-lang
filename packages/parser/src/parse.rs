@@ -28,9 +28,7 @@ impl<'tok, 'src: 'tok> winnow::Parser<TokenList<'tok, 'src>, Token<'src>, Contex
     }
 }
 
-impl<'tok, 'src: 'tok> winnow::Parser<TokenList<'tok, 'src>, Operator, ContextError>
-    for Operator
-{
+impl<'tok, 'src: 'tok> winnow::Parser<TokenList<'tok, 'src>, Operator, ContextError> for Operator {
     fn parse_next(&mut self, input: &mut TokenList<'tok, 'src>) -> Result<Operator> {
         Token::Operator(*self).value(*self).parse_next(input)
     }
