@@ -67,7 +67,7 @@ fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(
         Keyword::Forall,
-        separated_pair(variable_binding(), Token::SuchThat, term),
+        separated_pair(variable_binding(), NamedOperator::Implies, term),
     )
     .map(|((var, typ), term)| Term::pi_type(Some(var), typ, term, Evaluation::Static))
 }
@@ -80,7 +80,7 @@ fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
             opt(preceded(NamedOperator::HasType, term)),
             NamedOperator::Assign,
             term,
-            Token::SuchThat,
+            NamedOperator::Implies,
             term,
         ),
     )
@@ -100,7 +100,7 @@ fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(
         Token::Lambda,
-        separated_pair(variable_binding(), Token::SuchThat, term),
+        separated_pair(variable_binding(), NamedOperator::Implies, term),
     )
     .map(|((var, typ), term)| Term::lambda(var, typ, term))
 }

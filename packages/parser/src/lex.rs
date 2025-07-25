@@ -57,10 +57,6 @@ pub enum Token<'src> {
     #[token("\\")]
     Lambda,
 
-    #[token("=>")]
-    #[token("⇒")]
-    SuchThat,
-
     #[regex(r"(?&ident)")]
     Identifier(&'src str),
 
@@ -85,11 +81,13 @@ pub enum Token<'src> {
     #[token("=", |_| NamedOperator::Assign)]
     #[token(":", |_| NamedOperator::HasType)]
     #[token("->", |_| NamedOperator::To)]
+    #[token("=>", |_| NamedOperator::Implies)]
     // Unicode operators
     #[token("≠", |_| NamedOperator::NotEqual)]
     #[token("≤", |_| NamedOperator::LessOrEqual)]
     #[token("≥", |_| NamedOperator::GreaterOrEqual)]
     #[token("→", |_| NamedOperator::To)]
+    #[token("⇒", |_| NamedOperator::Implies)]
     Operator(NamedOperator),
 
     #[regex(r"\.(?&ident)")]
@@ -224,6 +222,7 @@ pub enum NamedOperator {
     Assign,
     HasType,
     To,
+    Implies
 }
 
 impl NamedOperator {
@@ -250,6 +249,7 @@ impl NamedOperator {
             Self::Apply => "<-",
             Self::StaticApply => "@",
             Self::To => "->",
+            Self::Implies => "=>"
         }
     }
 }
