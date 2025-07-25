@@ -223,6 +223,26 @@ impl<'src> Term<'src> {
         })
     }
 
+    fn unify_implicit_parameter(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
+        if let GenericTerm::Pi(binding) = &*other.value()
+            && binding.evaluation == Evaluation::Static
+        {
+            return Ok(ControlFlow::Continue(()));
+        }
+
+        Ok(
+            if let GenericTerm::Pi(binding) = &mut *self.value()
+                && binding.evaluation == Evaluation::Static
+            {
+                binding.variable.replace_with(&Self::unknown_value());
+                Self::unify(&mut binding.in_term, other)?;
+                ControlFlow::Break(())
+            } else {
+                ControlFlow::Continue(())
+            },
+        )
+    }
+
     fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
         x.collapse_links();
         y.collapse_links();
@@ -230,6 +250,8 @@ impl<'src> Term<'src> {
         if SharedMut::is_same(&x.0, &y.0)
             || x.unify_unknown(y)?.is_break()
             || y.unify_unknown(x)?.is_break()
+            || x.unify_implicit_parameter(y)?.is_break()
+            || y.unify_implicit_parameter(x)?.is_break()
         {
             return Ok(());
         }
