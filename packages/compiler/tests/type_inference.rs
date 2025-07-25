@@ -100,7 +100,8 @@ fn simple_id() {
 }
 
 // TODO: How will we infer the type of `a`? Should unification produce `∀a = Int
-// ⇒ a → a`? TODO: Can we remove brackets around `(∀a ⇒ a → a)`?
+// ⇒ a → a`?
+// TODO: Can we remove brackets around `(∀a ⇒ a → a)`?
 #[test]
 fn infer_implicit_argument() {
     "id one".infers("(id : (∀a ⇒ a → a)) (one : Int) : Int");
