@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{InferenceError, Result, linked, source};
+use crate::{InferenceError, Result, constraints::Constraints, linked, source};
 
 #[derive(Clone)]
 enum Global<'a> {
@@ -12,6 +12,7 @@ pub type GlobalValues<'a> = HashMap<&'a str, source::Term<'a>>;
 pub struct Context<'a> {
     local_variables: HashMap<&'a str, Vec<linked::Term<'a>>>,
     global_variables: Rc<HashMap<&'a str, RefCell<Global<'a>>>>,
+    constraints: Constraints,
 }
 
 impl<'a> Context<'a> {
@@ -24,7 +25,16 @@ impl<'a> Context<'a> {
                     .map(|(name, value)| (name, RefCell::new(Global::Source(value))))
                     .collect(),
             ),
+            constraints: Constraints::empty(),
         }
+    }
+
+    pub fn solve_constraints(&mut self) {
+        self.constraints.solve()
+    }
+
+    pub(crate) fn constraints(&mut self) -> &mut Constraints {
+        &mut self.constraints
     }
 
     pub(crate) fn in_scope<Output>(
@@ -63,10 +73,6 @@ impl<'a> Context<'a> {
     }
 
     fn global_value(&mut self, name: &'a str) -> Result<linked::Term<'a>> {
-        let mut global_ctx = Context {
-            local_variables: HashMap::new(),
-            global_variables: self.global_variables.clone(),
-        };
         let mut term = self
             .global_variables
             .get(name)
@@ -76,7 +82,16 @@ impl<'a> Context<'a> {
 
         let typed_term = match &mut *term {
             Global::Linked(term) => term.clone(),
-            Global::Source(term) => term.link(&mut global_ctx)?,
+            Global::Source(term) => {
+                let mut global_ctx = Context {
+                    local_variables: HashMap::new(),
+                    global_variables: self.global_variables.clone(),
+                    constraints: Constraints::empty(),
+                };
+                let term = term.link(&mut global_ctx)?;
+                self.constraints.merge(global_ctx.constraints);
+                term
+            }
         };
 
         *term = Global::Linked(typed_term.clone());

@@ -5,7 +5,7 @@ use katexit::katexit;
 
 use crate::{
     Evaluation, GenericTerm, InferenceError, Pretty, Result, SharedMut, TermReference,
-    VariableBinding,
+    VariableBinding, constraints::Constraints,
 };
 
 mod pretty;
@@ -43,8 +43,8 @@ impl<'src> Term<'src> {
         })
     }
 
-    pub fn constant(name: &'src str, typ: Self) -> Result<Self> {
-        typ.unify_type()?;
+    pub fn constant(name: &'src str, typ: Self, constraints: &mut Constraints) -> Result<Self> {
+        typ.unify_type(constraints)?;
         Ok(Self::new(GenericTerm::Constant { name, typ }))
     }
 
@@ -68,18 +68,20 @@ impl<'src> Term<'src> {
         argument: Self,
         mut typ: Self,
         evaluation: Evaluation,
+        constraints: &mut Constraints,
     ) -> Result<Self> {
         let mut extract_arg = Self::unknown_value();
         let pi_type = &mut Term::pi_type(extract_arg.clone(), typ.fresh_variables(), evaluation);
-        Self::unify(pi_type, &mut function.typ().fresh_variables())?;
+        Self::unify(pi_type, &mut function.typ().fresh_variables(), constraints)?;
 
         // TODO: Only do this for variables (assert?):
         Self::unify(
             &mut extract_arg.typ(),
             &mut argument.typ().fresh_variables(),
+            constraints,
         )?;
         extract_arg.replace_with(&argument);
-        typ.unify_type()?;
+        typ.unify_type(constraints)?;
 
         Ok(Self::new(GenericTerm::Apply {
             function,
@@ -89,9 +91,9 @@ impl<'src> Term<'src> {
         }))
     }
 
-    pub fn has_type(self, mut typ: Self) -> Result<Self> {
-        typ.unify_type()?;
-        Self::unify(&mut self.typ(), &mut typ)?;
+    pub fn has_type(self, mut typ: Self, constraints: &mut Constraints) -> Result<Self> {
+        typ.unify_type(constraints)?;
+        Self::unify(&mut self.typ(), &mut typ, constraints)?;
         Ok(self)
     }
 
@@ -105,8 +107,12 @@ impl<'src> Term<'src> {
     ///     \Gamma \vdash \text{let } x : A = a \text{ in } e : B[a/x]
     /// }
     /// $$
-    pub(crate) fn let_binding(value: Self, binding: VariableBinding<'src, Self>) -> Result<Self> {
-        Self::unify(&mut value.typ(), &mut binding.variable.typ())?;
+    pub(crate) fn let_binding(
+        value: Self,
+        binding: VariableBinding<'src, Self>,
+        constraints: &mut Constraints,
+    ) -> Result<Self> {
+        Self::unify(&mut value.typ(), &mut binding.variable.typ(), constraints)?;
         Ok(Self::new(GenericTerm::Let { value, binding }))
     }
 
@@ -200,11 +206,15 @@ impl<'src> Term<'src> {
         Self(SharedMut::new(TermEnum::Value { term }))
     }
 
-    fn unify_type(&self) -> Result<()> {
-        Self::unify(&mut self.typ(), &mut Self::type_of_type())
+    fn unify_type(&self, constraints: &mut Constraints) -> Result<()> {
+        Self::unify(&mut self.typ(), &mut Self::type_of_type(), constraints)
     }
 
-    fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
+    fn unify_unknown(
+        &mut self,
+        other: &mut Self,
+        constraints: &mut Constraints,
+    ) -> Result<ControlFlow<()>> {
         if other.value().is_variable() {
             return Ok(ControlFlow::Continue(()));
         }
@@ -215,7 +225,7 @@ impl<'src> Term<'src> {
             let mut typ = typ.clone();
             drop(self_ref);
             self.replace_with(other);
-            Self::unify(&mut typ, &mut other.typ())?;
+            Self::unify(&mut typ, &mut other.typ(), constraints)?;
 
             ControlFlow::Break(())
         } else {
@@ -223,7 +233,11 @@ impl<'src> Term<'src> {
         })
     }
 
-    fn unify_implicit_parameter(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
+    fn unify_implicit_parameter(
+        &mut self,
+        other: &mut Self,
+        constraints: &mut Constraints,
+    ) -> Result<ControlFlow<()>> {
         if let GenericTerm::Pi(binding) = &*other.value()
             && binding.evaluation == Evaluation::Static
         {
@@ -237,7 +251,7 @@ impl<'src> Term<'src> {
                 && binding.evaluation == Evaluation::Static
             {
                 binding.variable.replace_with(&Self::unknown_value());
-                Self::unify(&mut binding.in_term, other)?;
+                Self::unify(&mut binding.in_term, other, constraints)?;
                 drop(self_ref);
                 // We replaced the variable, so make sure we don't leave the binding around
                 self.replace_with(other);
@@ -248,15 +262,15 @@ impl<'src> Term<'src> {
         )
     }
 
-    fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
+    fn unify(x: &mut Self, y: &mut Self, constraints: &mut Constraints) -> Result<()> {
         x.collapse_links();
         y.collapse_links();
 
         if SharedMut::is_same(&x.0, &y.0)
-            || x.unify_unknown(y)?.is_break()
-            || y.unify_unknown(x)?.is_break()
-            || x.unify_implicit_parameter(y)?.is_break()
-            || y.unify_implicit_parameter(x)?.is_break()
+            || x.unify_unknown(y, constraints)?.is_break()
+            || y.unify_unknown(x, constraints)?.is_break()
+            || x.unify_implicit_parameter(y, constraints)?.is_break()
+            || y.unify_implicit_parameter(x, constraints)?.is_break()
         {
             return Ok(());
         }
@@ -291,7 +305,7 @@ impl<'src> Term<'src> {
                     name: name1,
                     typ: typ1,
                 },
-            ) if name == name1 => Self::unify(typ, typ1)?,
+            ) if name == name1 => Self::unify(typ, typ1, constraints)?,
             (
                 GenericTerm::Apply {
                     function,
@@ -306,9 +320,9 @@ impl<'src> Term<'src> {
                     evaluation: evaluation1,
                 },
             ) if evaluation == evaluation1 => {
-                Self::unify(function, function1)?;
-                Self::unify(argument, argument1)?;
-                Self::unify(typ, typ1)?;
+                Self::unify(function, function1, constraints)?;
+                Self::unify(argument, argument1, constraints)?;
+                Self::unify(typ, typ1, constraints)?;
             }
             (
                 GenericTerm::Let { value, binding },
@@ -317,16 +331,16 @@ impl<'src> Term<'src> {
                     binding: binding1,
                 },
             ) => {
-                Self::unify(value, value1)?;
-                VariableBinding::unify(binding, binding1)?
+                Self::unify(value, value1, constraints)?;
+                VariableBinding::unify(binding, binding1, constraints)?
             }
             (GenericTerm::Pi(binding0), GenericTerm::Pi(binding1))
                 if binding0.evaluation == binding1.evaluation =>
             {
-                VariableBinding::unify(binding0, binding1)?
+                VariableBinding::unify(binding0, binding1, constraints)?
             }
             (GenericTerm::Lambda(binding0), GenericTerm::Lambda(binding1)) => {
-                VariableBinding::unify(binding0, binding1)?
+                VariableBinding::unify(binding0, binding1, constraints)?
             }
             // It's safer to explicitly ignore each variant
             (GenericTerm::TypeOfType, _rhs)
@@ -444,12 +458,20 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         }
     }
 
-    fn unify(binding0: &mut Self, binding1: &mut Self) -> Result<()> {
+    fn unify(
+        binding0: &mut Self,
+        binding1: &mut Self,
+        constraints: &mut Constraints,
+    ) -> Result<()> {
         if binding0.evaluation != binding1.evaluation {
             return Err(InferenceError);
         }
 
-        Term::unify(&mut binding0.variable.typ(), &mut binding1.variable.typ())?;
+        Term::unify(
+            &mut binding0.variable.typ(),
+            &mut binding1.variable.typ(),
+            constraints,
+        )?;
 
         // Keep the name if we can
         if binding0.name.is_some() {
@@ -460,6 +482,6 @@ impl<'src> VariableBinding<'src, Term<'src>> {
             binding0.name = binding1.name;
         }
 
-        Term::unify(&mut binding0.in_term, &mut binding1.in_term)
+        Term::unify(&mut binding0.in_term, &mut binding1.in_term, constraints)
     }
 }
