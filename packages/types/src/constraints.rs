@@ -5,7 +5,5 @@ impl Constraints {
         Self
     }
 
-    pub fn merge(&mut self, _other: Self) {}
-
     pub fn solve(&mut self) {}
 }
