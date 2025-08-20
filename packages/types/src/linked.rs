@@ -275,6 +275,21 @@ impl<'src> Term<'src> {
             return Ok(());
         }
 
+        // TODO: Normalization by evaluation
+        //
+        // `evaluate` should evaluate `Self`. `evaluate_known` should evaluate
+        // `Self.value()`. They return an `Option<Future>`, which is `Some` if the
+        // evaluation is waiting on an unknown. Here we'll call `evaluate_known`, which
+        // recurses down with `evaluate`.
+
+        Self::unify_known(x, y, constraints)
+    }
+
+    fn unify_known(
+        x: &mut Term<'src>,
+        y: &mut Term<'src>,
+        constraints: &Constraints,
+    ) -> Result<()> {
         let mut x_ref = x.value();
         let mut y_ref = y.value();
 
