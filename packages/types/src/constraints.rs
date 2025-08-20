@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct Constraints;
 
 impl Constraints {
@@ -5,5 +6,5 @@ impl Constraints {
         Self
     }
 
-    pub fn solve(&mut self) {}
+    pub fn solve(&self) {}
 }

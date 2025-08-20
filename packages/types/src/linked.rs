@@ -43,7 +43,7 @@ impl<'src> Term<'src> {
         })
     }
 
-    pub fn constant(name: &'src str, typ: Self, constraints: &mut Constraints) -> Result<Self> {
+    pub fn constant(name: &'src str, typ: Self, constraints: &Constraints) -> Result<Self> {
         typ.unify_type(constraints)?;
         Ok(Self::new(GenericTerm::Constant { name, typ }))
     }
@@ -68,7 +68,7 @@ impl<'src> Term<'src> {
         argument: Self,
         mut typ: Self,
         evaluation: Evaluation,
-        constraints: &mut Constraints,
+        constraints: &Constraints,
     ) -> Result<Self> {
         let mut extract_arg = Self::unknown_value();
         let pi_type = &mut Term::pi_type(extract_arg.clone(), typ.fresh_variables(), evaluation);
@@ -91,7 +91,7 @@ impl<'src> Term<'src> {
         }))
     }
 
-    pub fn has_type(self, mut typ: Self, constraints: &mut Constraints) -> Result<Self> {
+    pub fn has_type(self, mut typ: Self, constraints: &Constraints) -> Result<Self> {
         typ.unify_type(constraints)?;
         Self::unify(&mut self.typ(), &mut typ, constraints)?;
         Ok(self)
@@ -110,7 +110,7 @@ impl<'src> Term<'src> {
     pub(crate) fn let_binding(
         value: Self,
         binding: VariableBinding<'src, Self>,
-        constraints: &mut Constraints,
+        constraints: &Constraints,
     ) -> Result<Self> {
         Self::unify(&mut value.typ(), &mut binding.variable.typ(), constraints)?;
         Ok(Self::new(GenericTerm::Let { value, binding }))
@@ -206,14 +206,14 @@ impl<'src> Term<'src> {
         Self(SharedMut::new(TermEnum::Value { term }))
     }
 
-    fn unify_type(&self, constraints: &mut Constraints) -> Result<()> {
+    fn unify_type(&self, constraints: &Constraints) -> Result<()> {
         Self::unify(&mut self.typ(), &mut Self::type_of_type(), constraints)
     }
 
     fn unify_unknown(
         &mut self,
         other: &mut Self,
-        constraints: &mut Constraints,
+        constraints: &Constraints,
     ) -> Result<ControlFlow<()>> {
         if other.value().is_variable() {
             return Ok(ControlFlow::Continue(()));
@@ -236,7 +236,7 @@ impl<'src> Term<'src> {
     fn unify_implicit_parameter(
         &mut self,
         other: &mut Self,
-        constraints: &mut Constraints,
+        constraints: &Constraints,
     ) -> Result<ControlFlow<()>> {
         if let GenericTerm::Pi(binding) = &*other.value()
             && binding.evaluation == Evaluation::Static
@@ -262,7 +262,7 @@ impl<'src> Term<'src> {
         )
     }
 
-    fn unify(x: &mut Self, y: &mut Self, constraints: &mut Constraints) -> Result<()> {
+    fn unify(x: &mut Self, y: &mut Self, constraints: &Constraints) -> Result<()> {
         x.collapse_links();
         y.collapse_links();
 
@@ -458,11 +458,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         }
     }
 
-    fn unify(
-        binding0: &mut Self,
-        binding1: &mut Self,
-        constraints: &mut Constraints,
-    ) -> Result<()> {
+    fn unify(binding0: &mut Self, binding1: &mut Self, constraints: &Constraints) -> Result<()> {
         if binding0.evaluation != binding1.evaluation {
             return Err(InferenceError);
         }

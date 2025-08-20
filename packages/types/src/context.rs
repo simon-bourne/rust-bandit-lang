@@ -1,10 +1,6 @@
-use std::{
-    cell::{RefCell, RefMut},
-    collections::HashMap,
-    rc::Rc,
-};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{InferenceError, Result, SharedMut, constraints::Constraints, linked, source};
+use crate::{InferenceError, Result, constraints::Constraints, linked, source};
 
 #[derive(Clone)]
 enum Global<'a> {
@@ -16,7 +12,7 @@ pub type GlobalValues<'a> = HashMap<&'a str, source::Term<'a>>;
 pub struct Context<'a> {
     local_variables: HashMap<&'a str, Vec<linked::Term<'a>>>,
     global_variables: Rc<HashMap<&'a str, RefCell<Global<'a>>>>,
-    constraints: SharedMut<Constraints>,
+    constraints: Constraints,
 }
 
 impl<'a> Context<'a> {
@@ -29,16 +25,12 @@ impl<'a> Context<'a> {
                     .map(|(name, value)| (name, RefCell::new(Global::Source(value))))
                     .collect(),
             ),
-            constraints: SharedMut::new(Constraints::empty()),
+            constraints: Constraints::empty(),
         }
     }
 
-    pub fn solve_constraints(&mut self) {
-        self.constraints.borrow_mut().solve()
-    }
-
-    pub(crate) fn constraints_mut(&self) -> RefMut<'_, Constraints> {
-        self.constraints.borrow_mut()
+    pub(crate) fn constraints(&self) -> &Constraints {
+        &self.constraints
     }
 
     pub(crate) fn in_scope<Output>(

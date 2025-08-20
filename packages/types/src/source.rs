@@ -129,9 +129,9 @@ impl<'src> Term<'src> {
     pub fn link(&self, ctx: &mut Context<'src>) -> Result<linked::Term<'src>> {
         match self.0.as_ref() {
             TermEnum::Value { term } => term.link(ctx),
-            TermEnum::HasType { term, typ } => term
-                .link(ctx)?
-                .has_type(typ.link(ctx)?, &mut ctx.constraints_mut()),
+            TermEnum::HasType { term, typ } => {
+                term.link(ctx)?.has_type(typ.link(ctx)?, ctx.constraints())
+            }
         }
     }
 
@@ -172,7 +172,7 @@ impl<'src> GenericTerm<'src, Term<'src>> {
         Ok(match self {
             Self::TypeOfType => Linked::type_of_type(),
             Self::Constant { name, typ } => {
-                Linked::constant(name, typ.link(ctx)?, &mut ctx.constraints_mut())?
+                Linked::constant(name, typ.link(ctx)?, ctx.constraints())?
             }
             Self::Apply {
                 function,
@@ -184,17 +184,15 @@ impl<'src> GenericTerm<'src, Term<'src>> {
                 argument.link(ctx)?,
                 typ.link(ctx)?,
                 *evaluation,
-                &mut ctx.constraints_mut(),
+                ctx.constraints(),
             )?,
             Self::Variable { name, typ } => ctx
                 .lookup(name)?
-                .has_type(typ.link(ctx)?, &mut ctx.constraints_mut())?,
+                .has_type(typ.link(ctx)?, ctx.constraints())?,
             Self::Unknown { typ } => Linked::unknown(typ.link(ctx)?),
-            Self::Let { value, binding } => Linked::let_binding(
-                value.link(ctx)?,
-                binding.link(ctx)?,
-                &mut ctx.constraints_mut(),
-            )?,
+            Self::Let { value, binding } => {
+                Linked::let_binding(value.link(ctx)?, binding.link(ctx)?, ctx.constraints())?
+            }
             Self::Pi(binding) => Linked::pi(binding.link(ctx)?),
             Self::Lambda(binding) => Linked::lambda(binding.link(ctx)?),
         })
