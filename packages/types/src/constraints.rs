@@ -1,5 +1,3 @@
-use crate::Result;
-
 #[derive(Clone)]
 pub struct Constraints;
 
@@ -8,9 +6,11 @@ impl Constraints {
         Self
     }
 
-    pub fn add(&self, _constraint: impl Future<Output = Result<()>>) {
-        todo!()
+    pub fn add(&self, _constraint: impl Future<Output = ()>) {
+        // TODO: implement
     }
 
-    pub fn solve(&self) {}
+    pub fn solve(&self) {
+        // TODO: implement
+    }
 }

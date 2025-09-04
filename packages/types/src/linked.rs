@@ -284,21 +284,19 @@ impl<'src> Term<'src> {
         Self::unify_known(x, y, constraints)
     }
 
-    async fn evaluate(&mut self) -> Result<()> {
+    async fn evaluate(&mut self) {
         let (mut function, mut argument) = {
             let GenericTerm::Apply {
                 function, argument, ..
             } = &mut *self.value()
             else {
-                return Ok(());
+                return;
             };
             (function.clone(), argument.clone())
         };
 
-        Box::pin(function.evaluate()).await?;
-        Box::pin(argument.evaluate()).await?;
-
-        Ok(())
+        Box::pin(function.evaluate()).await;
+        Box::pin(argument.evaluate()).await;
     }
 
     fn unify_known(x: &mut Self, y: &mut Self, constraints: &Constraints) -> Result<()> {
