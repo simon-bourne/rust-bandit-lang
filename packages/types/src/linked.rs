@@ -295,8 +295,11 @@ impl<'src> Term<'src> {
             (function.clone(), argument.clone())
         };
 
-        Box::pin(function.evaluate()).await;
-        Box::pin(argument.evaluate()).await;
+        Box::pin(async {
+            function.evaluate().await;
+            argument.evaluate().await;
+        })
+        .await;
     }
 
     fn unify_known(x: &mut Self, y: &mut Self, constraints: &Constraints<'src>) -> Result<()> {
