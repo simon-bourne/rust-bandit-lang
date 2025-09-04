@@ -275,21 +275,20 @@ impl<'src> Term<'src> {
             return Ok(());
         }
 
-        // TODO: Normalization by evaluation
-        //
-        // `evaluate` should evaluate `Self`. `evaluate_known` should evaluate
-        // `Self.value()`. They return an `Option<Future>`, which is `Some` if the
-        // evaluation is waiting on an unknown. Here we'll call `evaluate_known`, which
-        // recurses down with `evaluate`.
+        // For now, all normalization is done asynchronously by adding a constraint.
+        // Later, we can optimize this to only produce a future when we need to wait for
+        // an unknown.
+        constraints.add(x.evaluate());
+        constraints.add(y.evaluate());
 
         Self::unify_known(x, y, constraints)
     }
 
-    fn unify_known(
-        x: &mut Term<'src>,
-        y: &mut Term<'src>,
-        constraints: &Constraints,
-    ) -> Result<()> {
+    async fn evaluate(&mut self) -> Result<()> {
+        todo!()
+    }
+
+    fn unify_known(x: &mut Self, y: &mut Self, constraints: &Constraints) -> Result<()> {
         let mut x_ref = x.value();
         let mut y_ref = y.value();
 
