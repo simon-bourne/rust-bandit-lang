@@ -35,7 +35,7 @@ impl<'a> Constraints<'a> {
                 }
             }
 
-            if pending.is_empty() || ! any_solved {
+            if pending.is_empty() || !any_solved {
                 return;
             }
 
