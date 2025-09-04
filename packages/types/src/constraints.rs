@@ -41,7 +41,7 @@ impl<'a> Constraints<'a> {
                 return Err(InferenceError);
             }
 
-            self.0.replace_with(pending);
+            self.0.borrow_mut().extend(pending);
         }
     }
 }
