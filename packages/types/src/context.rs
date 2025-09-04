@@ -29,7 +29,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub(crate) fn constraints(&self) -> &Constraints<'a> {
+    pub fn constraints(&self) -> &Constraints<'a> {
         &self.constraints
     }
 

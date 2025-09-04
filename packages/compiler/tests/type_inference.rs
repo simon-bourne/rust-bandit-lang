@@ -56,7 +56,9 @@ fn infer_types(input: &str) -> Result<linked::Term<'_>, InferenceError> {
         ],
     );
 
-    parse(input).link(ctx)
+    let term = parse(input).link(ctx)?;
+    ctx.constraints().solve();
+    Ok(term)
 }
 
 #[test]

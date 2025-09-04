@@ -1,3 +1,5 @@
+use std::task::{self, Waker};
+
 use futures::future::{FutureExt, LocalBoxFuture};
 
 use crate::SharedMut;
@@ -15,6 +17,29 @@ impl<'a> Constraints<'a> {
     }
 
     pub fn solve(&self) {
-        // TODO: implement
+        loop {
+            let current = self.0.replace_with(Vec::new());
+            let mut pending = Vec::new();
+            let waker = Waker::noop();
+            let mut any_solved = false;
+
+            for mut future in current {
+                if future
+                    .as_mut()
+                    .poll(&mut task::Context::from_waker(waker))
+                    .is_pending()
+                {
+                    pending.push(future);
+                } else {
+                    any_solved = true;
+                }
+            }
+
+            if pending.is_empty() || ! any_solved {
+                return;
+            }
+
+            self.0.replace_with(pending);
+        }
     }
 }
