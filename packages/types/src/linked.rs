@@ -486,7 +486,11 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         }
     }
 
-    fn unify(binding0: &mut Self, binding1: &mut Self, constraints: &Constraints<'src>) -> Result<()> {
+    fn unify(
+        binding0: &mut Self,
+        binding1: &mut Self,
+        constraints: &Constraints<'src>,
+    ) -> Result<()> {
         if binding0.evaluation != binding1.evaluation {
             return Err(InferenceError);
         }
