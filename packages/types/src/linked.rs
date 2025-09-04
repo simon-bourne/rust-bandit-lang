@@ -285,6 +285,9 @@ impl<'src> Term<'src> {
     }
 
     async fn evaluate(mut self) {
+        // TODO: Wait for unknowns to be evaluated
+
+        // TODO: let bindings
         let (function, argument) = {
             let GenericTerm::Apply {
                 function, argument, ..
@@ -300,6 +303,8 @@ impl<'src> Term<'src> {
             argument.evaluate().await;
         })
         .await;
+
+        // TODO: Apply lambdas/constants to their argument
     }
 
     fn unify_known(x: &mut Self, y: &mut Self, constraints: &Constraints<'src>) -> Result<()> {
