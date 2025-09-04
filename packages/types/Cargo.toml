@@ -9,6 +9,7 @@ publish = false
 normal = ["katexit"]
 
 [dependencies]
+clonelet.workspace = true
 futures.workspace = true
 katexit.workspace = true
 pretty.workspace = true

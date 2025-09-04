@@ -1,5 +1,6 @@
 use std::{cell::RefMut, fmt, ops::ControlFlow};
 
+use clonelet::clone;
 #[cfg(doc)]
 use katexit::katexit;
 
@@ -281,30 +282,59 @@ impl<'src> Term<'src> {
         constraints.add(x.clone().evaluate());
         constraints.add(y.clone().evaluate());
 
+        // TODO: `unify_known` needs to wait for `x` and `y` to be evaluated.
         Self::unify_known(x, y, constraints)
     }
 
     async fn evaluate(mut self) {
+        // This lint gives a false positive. All the `match` arms below `drop(borrowed)`
+        // before awaiting
+        #![allow(clippy::await_holding_refcell_ref)]
         // TODO: Wait for unknowns to be evaluated
+        let borrowed = self.value();
 
-        // TODO: let bindings
-        let (function, argument) = {
-            let GenericTerm::Apply {
+        match &*borrowed {
+            GenericTerm::Apply {
                 function, argument, ..
-            } = &mut *self.value()
-            else {
-                return;
-            };
-            (function.clone(), argument.clone())
-        };
+            } => {
+                clone!(function, argument);
+                drop(borrowed);
+                Self::evaluate_apply(function, argument).await;
+            }
+            GenericTerm::Let {
+                value,
+                binding:
+                    VariableBinding {
+                        variable, in_term, ..
+                    },
+            } => {
+                clone!(variable, value, in_term);
+                drop(borrowed);
+                Self::evaluate_let(variable, value, in_term).await;
+            }
+            _ => {}
+        }
+    }
 
+    async fn evaluate_apply(function: Self, argument: Self) {
         Box::pin(async {
-            function.evaluate().await;
-            argument.evaluate().await;
+            function.clone().evaluate().await;
+            argument.clone().evaluate().await;
         })
         .await;
 
         // TODO: Apply lambdas/constants to their argument
+    }
+
+    /// Evaluate an expression of the form `let variable = value in expression`
+    async fn evaluate_let(mut variable: Self, value: Self, expression: Self) {
+        Box::pin(async {
+            variable.clone().evaluate().await;
+            value.clone().evaluate().await;
+        })
+        .await;
+        variable.replace_with(&value);
+        Box::pin(expression.clone().evaluate()).await;
     }
 
     fn unify_known(x: &mut Self, y: &mut Self, constraints: &Constraints<'src>) -> Result<()> {
