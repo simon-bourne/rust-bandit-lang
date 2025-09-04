@@ -9,5 +9,6 @@ publish = false
 normal = ["katexit"]
 
 [dependencies]
+futures.workspace = true
 katexit.workspace = true
 pretty.workspace = true

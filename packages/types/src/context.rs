@@ -12,7 +12,7 @@ pub type GlobalValues<'a> = HashMap<&'a str, source::Term<'a>>;
 pub struct Context<'a> {
     local_variables: HashMap<&'a str, Vec<linked::Term<'a>>>,
     global_variables: Rc<HashMap<&'a str, RefCell<Global<'a>>>>,
-    constraints: Constraints,
+    constraints: Constraints<'a>,
 }
 
 impl<'a> Context<'a> {
@@ -29,7 +29,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub(crate) fn constraints(&self) -> &Constraints {
+    pub(crate) fn constraints(&self) -> &Constraints<'a> {
         &self.constraints
     }
 

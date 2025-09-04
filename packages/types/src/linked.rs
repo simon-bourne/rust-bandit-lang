@@ -43,7 +43,7 @@ impl<'src> Term<'src> {
         })
     }
 
-    pub fn constant(name: &'src str, typ: Self, constraints: &Constraints) -> Result<Self> {
+    pub fn constant(name: &'src str, typ: Self, constraints: &Constraints<'src>) -> Result<Self> {
         typ.unify_type(constraints)?;
         Ok(Self::new(GenericTerm::Constant { name, typ }))
     }
@@ -68,7 +68,7 @@ impl<'src> Term<'src> {
         argument: Self,
         mut typ: Self,
         evaluation: Evaluation,
-        constraints: &Constraints,
+        constraints: &Constraints<'src>,
     ) -> Result<Self> {
         let mut extract_arg = Self::unknown_value();
         let pi_type = &mut Term::pi_type(extract_arg.clone(), typ.fresh_variables(), evaluation);
@@ -91,7 +91,7 @@ impl<'src> Term<'src> {
         }))
     }
 
-    pub fn has_type(self, mut typ: Self, constraints: &Constraints) -> Result<Self> {
+    pub fn has_type(self, mut typ: Self, constraints: &Constraints<'src>) -> Result<Self> {
         typ.unify_type(constraints)?;
         Self::unify(&mut self.typ(), &mut typ, constraints)?;
         Ok(self)
@@ -110,7 +110,7 @@ impl<'src> Term<'src> {
     pub(crate) fn let_binding(
         value: Self,
         binding: VariableBinding<'src, Self>,
-        constraints: &Constraints,
+        constraints: &Constraints<'src>,
     ) -> Result<Self> {
         Self::unify(&mut value.typ(), &mut binding.variable.typ(), constraints)?;
         Ok(Self::new(GenericTerm::Let { value, binding }))
@@ -206,14 +206,14 @@ impl<'src> Term<'src> {
         Self(SharedMut::new(TermEnum::Value { term }))
     }
 
-    fn unify_type(&self, constraints: &Constraints) -> Result<()> {
+    fn unify_type(&self, constraints: &Constraints<'src>) -> Result<()> {
         Self::unify(&mut self.typ(), &mut Self::type_of_type(), constraints)
     }
 
     fn unify_unknown(
         &mut self,
         other: &mut Self,
-        constraints: &Constraints,
+        constraints: &Constraints<'src>,
     ) -> Result<ControlFlow<()>> {
         if other.value().is_variable() {
             return Ok(ControlFlow::Continue(()));
@@ -236,7 +236,7 @@ impl<'src> Term<'src> {
     fn unify_implicit_parameter(
         &mut self,
         other: &mut Self,
-        constraints: &Constraints,
+        constraints: &Constraints<'src>,
     ) -> Result<ControlFlow<()>> {
         if let GenericTerm::Pi(binding) = &*other.value()
             && binding.evaluation == Evaluation::Static
@@ -262,7 +262,7 @@ impl<'src> Term<'src> {
         )
     }
 
-    fn unify(x: &mut Self, y: &mut Self, constraints: &Constraints) -> Result<()> {
+    fn unify(x: &mut Self, y: &mut Self, constraints: &Constraints<'src>) -> Result<()> {
         x.collapse_links();
         y.collapse_links();
 
@@ -278,14 +278,14 @@ impl<'src> Term<'src> {
         // For now, all normalization is done asynchronously by adding a constraint.
         // Later, we can optimize this to only produce a future when we need to wait for
         // an unknown.
-        constraints.add(x.evaluate());
-        constraints.add(y.evaluate());
+        constraints.add(x.clone().evaluate());
+        constraints.add(y.clone().evaluate());
 
         Self::unify_known(x, y, constraints)
     }
 
-    async fn evaluate(&mut self) {
-        let (mut function, mut argument) = {
+    async fn evaluate(mut self) {
+        let (function, argument) = {
             let GenericTerm::Apply {
                 function, argument, ..
             } = &mut *self.value()
@@ -299,7 +299,7 @@ impl<'src> Term<'src> {
         Box::pin(argument.evaluate()).await;
     }
 
-    fn unify_known(x: &mut Self, y: &mut Self, constraints: &Constraints) -> Result<()> {
+    fn unify_known(x: &mut Self, y: &mut Self, constraints: &Constraints<'src>) -> Result<()> {
         let mut x_ref = x.value();
         let mut y_ref = y.value();
 
@@ -483,7 +483,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         }
     }
 
-    fn unify(binding0: &mut Self, binding1: &mut Self, constraints: &Constraints) -> Result<()> {
+    fn unify(binding0: &mut Self, binding1: &mut Self, constraints: &Constraints<'src>) -> Result<()> {
         if binding0.evaluation != binding1.evaluation {
             return Err(InferenceError);
         }
