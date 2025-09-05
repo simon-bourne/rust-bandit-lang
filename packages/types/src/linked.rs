@@ -268,12 +268,10 @@ impl<'src> Term<'src> {
     }
 
     async fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
-        x.collapse_links();
-        y.collapse_links();
-
-        if SharedMut::is_same(&x.0, &y.0)
+        if Self::is_same(x, y)
             || x.unify_unknown(y).await?.is_break()
             || y.unify_unknown(x).await?.is_break()
+            // TODO: Does this belong before or after evaluate?
             || x.unify_implicit_parameter(y).await?.is_break()
             || y.unify_implicit_parameter(x).await?.is_break()
         {
@@ -283,8 +281,11 @@ impl<'src> Term<'src> {
         x.evaluate().await?;
         y.evaluate().await?;
 
-        Self::unify_known(x, y).await?;
+        if Self::is_same(x, y) {
+            return Ok(());
+        }
 
+        Self::unify_known(x, y).await?;
         x.replace_with(y);
 
         Ok(())
@@ -443,6 +444,13 @@ impl<'src> Term<'src> {
         }
 
         Ok(())
+    }
+
+    fn is_same(x: &mut Self, y: &mut Self) -> bool {
+        x.collapse_links();
+        y.collapse_links();
+
+        SharedMut::is_same(&x.0, &y.0)
     }
 
     fn replace_with(&mut self, other: &Self) {

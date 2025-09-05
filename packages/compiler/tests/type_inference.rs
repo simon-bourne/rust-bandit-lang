@@ -67,7 +67,6 @@ fn one() {
 }
 
 #[test]
-#[ignore = "todo: evaluation"]
 fn evaluate() {
     "one : let x = Int ⇒ x".infers("one : Int");
 }
