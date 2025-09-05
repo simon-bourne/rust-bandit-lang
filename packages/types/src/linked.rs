@@ -278,6 +278,10 @@ impl<'src> Term<'src> {
             return Ok(());
         }
 
+        // TODO: Should we evaluate here? We're recursing down and evaluating here, then
+        // doing the same at each level when unifying. Maybe it's better to `evaluate`
+        // once before unification? Or do we want to evaluate bit by bit as we unify
+        // each level? We should be able to infer more types that way.
         x.evaluate().await?;
         y.evaluate().await?;
 
