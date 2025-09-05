@@ -304,6 +304,7 @@ impl<'src> Term<'src> {
                 clone!(function, argument);
                 drop(borrowed);
                 Self::evaluate_apply(function, argument).await?;
+                // TODO: Replace self with evaluated application
             }
             GenericTerm::Let {
                 value,
@@ -314,7 +315,8 @@ impl<'src> Term<'src> {
             } => {
                 clone!(variable, value, in_term);
                 drop(borrowed);
-                Self::evaluate_let(variable, value, in_term).await?;
+                Self::evaluate_let(variable, value, in_term.clone()).await?;
+                self.replace_with(&in_term);
             }
             _ => {}
         }
