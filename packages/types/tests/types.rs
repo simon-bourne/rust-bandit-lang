@@ -15,6 +15,7 @@ fn infer_kinds() {
     )
     .link(ctx)
     .unwrap();
+    ctx.constraints().solve().unwrap();
 
     assert_eq!(
         constructor_type.to_pretty_string(80),
@@ -35,6 +36,7 @@ fn let_error() {
     global_types.insert("Int", Term::type_of_type());
     global_types.insert("Float", Term::type_of_type());
     let ctx = &mut Context::new(global_types);
+    let_binding.link(ctx).unwrap();
 
-    assert!(let_binding.link(ctx).is_err());
+    assert!(ctx.constraints().solve().is_err());
 }

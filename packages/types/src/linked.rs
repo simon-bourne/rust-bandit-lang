@@ -44,9 +44,9 @@ impl<'src> Term<'src> {
         })
     }
 
-    pub fn constant(name: &'src str, typ: Self, constraints: &Constraints<'src>) -> Result<Self> {
-        typ.unify_type(constraints)?;
-        Ok(Self::new(GenericTerm::Constant { name, typ }))
+    pub fn constant(name: &'src str, mut typ: Self, constraints: &Constraints<'src>) -> Self {
+        typ.unify_type(constraints);
+        Self::new(GenericTerm::Constant { name, typ })
     }
 
     #[cfg_attr(doc, katexit)]
@@ -70,32 +70,40 @@ impl<'src> Term<'src> {
         mut typ: Self,
         evaluation: Evaluation,
         constraints: &Constraints<'src>,
-    ) -> Result<Self> {
-        let mut extract_arg = Self::unknown_value();
-        let pi_type = &mut Term::pi_type(extract_arg.clone(), typ.fresh_variables(), evaluation);
-        Self::unify(pi_type, &mut function.typ().fresh_variables(), constraints)?;
+    ) -> Self {
+        let mut function_type = function.typ().fresh_variables();
+        let mut argument_type = argument.typ().fresh_variables();
+        let fresh_type = typ.fresh_variables();
 
-        // TODO: Only do this for variables (assert?):
-        Self::unify(
-            &mut extract_arg.typ(),
-            &mut argument.typ().fresh_variables(),
-            constraints,
-        )?;
-        extract_arg.replace_with(&argument);
-        typ.unify_type(constraints)?;
+        constraints.add({
+            clone!(argument);
 
-        Ok(Self::new(GenericTerm::Apply {
+            async move {
+                let mut extract_arg = Self::unknown_value();
+                let pi_type = &mut Term::pi_type(extract_arg.clone(), fresh_type, evaluation);
+                Self::unify(pi_type, &mut function_type).await?;
+
+                // TODO: Only do this for variables (assert?):
+                Self::unify(&mut extract_arg.typ(), &mut argument_type).await?;
+                extract_arg.replace_with(&argument);
+                Ok(())
+            }
+        });
+
+        typ.unify_type(constraints);
+
+        Self::new(GenericTerm::Apply {
             function,
             argument,
             typ,
             evaluation,
-        }))
+        })
     }
 
-    pub fn has_type(self, mut typ: Self, constraints: &Constraints<'src>) -> Result<Self> {
-        typ.unify_type(constraints)?;
-        Self::unify(&mut self.typ(), &mut typ, constraints)?;
-        Ok(self)
+    pub fn has_type(self, mut typ: Self, constraints: &Constraints<'src>) -> Self {
+        typ.unify_type(constraints);
+        Self::add_unify_constraint(self.typ(), typ, constraints);
+        self
     }
 
     #[cfg_attr(doc, katexit)]
@@ -112,9 +120,9 @@ impl<'src> Term<'src> {
         value: Self,
         binding: VariableBinding<'src, Self>,
         constraints: &Constraints<'src>,
-    ) -> Result<Self> {
-        Self::unify(&mut value.typ(), &mut binding.variable.typ(), constraints)?;
-        Ok(Self::new(GenericTerm::Let { value, binding }))
+    ) -> Self {
+        Self::add_unify_constraint(value.typ(), binding.variable.typ(), constraints);
+        Self::new(GenericTerm::Let { value, binding })
     }
 
     #[cfg_attr(doc, katexit)]
@@ -207,86 +215,82 @@ impl<'src> Term<'src> {
         Self(SharedMut::new(TermEnum::Value { term }))
     }
 
-    fn unify_type(&self, constraints: &Constraints<'src>) -> Result<()> {
-        Self::unify(&mut self.typ(), &mut Self::type_of_type(), constraints)
+    fn unify_type(&mut self, constraints: &Constraints<'src>) {
+        let mut typ = self.typ();
+
+        constraints.add(async move { Self::unify(&mut typ, &mut Self::type_of_type()).await })
     }
 
-    fn unify_unknown(
-        &mut self,
-        other: &mut Self,
-        constraints: &Constraints<'src>,
-    ) -> Result<ControlFlow<()>> {
+    async fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
         if other.value().is_variable() {
             return Ok(ControlFlow::Continue(()));
         }
 
-        let mut self_ref = self.value();
-
-        Ok(if let GenericTerm::Unknown { typ } = &mut *self_ref {
-            let mut typ = typ.clone();
-            drop(self_ref);
-            self.replace_with(other);
-            Self::unify(&mut typ, &mut other.typ(), constraints)?;
-
-            ControlFlow::Break(())
+        let mut typ = if let GenericTerm::Unknown { typ } = &mut *self.value() {
+            typ.clone()
         } else {
-            ControlFlow::Continue(())
-        })
+            return Ok(ControlFlow::Continue(()));
+        };
+
+        self.replace_with(other);
+        Self::unify_recurse(&mut typ, &mut other.typ()).await?;
+        Ok(ControlFlow::Break(()))
     }
 
-    fn unify_implicit_parameter(
-        &mut self,
-        other: &mut Self,
-        constraints: &Constraints<'src>,
-    ) -> Result<ControlFlow<()>> {
+    async fn unify_implicit_parameter(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
         if let GenericTerm::Pi(binding) = &*other.value()
             && binding.evaluation == Evaluation::Static
         {
             return Ok(ControlFlow::Continue(()));
         }
 
-        let mut self_ref = self.value();
+        let (mut variable, mut in_term) = if let GenericTerm::Pi(binding) = &mut *self.value()
+            && binding.evaluation == Evaluation::Static
+        {
+            (binding.variable.clone(), binding.in_term.clone())
+        } else {
+            return Ok(ControlFlow::Continue(()));
+        };
 
-        Ok(
-            if let GenericTerm::Pi(binding) = &mut *self_ref
-                && binding.evaluation == Evaluation::Static
-            {
-                binding.variable.replace_with(&Self::unknown_value());
-                Self::unify(&mut binding.in_term, other, constraints)?;
-                drop(self_ref);
-                // We replaced the variable, so make sure we don't leave the binding around
-                self.replace_with(other);
-                ControlFlow::Break(())
-            } else {
-                ControlFlow::Continue(())
-            },
-        )
+        variable.replace_with(&Self::unknown_value());
+        Self::unify_recurse(&mut in_term, other).await?;
+        // We replaced the variable, so make sure we don't leave the binding around
+        self.replace_with(other);
+        Ok(ControlFlow::Break(()))
     }
 
-    fn unify(x: &mut Self, y: &mut Self, constraints: &Constraints<'src>) -> Result<()> {
+    fn add_unify_constraint(mut x: Self, mut y: Self, constraints: &Constraints<'src>) {
+        constraints.add(async move { Self::unify(&mut x, &mut y).await })
+    }
+
+    async fn unify_recurse(x: &mut Self, y: &mut Self) -> Result<()> {
+        Box::pin(async { Self::unify(x, y).await }).await
+    }
+
+    async fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
         x.collapse_links();
         y.collapse_links();
 
         if SharedMut::is_same(&x.0, &y.0)
-            || x.unify_unknown(y, constraints)?.is_break()
-            || y.unify_unknown(x, constraints)?.is_break()
-            || x.unify_implicit_parameter(y, constraints)?.is_break()
-            || y.unify_implicit_parameter(x, constraints)?.is_break()
+            || x.unify_unknown(y).await?.is_break()
+            || y.unify_unknown(x).await?.is_break()
+            || x.unify_implicit_parameter(y).await?.is_break()
+            || y.unify_implicit_parameter(x).await?.is_break()
         {
             return Ok(());
         }
 
-        // For now, all normalization is done asynchronously by adding a constraint.
-        // Later, we can optimize this to only produce a future when we need to wait for
-        // an unknown.
-        constraints.add(x.clone().evaluate());
-        constraints.add(y.clone().evaluate());
+        x.evaluate().await?;
+        y.evaluate().await?;
 
-        // TODO: `unify_known` needs to wait for `x` and `y` to be evaluated.
-        Self::unify_known(x, y, constraints)
+        Self::unify_known(x, y).await?;
+
+        x.replace_with(y);
+
+        Ok(())
     }
 
-    async fn evaluate(mut self) -> Result<()> {
+    async fn evaluate(&mut self) -> Result<()> {
         // This lint gives a false positive. All the `match` arms below `drop(borrowed)`
         // before awaiting
         #![allow(clippy::await_holding_refcell_ref)]
@@ -321,8 +325,7 @@ impl<'src> Term<'src> {
     async fn evaluate_apply(function: Self, argument: Self) -> Result<()> {
         Box::pin(async {
             function.clone().evaluate().await?;
-            argument.clone().evaluate().await?;
-            Ok(())
+            argument.clone().evaluate().await
         })
         .await?;
 
@@ -335,15 +338,17 @@ impl<'src> Term<'src> {
     async fn evaluate_let(mut variable: Self, value: Self, expression: Self) -> Result<()> {
         Box::pin(async {
             variable.clone().evaluate().await?;
-            value.clone().evaluate().await?;
-            Ok(())
+            value.clone().evaluate().await
         })
         .await?;
         variable.replace_with(&value);
         Box::pin(expression.clone().evaluate()).await
     }
 
-    fn unify_known(x: &mut Self, y: &mut Self, constraints: &Constraints<'src>) -> Result<()> {
+    async fn unify_known(x: &mut Self, y: &mut Self) -> Result<()> {
+        // TODO: Find a way to not borrow `x` and `y` across await for
+        // `VariableBinding::unify`
+        #![allow(clippy::await_holding_refcell_ref)]
         let mut x_ref = x.value();
         let mut y_ref = y.value();
 
@@ -374,7 +379,11 @@ impl<'src> Term<'src> {
                     name: name1,
                     typ: typ1,
                 },
-            ) if name == name1 => Self::unify(typ, typ1, constraints)?,
+            ) if name == name1 => {
+                clone!(mut typ, mut typ1);
+                drop((x_ref, y_ref));
+                Self::unify_recurse(&mut typ, &mut typ1).await?
+            }
             (
                 GenericTerm::Apply {
                     function,
@@ -389,9 +398,18 @@ impl<'src> Term<'src> {
                     evaluation: evaluation1,
                 },
             ) if evaluation == evaluation1 => {
-                Self::unify(function, function1, constraints)?;
-                Self::unify(argument, argument1, constraints)?;
-                Self::unify(typ, typ1, constraints)?;
+                clone!(
+                    mut function,
+                    mut function1,
+                    mut argument,
+                    mut argument1,
+                    mut typ,
+                    mut typ1
+                );
+                drop((x_ref, y_ref));
+                Self::unify_recurse(&mut function, &mut function1).await?;
+                Self::unify_recurse(&mut argument, &mut argument1).await?;
+                Self::unify_recurse(&mut typ, &mut typ1).await?;
             }
             (
                 GenericTerm::Let { value, binding },
@@ -400,16 +418,16 @@ impl<'src> Term<'src> {
                     binding: binding1,
                 },
             ) => {
-                Self::unify(value, value1, constraints)?;
-                VariableBinding::unify(binding, binding1, constraints)?
+                Self::unify_recurse(value, value1).await?;
+                VariableBinding::unify(binding, binding1).await?
             }
             (GenericTerm::Pi(binding0), GenericTerm::Pi(binding1))
                 if binding0.evaluation == binding1.evaluation =>
             {
-                VariableBinding::unify(binding0, binding1, constraints)?
+                VariableBinding::unify(binding0, binding1).await?
             }
             (GenericTerm::Lambda(binding0), GenericTerm::Lambda(binding1)) => {
-                VariableBinding::unify(binding0, binding1, constraints)?
+                VariableBinding::unify(binding0, binding1).await?
             }
             // It's safer to explicitly ignore each variant
             (GenericTerm::TypeOfType, _rhs)
@@ -421,9 +439,6 @@ impl<'src> Term<'src> {
             | (GenericTerm::Pi(_), _rhs)
             | (GenericTerm::Lambda(_), _rhs) => Err(InferenceError)?,
         }
-
-        drop((x_ref, y_ref));
-        x.replace_with(y);
 
         Ok(())
     }
@@ -527,20 +542,12 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         }
     }
 
-    fn unify(
-        binding0: &mut Self,
-        binding1: &mut Self,
-        constraints: &Constraints<'src>,
-    ) -> Result<()> {
+    async fn unify(binding0: &mut Self, binding1: &mut Self) -> Result<()> {
         if binding0.evaluation != binding1.evaluation {
             return Err(InferenceError);
         }
 
-        Term::unify(
-            &mut binding0.variable.typ(),
-            &mut binding1.variable.typ(),
-            constraints,
-        )?;
+        Term::unify_recurse(&mut binding0.variable.typ(), &mut binding1.variable.typ()).await?;
 
         // Keep the name if we can
         if binding0.name.is_some() {
@@ -551,6 +558,6 @@ impl<'src> VariableBinding<'src, Term<'src>> {
             binding0.name = binding1.name;
         }
 
-        Term::unify(&mut binding0.in_term, &mut binding1.in_term, constraints)
+        Term::unify_recurse(&mut binding0.in_term, &mut binding1.in_term).await
     }
 }
