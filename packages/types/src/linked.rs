@@ -282,8 +282,8 @@ impl<'src> Term<'src> {
         // doing the same at each level when unifying. Maybe it's better to `evaluate`
         // once before unification? Or do we want to evaluate bit by bit as we unify
         // each level? We should be able to infer more types that way.
-        x.evaluate().await?;
-        y.evaluate().await?;
+        x.evaluate_node().await?;
+        y.evaluate_node().await?;
 
         if Self::is_same(x, y) {
             return Ok(());
@@ -295,7 +295,7 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    async fn evaluate(&mut self) -> Result<()> {
+    async fn evaluate_node(&mut self) -> Result<()> {
         // This lint gives a false positive. All the `match` arms below `drop(borrowed)`
         // before awaiting
         #![allow(clippy::await_holding_refcell_ref)]
@@ -308,8 +308,7 @@ impl<'src> Term<'src> {
             } => {
                 clone!(function, argument);
                 drop(borrowed);
-                Self::evaluate_apply(function, argument).await?;
-                // TODO: Replace self with evaluated application
+                self.evaluate_apply(function, argument).await?;
             }
             GenericTerm::Let {
                 value,
@@ -320,8 +319,7 @@ impl<'src> Term<'src> {
             } => {
                 clone!(variable, value, in_term);
                 drop(borrowed);
-                Self::evaluate_let(variable, value, in_term.clone()).await?;
-                self.replace_with(&in_term);
+                self.evaluate_let(variable, value, in_term).await?;
             }
             _ => {}
         }
@@ -329,27 +327,18 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    async fn evaluate_apply(function: Self, argument: Self) -> Result<()> {
-        Box::pin(async {
-            function.clone().evaluate().await?;
-            argument.clone().evaluate().await
-        })
-        .await?;
-
+    async fn evaluate_apply(&mut self, _function: Self, _argument: Self) -> Result<()> {
         // TODO: Apply lambdas/constants to their argument
+        // TODO: Replace self with evaluated application
 
         Ok(())
     }
 
     /// Evaluate an expression of the form `let variable = value in expression`
-    async fn evaluate_let(mut variable: Self, value: Self, expression: Self) -> Result<()> {
-        Box::pin(async {
-            variable.clone().evaluate().await?;
-            value.clone().evaluate().await
-        })
-        .await?;
+    async fn evaluate_let(&mut self, mut variable: Self, value: Self, in_term: Self) -> Result<()> {
         variable.replace_with(&value);
-        Box::pin(expression.clone().evaluate()).await
+        self.replace_with(&in_term);
+        Ok(())
     }
 
     async fn unify_known(x: &mut Self, y: &mut Self) -> Result<()> {
