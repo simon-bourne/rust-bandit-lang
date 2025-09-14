@@ -67,8 +67,23 @@ fn one() {
 }
 
 #[test]
-fn evaluate() {
+fn evaluate_let() {
     "one : let x = Int ⇒ x".infers("one : Int");
+}
+
+#[test]
+fn evaluate_apply() {
+    r"one : (\x ⇒ x) Int".infers("one : Int");
+}
+
+#[test]
+fn evaluate_recursively() {
+    r"one : let x = (\y ⇒ y) Int ⇒ x".infers("one : Int");
+}
+
+#[test]
+fn evaluate_recursively2() {
+    r"one : let x = Int ⇒ (\y ⇒ y) x".infers("one : Int");
 }
 
 #[test]

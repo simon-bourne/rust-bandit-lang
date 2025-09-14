@@ -299,6 +299,7 @@ impl<'src> Term<'src> {
         // This lint gives a false positive. All the `match` arms below `drop(borrowed)`
         // before awaiting
         #![allow(clippy::await_holding_refcell_ref)]
+
         // TODO: Wait for unknowns to be evaluated
         let borrowed = self.value();
 
@@ -309,6 +310,7 @@ impl<'src> Term<'src> {
                 clone!(function, argument);
                 drop(borrowed);
                 self.evaluate_apply(function, argument).await?;
+                Box::pin(self.evaluate_node()).await?;
             }
             GenericTerm::Let {
                 value,
@@ -320,16 +322,34 @@ impl<'src> Term<'src> {
                 clone!(variable, value, in_term);
                 drop(borrowed);
                 self.evaluate_let(variable, value, in_term).await?;
+                Box::pin(self.evaluate_node()).await?;
             }
-            _ => {}
+            _ => (),
         }
 
         Ok(())
     }
 
-    async fn evaluate_apply(&mut self, _function: Self, _argument: Self) -> Result<()> {
-        // TODO: Apply lambdas/constants to their argument
-        // TODO: Replace self with evaluated application
+    async fn evaluate_apply(&mut self, mut function: Self, argument: Self) -> Result<()> {
+        Box::pin(function.evaluate_node()).await?;
+
+        match &mut *function.fresh_variables().value() {
+            GenericTerm::Lambda(VariableBinding {
+                variable, in_term, ..
+            }) => {
+                variable.replace_with(&argument);
+                self.replace_with(in_term);
+            }
+            GenericTerm::Constant { .. } => {
+                todo!("apply the argument to the function, and `self.replace_with(evaluated)`")
+            }
+            GenericTerm::Apply { .. } | GenericTerm::Let { .. } => {
+                unreachable!("Expect evaluated function")
+            }
+            GenericTerm::Variable { .. } => todo!("????"),
+            GenericTerm::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
+            GenericTerm::Pi(_) | GenericTerm::TypeOfType => todo!("type error"),
+        }
 
         Ok(())
     }
@@ -347,24 +367,6 @@ impl<'src> Term<'src> {
         #![allow(clippy::await_holding_refcell_ref)]
         let mut x_ref = x.value();
         let mut y_ref = y.value();
-
-        // TODO: Application evaluation:
-        //
-        // Can we use `Future`s to manage all of this for us? `unify` and `evaluate`
-        // would be `async`. `unify` would `await` `evaluate`, and `evaluate` would
-        // `await` for `Unknown` values to change. `TermEnum::Value` would need to wrap
-        // its term in a `tokio::sync::watch`, or contain a `tokio::sync::Notify` or
-        // something similar. We could box this and make it optional for efficiency. We
-        // need to consider whether this should be on `TermEnum::Value`or
-        // `GenericTerm::Unknown`. Any `GenericTerm` variant could be updated when we
-        // unify a compile time application.
-        //
-        // - If all types are known, and the term is `Reducible::Maybe`:
-        //      - Evaluate the term as much as possible.
-        // - Otherwise add to a list of deferred unifications.
-        // - Only unify applications if they're both `Reducible::No` (meaning we've
-        //   tried to evaluate the term).
-        // - Reducible has another variant of `Reducible::PendingTypeCheck`
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
