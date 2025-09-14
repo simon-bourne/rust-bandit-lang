@@ -338,12 +338,12 @@ impl<'src> Term<'src> {
         // substituting the lambda's argument with a variable from outside the function
         // term.
         //
-        // For example, in the term `(\x => x) y`, the child term `(\x => x)` could be
+        // For example, in the term `(\x ⇒ x) y`, the child term `(\x ⇒ x)` could be
         // shared with other terms, so we want to modify a copy of it.
         //
         // TODO: We actually only need the outermost variable to be fresh as we'll
         // generate fresh variables for function applications as we need them. We never
-        // need fresh variables for let bindings or PI types.
+        // need fresh variables for let bindings or Π types.
         match &mut *function.fresh_variables().value() {
             GenericTerm::Lambda(VariableBinding {
                 variable, in_term, ..
