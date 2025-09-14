@@ -333,6 +333,7 @@ impl<'src> Term<'src> {
     async fn evaluate_apply(&mut self, mut function: Self, argument: Self) -> Result<()> {
         Box::pin(function.evaluate_node()).await?;
 
+        // TODO: Do we need `fresh_variables` here?
         match &mut *function.fresh_variables().value() {
             GenericTerm::Lambda(VariableBinding {
                 variable, in_term, ..
