@@ -71,6 +71,7 @@ impl<'src> Term<'src> {
         evaluation: Evaluation,
         constraints: &Constraints<'src>,
     ) -> Self {
+        // TODO: Document exactly why we need fresh variables
         let mut function_type = function.typ().fresh_variables();
         let mut argument_type = argument.typ().fresh_variables();
         let fresh_type = typ.fresh_variables();
@@ -333,7 +334,16 @@ impl<'src> Term<'src> {
     async fn evaluate_apply(&mut self, mut function: Self, argument: Self) -> Result<()> {
         Box::pin(function.evaluate_node()).await?;
 
-        // TODO: Do we need `fresh_variables` here?
+        // We need fresh variables if the function is a lambda, because we'll be
+        // substituting the lambda's argument with a variable from outside the function
+        // term.
+        //
+        // For example, in the term `(\x => x) y`, the child term `(\x => x)` could be
+        // shared with other terms, so we want to modify a copy of it.
+        //
+        // TODO: We actually only need the outermost variable to be fresh as we'll
+        // generate fresh variables for function applications as we need them. We never
+        // need fresh variables for let bindings or PI types.
         match &mut *function.fresh_variables().value() {
             GenericTerm::Lambda(VariableBinding {
                 variable, in_term, ..
