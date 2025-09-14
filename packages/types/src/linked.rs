@@ -343,12 +343,10 @@ impl<'src> Term<'src> {
             GenericTerm::Constant { .. } => {
                 todo!("apply the argument to the function, and `self.replace_with(evaluated)`")
             }
-            GenericTerm::Apply { .. } | GenericTerm::Let { .. } => {
-                unreachable!("Expect evaluated function")
-            }
+            GenericTerm::Apply { .. } | GenericTerm::Let { .. } => (),
             GenericTerm::Variable { .. } => (),
             GenericTerm::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
-            GenericTerm::Pi(_) | GenericTerm::TypeOfType => todo!("type error"),
+            GenericTerm::Pi(_) | GenericTerm::TypeOfType => Err(InferenceError)?,
         }
 
         Ok(())
