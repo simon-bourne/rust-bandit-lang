@@ -346,7 +346,7 @@ impl<'src> Term<'src> {
             GenericTerm::Apply { .. } | GenericTerm::Let { .. } => {
                 unreachable!("Expect evaluated function")
             }
-            GenericTerm::Variable { .. } => todo!("????"),
+            GenericTerm::Variable { .. } => (),
             GenericTerm::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
             GenericTerm::Pi(_) | GenericTerm::TypeOfType => todo!("type error"),
         }
