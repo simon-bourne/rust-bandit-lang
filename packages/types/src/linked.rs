@@ -324,7 +324,7 @@ impl<'src> Term<'src> {
                 self.evaluate_let(variable, value, in_term).await?;
                 Box::pin(self.evaluate_node()).await?;
             }
-            _ => (),
+            _ => {}
         }
 
         Ok(())
@@ -343,8 +343,8 @@ impl<'src> Term<'src> {
             GenericTerm::Constant { .. } => {
                 todo!("apply the argument to the function, and `self.replace_with(evaluated)`")
             }
-            GenericTerm::Apply { .. } | GenericTerm::Let { .. } => (),
-            GenericTerm::Variable { .. } => (),
+            GenericTerm::Apply { .. } | GenericTerm::Let { .. } => {}
+            GenericTerm::Variable { .. } => {}
             GenericTerm::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
             GenericTerm::Pi(_) | GenericTerm::TypeOfType => Err(InferenceError)?,
         }
@@ -368,7 +368,7 @@ impl<'src> Term<'src> {
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
-            (GenericTerm::TypeOfType, GenericTerm::TypeOfType) => (),
+            (GenericTerm::TypeOfType, GenericTerm::TypeOfType) => {}
             (
                 GenericTerm::Constant { name, typ },
                 GenericTerm::Constant {
