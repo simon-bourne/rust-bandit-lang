@@ -264,7 +264,7 @@ impl<'src> Term<'src> {
     }
 
     async fn unify_recurse(x: &mut Self, y: &mut Self) -> Result<()> {
-        Box::pin(async { Self::unify(x, y).await }).await
+        Box::pin(Self::unify(x, y)).await
     }
 
     async fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
