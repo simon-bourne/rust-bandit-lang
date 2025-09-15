@@ -162,46 +162,6 @@ impl<'src> Term<'src> {
         Self::new(GenericTerm::Lambda(binding))
     }
 
-    fn substitute(&mut self, variable: &mut Self, with_term: &Self) -> Self {
-        if Self::is_same(self, variable) {
-            dbg!("Substituting");
-            return with_term.clone();
-        }
-
-        let mut value = self.value();
-
-        Self::new(match &mut *value {
-            GenericTerm::Variable { .. } | GenericTerm::Unknown { .. } => {
-                drop(value);
-                return self.clone();
-            }
-            GenericTerm::Let { value, binding } => GenericTerm::Let {
-                value: value.substitute(variable, with_term),
-                binding: binding.substitute(variable, with_term),
-            },
-            GenericTerm::Pi(binding) => GenericTerm::Pi(binding.substitute(variable, with_term)),
-            GenericTerm::Lambda(binding) => {
-                GenericTerm::Lambda(binding.substitute(variable, with_term))
-            }
-            GenericTerm::TypeOfType => GenericTerm::TypeOfType,
-            GenericTerm::Constant { name, typ } => GenericTerm::Constant {
-                name,
-                typ: typ.substitute(variable, with_term),
-            },
-            GenericTerm::Apply {
-                function,
-                argument,
-                typ,
-                evaluation,
-            } => GenericTerm::Apply {
-                function: function.substitute(variable, with_term),
-                argument: argument.substitute(variable, with_term),
-                typ: typ.substitute(variable, with_term),
-                evaluation: *evaluation,
-            },
-        })
-    }
-
     fn fresh_variables(&mut self) -> Self {
         let mut value = self.value();
 
@@ -380,10 +340,17 @@ impl<'src> Term<'src> {
         //
         // For example, in the term `(\x ⇒ x) y`, the child term `(\x ⇒ x)` could be
         // shared with other terms, so we want to modify a copy of it.
-        match &mut *function.value() {
+        //
+        // TODO: We actually only need the outermost variable to be fresh as we'll
+        // generate fresh variables for function applications as we need them. We never
+        // need fresh variables for let bindings or Π types.
+        match &mut *function.fresh_variables().value() {
             GenericTerm::Lambda(VariableBinding {
                 variable, in_term, ..
-            }) => self.replace_with(&in_term.substitute(variable, &argument)),
+            }) => {
+                variable.replace_with(&argument);
+                self.replace_with(in_term);
+            }
             GenericTerm::Constant { .. } => {
                 todo!("apply the argument to the function, and `self.replace_with(evaluated)`")
             }
@@ -555,15 +522,6 @@ impl<'src> TermReference<'src> for Term<'src> {
 }
 
 impl<'src> VariableBinding<'src, Term<'src>> {
-    fn substitute(&mut self, variable: &mut Term<'src>, with_term: &Term<'src>) -> Self {
-        Self {
-            name: self.name,
-            variable: self.variable.clone(),
-            in_term: self.in_term.substitute(variable, with_term),
-            evaluation: self.evaluation,
-        }
-    }
-
     fn fresh_variables(&mut self) -> Self {
         let variable = self.allocate_fresh_variable();
         let in_term = self.in_term.fresh_variables();
