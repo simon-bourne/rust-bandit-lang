@@ -71,22 +71,22 @@ impl<'src> Term<'src> {
         evaluation: Evaluation,
         constraints: &Constraints<'src>,
     ) -> Self {
-        // TODO: Document exactly why we need fresh variables
-        let mut function_type = function.typ().fresh_variables();
-        let mut argument_type = argument.typ().fresh_variables();
-        let fresh_type = typ.fresh_variables();
-
         constraints.add({
-            clone!(argument);
+            // We need fresh variables as we'll be instantiating the variable bound by
+            // `function.typ()` with `argument`. We don't want to modify any linked
+            // occurrences of `function`.
+            let mut function_type = function.typ().fresh_variables();
+            clone!(argument, typ);
 
             async move {
-                let mut extract_arg = Self::unknown_value();
-                let pi_type = &mut Term::pi_type(extract_arg.clone(), fresh_type, evaluation);
-                Self::unify(pi_type, &mut function_type).await?;
-
-                // TODO: Only do this for variables (assert?):
-                Self::unify(&mut extract_arg.typ(), &mut argument_type).await?;
-                extract_arg.replace_with(&argument);
+                let mut variable = Self::variable(None, Self::unknown_type());
+                Self::unify(
+                    &mut Term::pi_type(variable.clone(), typ, evaluation),
+                    &mut function_type,
+                )
+                .await?;
+                Self::unify(&mut variable.typ(), &mut argument.typ()).await?;
+                variable.replace_with(&argument);
                 Ok(())
             }
         });
@@ -162,6 +162,13 @@ impl<'src> Term<'src> {
         Self::new(GenericTerm::Lambda(binding))
     }
 
+    /// Create a copy of `self`, making a fresh variable for every binding.
+    ///
+    /// Note that we can't just substitute a single variable, because variables
+    /// have a type that may depend on the variable we're substituting.
+    ///
+    /// For example, if we substitute `a` in the term `f : (a : Type) -> ((x :
+    /// a) -> (f x))`, we also need a fresh variable for `x`.
     fn fresh_variables(&mut self) -> Self {
         let mut value = self.value();
 
@@ -203,10 +210,10 @@ impl<'src> Term<'src> {
         })
     }
 
-    fn pi_type(argument_value: Self, result_type: Self, evaluation: Evaluation) -> Self {
+    fn pi_type(bound_variable: Self, result_type: Self, evaluation: Evaluation) -> Self {
         Self::new(GenericTerm::pi(
             None,
-            argument_value,
+            bound_variable,
             result_type,
             evaluation,
         ))
@@ -340,10 +347,6 @@ impl<'src> Term<'src> {
         //
         // For example, in the term `(\x ⇒ x) y`, the child term `(\x ⇒ x)` could be
         // shared with other terms, so we want to modify a copy of it.
-        //
-        // TODO: We actually only need the outermost variable to be fresh as we'll
-        // generate fresh variables for function applications as we need them. We never
-        // need fresh variables for let bindings or Π types.
         match &mut *function.fresh_variables().value() {
             GenericTerm::Lambda(VariableBinding {
                 variable, in_term, ..
