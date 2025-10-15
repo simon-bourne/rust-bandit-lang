@@ -6,6 +6,12 @@ use crate::{
     linked, pretty::has_type,
 };
 
+pub struct FunctionDefinition<'src> {
+    pub name: &'src str,
+    pub typ: Term<'src>,
+    pub value: Option<Term<'src>>,
+}
+
 #[derive(Clone)]
 pub struct Term<'src>(Rc<TermEnum<'src>>);
 

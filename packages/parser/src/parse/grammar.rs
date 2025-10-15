@@ -2,11 +2,12 @@
 // TODO: Newline to separate let binding and expression.
 // TODO: Static and dynamic type construction `T → U`, `T ⇒ U`, `∀x : T → U`,
 // and `∀x : T ⇒ U`
-use bandit_types::Evaluation;
+use bandit_types::{Evaluation, source::FunctionDefinition};
 use winnow::{
     Parser as _, Result,
     combinator::{
-        alt, delimited, opt, preceded, repeat, separated_foldl1, separated_foldr1, separated_pair,
+        alt, delimited, opt, preceded, repeat, separated, separated_foldl1, separated_foldr1,
+        separated_pair, terminated,
     },
     token::any,
 };
@@ -14,8 +15,28 @@ use winnow::{
 use super::{Parser, Term, TokenList};
 use crate::lex::{Grouping, Keyword, Operator, SrcToken, Token};
 
+pub fn definitions<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Vec<FunctionDefinition<'src>>> {
+    terminated(
+        separated(0.., function_definition(), Token::LineEnd),
+        opt(Token::LineEnd),
+    )
+}
+
 pub fn term<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> Result<Term<'src>> {
     type_annotations().parse_next(input)
+}
+
+fn function_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, FunctionDefinition<'src>> {
+    (
+        identifier(),
+        opt(preceded(Operator::HasType, term)),
+        opt(preceded(Operator::Assign, term)),
+    )
+        .map(|(name, typ, value)| FunctionDefinition {
+            name,
+            typ: typ.unwrap_or_else(Term::unknown_type),
+            value,
+        })
 }
 
 fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {

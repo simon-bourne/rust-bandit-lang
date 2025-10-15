@@ -1,5 +1,5 @@
 use bandit_types::source::Term;
-pub use grammar::term;
+pub use grammar::{definitions, term};
 use winnow::{Result, error::ContextError, token::one_of};
 
 use crate::lex::{Keyword, Operator, SrcToken, Token};

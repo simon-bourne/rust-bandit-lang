@@ -1,0 +1,13 @@
+Bool : Type
+Int : Type
+Float : Type
+    
+one : Int
+pi : Float
+true : Bool
+abs : Int → Int
+add : Int → Int → Int
+id : ∀a ⇒ a → a
+float_to_int : Float → Int
+polymorphic : ∀a ⇒ a
+scoped : ∀a ⇒ (∀s ⇒ s → a) → a
