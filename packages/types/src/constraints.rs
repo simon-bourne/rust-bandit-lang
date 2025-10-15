@@ -16,9 +16,15 @@ impl<'a> Constraints<'a> {
         self.0.borrow_mut().push(constraint.boxed_local())
     }
 
+    // TODO: Tidy
     pub fn solve(&self) -> Result<()> {
         loop {
             let current = self.0.replace_with(Vec::new());
+
+            if current.is_empty() {
+                return Ok(());
+            }
+
             let mut pending = Vec::new();
             let waker = Waker::noop();
             let mut any_solved = false;
