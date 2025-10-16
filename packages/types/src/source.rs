@@ -44,8 +44,8 @@ impl<'src> TermReference<'src> for Term<'src> {
 }
 
 impl<'src> Term<'src> {
-    pub fn type_of_type() -> Self {
-        Self::value(GenericTerm::TypeOfType)
+    pub fn typ() -> Self {
+        Self::value(GenericTerm::Type)
     }
 
     pub fn unknown(typ: Self) -> Self {
@@ -53,7 +53,7 @@ impl<'src> Term<'src> {
     }
 
     pub fn unknown_type() -> Self {
-        Self::unknown(Self::type_of_type())
+        Self::unknown(Self::typ())
     }
 
     pub fn unknown_value() -> Self {
@@ -63,7 +63,7 @@ impl<'src> Term<'src> {
     pub fn type_constant(name: &'src str) -> Self {
         Self::value(GenericTerm::Constant {
             name,
-            typ: Self::type_of_type(),
+            typ: Self::typ(),
         })
     }
 
@@ -183,7 +183,7 @@ impl<'src> GenericTerm<'src, Term<'src>> {
         use linked::Term as Linked;
 
         Ok(match self {
-            Self::TypeOfType => Linked::type_of_type(),
+            Self::Type => Linked::typ(),
             Self::Constant { name, typ } => {
                 Linked::constant(name, typ.link(ctx)?, ctx.constraints())
             }

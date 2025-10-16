@@ -33,8 +33,8 @@ fn let_error() {
 
     let mut global_types = HashMap::new();
     global_types.insert("one", int_type);
-    global_types.insert("Int", Term::type_of_type());
-    global_types.insert("Float", Term::type_of_type());
+    global_types.insert("Int", Term::typ());
+    global_types.insert("Float", Term::typ());
     let ctx = &mut Context::new(global_types);
     let_binding.link(ctx).unwrap();
 

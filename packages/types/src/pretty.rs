@@ -94,7 +94,7 @@ impl<Value: Pretty, Type: Pretty> Pretty for TypeAnnotated<Value, Type> {
 impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self {
-            Self::TypeOfType => Document::text("Type"),
+            Self::Type => Document::text("Type"),
             Self::Constant { name, typ } => has_type(*name, typ).to_document(parent, layout),
             Self::Apply {
                 function,

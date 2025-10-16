@@ -21,8 +21,8 @@ enum TermEnum<'src> {
 }
 
 impl<'src> Term<'src> {
-    pub fn type_of_type() -> Self {
-        Self::new(GenericTerm::TypeOfType)
+    pub fn typ() -> Self {
+        Self::new(GenericTerm::Type)
     }
 
     pub fn unknown(typ: Self) -> Self {
@@ -34,7 +34,7 @@ impl<'src> Term<'src> {
     }
 
     pub fn unknown_type() -> Self {
-        Self::unknown(Self::type_of_type())
+        Self::unknown(Self::typ())
     }
 
     pub fn variable(name: Option<&'src str>, typ: Self) -> Self {
@@ -191,7 +191,7 @@ impl<'src> Term<'src> {
             },
             GenericTerm::Pi(binding) => GenericTerm::Pi(binding.fresh_variables()),
             GenericTerm::Lambda(binding) => GenericTerm::Lambda(binding.fresh_variables()),
-            GenericTerm::TypeOfType => GenericTerm::TypeOfType,
+            GenericTerm::Type => GenericTerm::Type,
             GenericTerm::Constant { name, typ } => GenericTerm::Constant {
                 name,
                 typ: typ.fresh_variables(),
@@ -226,7 +226,7 @@ impl<'src> Term<'src> {
     fn unify_type(&mut self, constraints: &Constraints<'src>) {
         let mut typ = self.typ();
 
-        constraints.add(async move { Self::unify(&mut typ, &mut Self::type_of_type()).await })
+        constraints.add(async move { Self::unify(&mut typ, &mut Self::typ()).await })
     }
 
     async fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
@@ -360,7 +360,7 @@ impl<'src> Term<'src> {
             GenericTerm::Apply { .. } | GenericTerm::Let { .. } => {}
             GenericTerm::Variable { .. } => {}
             GenericTerm::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
-            GenericTerm::Pi(_) | GenericTerm::TypeOfType => Err(InferenceError)?,
+            GenericTerm::Pi(_) | GenericTerm::Type => Err(InferenceError)?,
         }
 
         Ok(())
@@ -382,7 +382,7 @@ impl<'src> Term<'src> {
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
-            (GenericTerm::TypeOfType, GenericTerm::TypeOfType) => {}
+            (GenericTerm::Type, GenericTerm::Type) => {}
             (
                 GenericTerm::Constant { name, typ },
                 GenericTerm::Constant {
@@ -440,7 +440,7 @@ impl<'src> Term<'src> {
                 VariableBinding::unify(binding0, binding1).await?
             }
             // It's safer to explicitly ignore each variant
-            (GenericTerm::TypeOfType, _rhs)
+            (GenericTerm::Type, _rhs)
             | (GenericTerm::Constant { .. }, _rhs)
             | (GenericTerm::Apply { .. }, _rhs)
             | (GenericTerm::Variable { .. }, _rhs)

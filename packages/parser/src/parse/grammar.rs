@@ -76,7 +76,7 @@ fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 }
 
 fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    identifier().verify_map(|name| (name == "Type").then(Term::type_of_type))
+    identifier().verify_map(|name| (name == "Type").then(Term::typ))
 }
 
 fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
