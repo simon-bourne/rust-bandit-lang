@@ -29,6 +29,20 @@ impl<'a> Context<'a> {
         }
     }
 
+    pub fn infer_types(&self) -> Result<()> {
+        for value in self.global_variables.values() {
+            self.link_global(value)?;
+        }
+
+        self.constraints.solve()
+    }
+
+    pub fn globals(&self) -> impl Iterator<Item = (&'a str, Result<linked::Term<'a>>)> {
+        self.global_variables
+            .iter()
+            .map(|(name, value)| (*name, self.link_global(value)))
+    }
+
     pub fn constraints(&self) -> &Constraints<'a> {
         &self.constraints
     }
@@ -60,7 +74,7 @@ impl<'a> Context<'a> {
         if let Some(local) = self.lookup_local(name) {
             Ok(local)
         } else {
-            self.global_value(name)
+            self.link_global(self.global_variables.get(name).ok_or(InferenceError)?)
         }
     }
 
@@ -68,13 +82,8 @@ impl<'a> Context<'a> {
         Some(self.local_variables.get(name)?.last()?.clone())
     }
 
-    fn global_value(&mut self, name: &'a str) -> Result<linked::Term<'a>> {
-        let mut term = self
-            .global_variables
-            .get(name)
-            .ok_or(InferenceError)?
-            .try_borrow_mut()
-            .map_err(|_| InferenceError)?;
+    fn link_global(&self, term: &RefCell<Global<'a>>) -> Result<linked::Term<'a>> {
+        let mut term = term.try_borrow_mut().map_err(|_| InferenceError)?;
 
         let typed_term = match &mut *term {
             Global::Linked(term) => term.clone(),

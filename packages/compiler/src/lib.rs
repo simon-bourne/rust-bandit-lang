@@ -3,7 +3,7 @@ use bandit_parser::{
     lex::{SrcToken, Token},
     parse::definitions,
 };
-use bandit_types::{Pretty, context::Context, source::FunctionDefinition};
+use bandit_types::{Pretty, source::FunctionDefinition};
 use winnow::Parser;
 
 pub fn compile(source: &str) -> Result<()> {
@@ -12,45 +12,28 @@ pub fn compile(source: &str) -> Result<()> {
         .parse(&tokens)
         .map_err(|_| anyhow!("A parse error occurred"))?;
 
-    println!("Before type inference");
-    print_definitions(&source);
+    println!("Before type inference:");
 
-    let mut ctx = Context::new(
-        source
-            .iter()
-            .map(|FunctionDefinition { name, typ, .. }| (*name, typ.clone())),
-    );
-
-    // TODO: We need to transform `FunctionDefinition<source::Term>` to
-    // `FunctionDefinition<linked::Term>`, which will have its types inferred
-    for FunctionDefinition { typ, value, .. } in &source {
-        if let Some(value) = value {
-            value
-                .clone()
-                .has_type(typ.clone())
-                .link(&mut ctx)
-                .map_err(|_| anyhow!("A link error occurred"))?;
-        }
+    for definition in &source {
+        println!("{}", definition.to_pretty_string(80));
     }
 
-    ctx.constraints()
-        .solve()
+    let ctx = FunctionDefinition::context(source);
+    ctx.infer_types()
         .map_err(|_| anyhow!("A type inference error occurred"))?;
 
-    println!("After type inference");
-    print_definitions(&source);
+    println!();
+    println!("After type inference:");
+
+    for (name, value) in ctx.globals() {
+        // TODO: We need a `linked::FunctionDefinition : Pretty`
+        println!(
+            "{name} = {}",
+            value
+                .map_err(|_| anyhow!("A type linking error occurred"))?
+                .to_pretty_string(80)
+        )
+    }
 
     Ok(())
-}
-
-fn print_definitions(source: &[FunctionDefinition<'_>]) {
-    for FunctionDefinition { name, typ, value } in source {
-        print!("{name} : {}", typ.to_pretty_string(80));
-
-        if let Some(value) = value {
-            println!(" = {}", value.to_pretty_string(80));
-        } else {
-            println!();
-        }
-    }
 }

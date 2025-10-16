@@ -1,15 +1,31 @@
 use std::rc::Rc;
 
-use super::pretty::{Document, Layout, Operator, Side};
+use derive_more::Constructor;
+
 use crate::{
-    Evaluation, GenericTerm, Pretty, Result, TermReference, VariableBinding, context::Context,
-    linked, pretty::has_type,
+    Evaluation, GenericTerm, Result, TermReference, VariableBinding, context::Context, linked,
 };
 
+mod pretty;
+
+#[derive(Constructor)]
 pub struct FunctionDefinition<'src> {
-    pub name: &'src str,
-    pub typ: Term<'src>,
-    pub value: Option<Term<'src>>,
+    name: &'src str,
+    typ: Option<Term<'src>>,
+    value: Option<Term<'src>>,
+}
+
+impl<'src> FunctionDefinition<'src> {
+    pub fn context(definitions: impl IntoIterator<Item = Self>) -> Context<'src> {
+        Context::new(definitions.into_iter().map(|Self { name, typ, value }| {
+            (
+                name,
+                value
+                    .unwrap_or_else(Term::unknown_value)
+                    .has_type(typ.unwrap_or_else(Term::unknown_type)),
+            )
+        }))
+    }
 }
 
 #[derive(Clone)]
@@ -24,15 +40,6 @@ impl<'src> TermReference<'src> for Term<'src> {
 
     fn typ(&self) -> Self {
         self.0.typ(Self::value)
-    }
-}
-
-impl Pretty for Term<'_> {
-    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        match self.0.as_ref() {
-            TermEnum::Value { term } => term.to_document(parent, layout),
-            TermEnum::HasType { term, typ } => has_type(term, typ).to_document(parent, layout),
-        }
     }
 }
 

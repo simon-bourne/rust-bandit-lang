@@ -1,5 +1,6 @@
 use std::fmt;
 
+use derive_more::Constructor;
 use pretty::RcDoc;
 
 use super::{GenericTerm, TermReference, VariableBinding};
@@ -53,6 +54,7 @@ impl<'src, Term: TermReference<'src>> VariableBinding<'src, Term> {
     }
 }
 
+#[derive(Constructor)]
 pub struct TypeAnnotated<Value: Pretty, Type: Pretty> {
     value: Value,
     typ: Option<Type>,
@@ -302,7 +304,7 @@ pub enum LayoutVariable {
 }
 
 impl Layout {
-    fn verbose() -> Self {
+    pub fn verbose() -> Self {
         Self {
             annotate_type: true,
             show_id: true,
@@ -311,14 +313,14 @@ impl Layout {
         }
     }
 
-    fn without_types(self) -> Self {
+    pub fn without_types(self) -> Self {
         Self {
             annotate_type: false,
             ..self
         }
     }
 
-    fn variable_value(self) -> Self {
+    pub fn variable_value(self) -> Self {
         Self {
             variable: LayoutVariable::Value,
             ..self

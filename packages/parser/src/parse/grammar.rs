@@ -32,11 +32,7 @@ fn function_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, FunctionDe
         opt(preceded(Operator::HasType, term)),
         opt(preceded(Operator::Assign, term)),
     )
-        .map(|(name, typ, value)| FunctionDefinition {
-            name,
-            typ: typ.unwrap_or_else(Term::unknown_type),
-            value,
-        })
+        .map(|(name, typ, value)| FunctionDefinition::new(name, typ, value))
 }
 
 fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
