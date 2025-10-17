@@ -63,10 +63,6 @@ pub enum Evaluation {
 
 enum GenericTerm<'src, Term: TermReference<'src>> {
     Type,
-    Constant {
-        name: &'src str,
-        typ: Term,
-    },
     Apply {
         function: Term,
         argument: Term,
@@ -106,9 +102,7 @@ impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
     ) -> Term {
         match self {
             Self::Type => new(Self::Type),
-            Self::Constant { typ, .. } | Self::Apply { typ, .. } | Self::Unknown { typ } => {
-                typ.clone()
-            }
+            Self::Apply { typ, .. } | Self::Unknown { typ } => typ.clone(),
             Self::Variable(variable) => type_of_variable(variable),
             Self::Let { binding, .. } => binding.in_term.typ(),
             Self::Pi(_) => new(Self::Type),

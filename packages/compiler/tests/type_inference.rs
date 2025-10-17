@@ -16,10 +16,10 @@ fn context<'src>(
 ) -> Context<'src> {
     let types = types
         .into_iter()
-        .map(|name| (name, Term::type_constant(name)));
+        .map(|name| (name, Term::typ()));
     let items = items
         .into_iter()
-        .map(|(name, typ)| (name, Term::constant(name, parse(typ))));
+        .map(|(name, typ)| (name, Term::unknown(parse(typ))));
     Context::new(types.chain(items))
 }
 

@@ -95,7 +95,6 @@ impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self {
             Self::Type => Document::text("Type"),
-            Self::Constant { name, typ } => has_type(*name, typ).to_document(parent, layout),
             Self::Apply {
                 function,
                 argument,

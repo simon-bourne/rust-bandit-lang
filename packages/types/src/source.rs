@@ -60,17 +60,6 @@ impl<'src> Term<'src> {
         Self::unknown(Self::unknown_type())
     }
 
-    pub fn type_constant(name: &'src str) -> Self {
-        Self::value(GenericTerm::Constant {
-            name,
-            typ: Self::typ(),
-        })
-    }
-
-    pub fn constant(name: &'src str, typ: Self) -> Self {
-        Self::value(GenericTerm::Constant { name, typ })
-    }
-
     pub fn apply(self, argument: Self) -> Self {
         Self::value(GenericTerm::Apply {
             function: self,
@@ -181,9 +170,6 @@ impl<'src> GenericTerm<'src, Term<'src>> {
 
         Ok(match self {
             Self::Type => Linked::typ(),
-            Self::Constant { name, typ } => {
-                Linked::constant(name, typ.link(ctx)?, ctx.constraints())
-            }
             Self::Apply {
                 function,
                 argument,
@@ -210,7 +196,7 @@ impl<'src> GenericTerm<'src, Term<'src>> {
 impl<'src> VariableBinding<'src, Term<'src>> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<'src, linked::Term<'src>>> {
         let name = self.name;
-        let variable = linked::Term::variable(name, self.binding_type().link(ctx)?);
+        let variable = linked::Term::local_variable(name, self.binding_type().link(ctx)?);
         let in_term = ctx.in_scope(name, variable.clone(), |ctx| self.in_term.link(ctx))?;
 
         Ok(VariableBinding {

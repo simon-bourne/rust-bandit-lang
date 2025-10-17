@@ -26,8 +26,8 @@ fn infer_kinds() {
 #[test]
 fn let_error() {
     // let x : Int = 1 in x : Float
-    let int_type = Term::type_constant("Int");
-    let float_type = Term::type_constant("Float");
+    let int_type = Term::variable("Int");
+    let float_type = Term::variable("Float");
     let one = Term::variable("one").has_type(int_type.clone());
     let let_binding = Term::let_binding("x", one, Term::variable("x").has_type(float_type));
 

@@ -37,13 +37,12 @@ impl<'src> Term<'src> {
         Self::unknown(Self::typ())
     }
 
-    pub fn variable(name: Option<&'src str>, typ: Self) -> Self {
+    pub fn local_variable(name: Option<&'src str>, typ: Self) -> Self {
         Self::new(GenericTerm::Variable(Variable::local(name, typ)))
     }
 
-    pub fn constant(name: &'src str, mut typ: Self, constraints: &Constraints<'src>) -> Self {
-        typ.unify_type(constraints);
-        Self::new(GenericTerm::Constant { name, typ })
+    pub fn constant(name: &'src str, value: Self) -> Self {
+        Self::new(GenericTerm::Variable(Variable::Global { name, value }))
     }
 
     #[cfg_attr(doc, katexit)]
@@ -76,7 +75,7 @@ impl<'src> Term<'src> {
             clone!(argument, typ);
 
             async move {
-                let mut variable = Self::variable(None, Self::unknown_type());
+                let mut variable = Self::local_variable(None, Self::unknown_type());
                 Self::unify(
                     &mut Term::pi_type(variable.clone(), typ, evaluation),
                     &mut function_type,
@@ -192,10 +191,6 @@ impl<'src> Term<'src> {
             GenericTerm::Pi(binding) => GenericTerm::Pi(binding.fresh_variables()),
             GenericTerm::Lambda(binding) => GenericTerm::Lambda(binding.fresh_variables()),
             GenericTerm::Type => GenericTerm::Type,
-            GenericTerm::Constant { name, typ } => GenericTerm::Constant {
-                name,
-                typ: typ.fresh_variables(),
-            },
             GenericTerm::Apply {
                 function,
                 argument,
@@ -354,9 +349,6 @@ impl<'src> Term<'src> {
                 variable.replace_with(&argument);
                 self.replace_with(in_term);
             }
-            GenericTerm::Constant { .. } => {
-                todo!("apply the argument to the function, and `self.replace_with(evaluated)`")
-            }
             GenericTerm::Apply { .. } | GenericTerm::Let { .. } => {}
             GenericTerm::Variable { .. } => {}
             GenericTerm::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
@@ -393,17 +385,6 @@ impl<'src> Term<'src> {
                 clone!(mut value, mut value1);
                 drop((x_ref, y_ref));
                 Self::unify_recurse(&mut value, &mut value1).await?
-            }
-            (
-                GenericTerm::Constant { name, typ },
-                GenericTerm::Constant {
-                    name: name1,
-                    typ: typ1,
-                },
-            ) if name == name1 => {
-                clone!(mut typ, mut typ1);
-                drop((x_ref, y_ref));
-                Self::unify_recurse(&mut typ, &mut typ1).await?
             }
             (
                 GenericTerm::Apply {
@@ -452,7 +433,6 @@ impl<'src> Term<'src> {
             }
             // It's safer to explicitly ignore each variant
             (GenericTerm::Type, _rhs)
-            | (GenericTerm::Constant { .. }, _rhs)
             | (GenericTerm::Apply { .. }, _rhs)
             | (GenericTerm::Variable { .. }, _rhs)
             | (GenericTerm::Unknown { .. }, _rhs)
