@@ -15,6 +15,11 @@ impl Pretty for Term<'_> {
 
 impl Pretty for Variable<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        has_type(self.name, &self.typ).to_document(parent, layout)
+        let name = match self {
+            Self::Local { name, .. } => *name,
+            Self::Global { name, .. } => Some(*name),
+        };
+
+        has_type(name, &self.typ()).to_document(parent, layout)
     }
 }

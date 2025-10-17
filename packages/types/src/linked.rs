@@ -38,7 +38,7 @@ impl<'src> Term<'src> {
     }
 
     pub fn variable(name: Option<&'src str>, typ: Self) -> Self {
-        Self::new(GenericTerm::Variable(Variable::new(name, typ)))
+        Self::new(GenericTerm::Variable(Variable::local(name, typ)))
     }
 
     pub fn constant(name: &'src str, mut typ: Self, constraints: &Constraints<'src>) -> Self {
@@ -170,14 +170,20 @@ impl<'src> Term<'src> {
         let mut value = self.value();
 
         Self::new(match &mut *value {
-            GenericTerm::Variable(Variable {
+            GenericTerm::Variable(Variable::Local {
                 fresh: Some(fresh), ..
             }) => {
                 return fresh.clone();
             }
-            GenericTerm::Variable(_) | GenericTerm::Unknown { .. } => {
+            GenericTerm::Variable(Variable::Local { .. }) | GenericTerm::Unknown { .. } => {
                 drop(value);
                 return self.clone();
+            }
+            GenericTerm::Variable(Variable::Global { name, value }) => {
+                GenericTerm::Variable(Variable::Global {
+                    name,
+                    value: value.fresh_variables(),
+                })
             }
             GenericTerm::Let { value, binding } => GenericTerm::Let {
                 value: value.fresh_variables(),
@@ -378,6 +384,17 @@ impl<'src> Term<'src> {
         match (&mut *x_ref, &mut *y_ref) {
             (GenericTerm::Type, GenericTerm::Type) => {}
             (
+                GenericTerm::Variable(Variable::Global { name, value }),
+                GenericTerm::Variable(Variable::Global {
+                    name: name1,
+                    value: value1,
+                }),
+            ) if name == name1 => {
+                clone!(mut value, mut value1);
+                drop((x_ref, y_ref));
+                Self::unify_recurse(&mut value, &mut value1).await?
+            }
+            (
                 GenericTerm::Constant { name, typ },
                 GenericTerm::Constant {
                     name: name1,
@@ -491,19 +508,25 @@ impl fmt::Debug for Term<'_> {
 
 impl<'src> GenericTerm<'src, Term<'src>> {
     fn is_local_variable(&self) -> bool {
-        matches!(self, Self::Variable { .. })
+        matches!(self, Self::Variable(Variable::Local { .. }))
     }
 }
 
-pub struct Variable<'src> {
-    name: Option<&'src str>,
-    fresh: Option<Term<'src>>,
-    typ: Term<'src>,
+pub enum Variable<'src> {
+    Local {
+        name: Option<&'src str>,
+        fresh: Option<Term<'src>>,
+        typ: Term<'src>,
+    },
+    Global {
+        name: &'src str,
+        value: Term<'src>,
+    },
 }
 
 impl<'src> Variable<'src> {
-    fn new(name: Option<&'src str>, typ: Term<'src>) -> Self {
-        Self {
+    fn local(name: Option<&'src str>, typ: Term<'src>) -> Self {
+        Self::Local {
             name,
             fresh: None,
             typ,
@@ -511,7 +534,10 @@ impl<'src> Variable<'src> {
     }
 
     fn typ(&self) -> Term<'src> {
-        self.typ.clone()
+        match self {
+            Self::Local { typ, .. } => typ.clone(),
+            Self::Global { value, .. } => value.typ(),
+        }
     }
 }
 
@@ -548,12 +574,13 @@ impl<'src> VariableBinding<'src, Term<'src>> {
     }
 
     fn allocate_fresh_variable(&mut self) -> Term<'src> {
-        let GenericTerm::Variable(Variable { name, fresh, typ }) = &mut *self.variable.value()
+        let GenericTerm::Variable(Variable::Local { name, fresh, typ }) =
+            &mut *self.variable.value()
         else {
             return self.variable.fresh_variables();
         };
 
-        let variable = Term::new(GenericTerm::Variable(Variable::new(
+        let variable = Term::new(GenericTerm::Variable(Variable::local(
             *name,
             typ.fresh_variables(),
         )));
@@ -564,7 +591,7 @@ impl<'src> VariableBinding<'src, Term<'src>> {
     }
 
     fn free_fresh_variable(&mut self) {
-        if let GenericTerm::Variable(Variable { fresh, .. }) = &mut *self.variable.value() {
+        if let GenericTerm::Variable(Variable::Local { fresh, .. }) = &mut *self.variable.value() {
             *fresh = None;
         }
     }
