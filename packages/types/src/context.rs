@@ -30,8 +30,8 @@ impl<'a> Context<'a> {
     }
 
     pub fn infer_types(&self) -> Result<()> {
-        for (name, value) in self.global_variables.iter() {
-            self.link_global(name, value)?;
+        for value in self.global_variables.values() {
+            self.link_global(value)?;
         }
 
         self.constraints.solve()
@@ -40,7 +40,7 @@ impl<'a> Context<'a> {
     pub fn globals(&self) -> impl Iterator<Item = (&'a str, Result<linked::Term<'a>>)> {
         self.global_variables
             .iter()
-            .map(|(name, value)| (*name, self.link_global(name, value)))
+            .map(|(name, value)| (*name, self.link_global(value)))
     }
 
     pub fn constraints(&self) -> &Constraints<'a> {
@@ -71,18 +71,21 @@ impl<'a> Context<'a> {
     }
 
     pub(crate) fn lookup(&mut self, name: &'a str) -> Result<linked::Term<'a>> {
-        if let Some(local) = self.lookup_local(name) {
-            Ok(local)
+        Ok(if let Some(local) = self.lookup_local(name) {
+            local
         } else {
-            self.link_global(name, self.global_variables.get(name).ok_or(InferenceError)?)
-        }
+            linked::Term::constant(
+                name,
+                self.link_global(self.global_variables.get(name).ok_or(InferenceError)?)?,
+            )
+        })
     }
 
     fn lookup_local(&self, name: &'a str) -> Option<linked::Term<'a>> {
         Some(self.local_variables.get(name)?.last()?.clone())
     }
 
-    fn link_global(&self, name: &'a str, term: &RefCell<Global<'a>>) -> Result<linked::Term<'a>> {
+    fn link_global(&self, term: &RefCell<Global<'a>>) -> Result<linked::Term<'a>> {
         let mut term = term.try_borrow_mut().map_err(|_| InferenceError)?;
 
         let typed_term = match &mut *term {
@@ -94,7 +97,7 @@ impl<'a> Context<'a> {
                     constraints: self.constraints.clone(),
                 };
 
-                linked::Term::constant(name, term.link(&mut global_ctx)?)
+                term.link(&mut global_ctx)?
             }
         };
 
