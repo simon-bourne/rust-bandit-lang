@@ -1,7 +1,7 @@
-use super::{Term, TermEnum, VariableName};
+use super::{Term, TermEnum, Variable};
 use crate::{
     Pretty,
-    pretty::{Document, Layout, Operator, Side},
+    pretty::{Document, Layout, Operator, Side, has_type},
 };
 
 impl Pretty for Term<'_> {
@@ -13,8 +13,8 @@ impl Pretty for Term<'_> {
     }
 }
 
-impl Pretty for VariableName<'_> {
+impl Pretty for Variable<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        self.name.to_document(parent, layout)
+        has_type(self.name, &self.typ).to_document(parent, layout)
     }
 }

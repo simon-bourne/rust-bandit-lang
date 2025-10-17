@@ -32,7 +32,7 @@ impl<'src> FunctionDefinition<'src> {
 pub struct Term<'src>(Rc<TermEnum<'src>>);
 
 impl<'src> TermReference<'src> for Term<'src> {
-    type VariableName = &'src str;
+    type Variable = &'src str;
 
     fn is_known(&self) -> bool {
         self.0.is_known()
@@ -129,10 +129,7 @@ impl<'src> Term<'src> {
     }
 
     pub fn variable(name: &'src str) -> Self {
-        Self::value(GenericTerm::Variable {
-            name,
-            typ: Self::unknown_type(),
-        })
+        Self::value(GenericTerm::Variable(name))
     }
 
     fn bound_variable(typ: Self) -> Self {
@@ -172,7 +169,7 @@ impl<'src> TermEnum<'src> {
 
     fn typ(&self, new: impl FnOnce(GenericTerm<'src, Term<'src>>) -> Term<'src>) -> Term<'src> {
         match self {
-            Self::Value { term } => term.typ(new),
+            Self::Value { term } => term.typ(new, |_| Term::unknown_value()),
             Self::HasType { typ, .. } => typ.clone(),
         }
     }
@@ -199,9 +196,7 @@ impl<'src> GenericTerm<'src, Term<'src>> {
                 *evaluation,
                 ctx.constraints(),
             ),
-            Self::Variable { name, typ } => ctx
-                .lookup(name)?
-                .has_type(typ.link(ctx)?, ctx.constraints()),
+            Self::Variable(name) => ctx.lookup(name)?,
             Self::Unknown { typ } => Linked::unknown(typ.link(ctx)?),
             Self::Let { value, binding } => {
                 Linked::let_binding(value.link(ctx)?, binding.link(ctx)?, ctx.constraints())

@@ -48,7 +48,7 @@ pub type Result<T> = result::Result<T, InferenceError>;
 pub struct InferenceError;
 
 pub trait TermReference<'src>: Pretty + Clone + Sized {
-    type VariableName: Pretty;
+    type Variable: Pretty;
 
     fn is_known(&self) -> bool;
 
@@ -73,10 +73,7 @@ enum GenericTerm<'src, Term: TermReference<'src>> {
         typ: Term,
         evaluation: Evaluation,
     },
-    Variable {
-        name: Term::VariableName,
-        typ: Term,
-    },
+    Variable(Term::Variable),
     Unknown {
         typ: Term,
     },
@@ -102,13 +99,17 @@ impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
         !matches!(self, Self::Unknown { .. })
     }
 
-    fn typ(&self, new: impl FnOnce(Self) -> Term) -> Term {
+    fn typ(
+        &self,
+        new: impl FnOnce(Self) -> Term,
+        type_of_variable: impl FnOnce(&Term::Variable) -> Term,
+    ) -> Term {
         match self {
             Self::Type => new(Self::Type),
-            Self::Constant { typ, .. }
-            | Self::Apply { typ, .. }
-            | Self::Variable { typ, .. }
-            | Self::Unknown { typ } => typ.clone(),
+            Self::Constant { typ, .. } | Self::Apply { typ, .. } | Self::Unknown { typ } => {
+                typ.clone()
+            }
+            Self::Variable(variable) => type_of_variable(variable),
             Self::Let { binding, .. } => binding.in_term.typ(),
             Self::Pi(_) => new(Self::Type),
             Self::Lambda(binding) => new(Self::pi(

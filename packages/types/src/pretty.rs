@@ -106,9 +106,7 @@ impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
                 typ,
             )
             .to_document(parent, layout),
-            Self::Variable { name, typ } => {
-                has_type(WithId::new(self, name), typ).to_document(parent, layout)
-            }
+            Self::Variable(variable) => WithId::new(self, variable).to_document(parent, layout),
             Self::Unknown { typ } => {
                 has_type(WithId::new(self, None), typ).to_document(parent, layout)
             }

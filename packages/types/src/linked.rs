@@ -38,10 +38,7 @@ impl<'src> Term<'src> {
     }
 
     pub fn variable(name: Option<&'src str>, typ: Self) -> Self {
-        Self::new(GenericTerm::Variable {
-            name: VariableName::new(name),
-            typ,
-        })
+        Self::new(GenericTerm::Variable(Variable::new(name, typ)))
     }
 
     pub fn constant(name: &'src str, mut typ: Self, constraints: &Constraints<'src>) -> Self {
@@ -173,15 +170,12 @@ impl<'src> Term<'src> {
         let mut value = self.value();
 
         Self::new(match &mut *value {
-            GenericTerm::Variable {
-                name: VariableName {
-                    fresh: Some(fresh), ..
-                },
-                ..
-            } => {
+            GenericTerm::Variable(Variable {
+                fresh: Some(fresh), ..
+            }) => {
                 return fresh.clone();
             }
-            GenericTerm::Variable { .. } | GenericTerm::Unknown { .. } => {
+            GenericTerm::Variable(_) | GenericTerm::Unknown { .. } => {
                 drop(value);
                 return self.clone();
             }
@@ -501,19 +495,28 @@ impl<'src> GenericTerm<'src, Term<'src>> {
     }
 }
 
-pub struct VariableName<'src> {
+pub struct Variable<'src> {
     name: Option<&'src str>,
     fresh: Option<Term<'src>>,
+    typ: Term<'src>,
 }
 
-impl<'src> VariableName<'src> {
-    fn new(name: Option<&'src str>) -> Self {
-        Self { name, fresh: None }
+impl<'src> Variable<'src> {
+    fn new(name: Option<&'src str>, typ: Term<'src>) -> Self {
+        Self {
+            name,
+            fresh: None,
+            typ,
+        }
+    }
+
+    fn typ(&self) -> Term<'src> {
+        self.typ.clone()
     }
 }
 
 impl<'src> TermReference<'src> for Term<'src> {
-    type VariableName = VariableName<'src>;
+    type Variable = Variable<'src>;
 
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
@@ -524,7 +527,7 @@ impl<'src> TermReference<'src> for Term<'src> {
 
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            TermEnum::Value { term, .. } => term.typ(Self::new),
+            TermEnum::Value { term, .. } => term.typ(Self::new, Variable::typ),
             TermEnum::Link { target } => target.typ(),
         }
     }
@@ -545,23 +548,24 @@ impl<'src> VariableBinding<'src, Term<'src>> {
     }
 
     fn allocate_fresh_variable(&mut self) -> Term<'src> {
-        let GenericTerm::Variable { name, typ } = &mut *self.variable.value() else {
+        let GenericTerm::Variable(Variable { name, fresh, typ }) = &mut *self.variable.value()
+        else {
             return self.variable.fresh_variables();
         };
 
-        let variable = Term::new(GenericTerm::Variable {
-            name: VariableName::new(name.name),
-            typ: typ.fresh_variables(),
-        });
+        let variable = Term::new(GenericTerm::Variable(Variable::new(
+            *name,
+            typ.fresh_variables(),
+        )));
 
-        assert!(name.fresh.is_none());
-        name.fresh = Some(variable.clone());
+        assert!(fresh.is_none());
+        *fresh = Some(variable.clone());
         variable
     }
 
     fn free_fresh_variable(&mut self) {
-        if let GenericTerm::Variable { name, .. } = &mut *self.variable.value() {
-            name.fresh = None;
+        if let GenericTerm::Variable(Variable { fresh, .. }) = &mut *self.variable.value() {
+            *fresh = None;
         }
     }
 
