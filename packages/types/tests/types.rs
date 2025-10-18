@@ -9,9 +9,8 @@ fn infer_kinds() {
     let a = Term::variable("a");
     let ctx = &mut Context::new([]);
     let constructor_type = Term::lambda(
-        "m",
-        Term::unknown_value(),
-        Term::lambda("a", Term::unknown_value(), Term::apply(m, a)),
+        m.clone(),
+        Term::lambda(a.clone(), Term::apply(m, a)),
     )
     .link(ctx)
     .unwrap();
@@ -26,10 +25,11 @@ fn infer_kinds() {
 #[test]
 fn let_error() {
     // let x : Int = 1 in x : Float
+    let x = Term::variable("x");
     let int_type = Term::variable("Int");
     let float_type = Term::variable("Float");
     let one = Term::variable("one").has_type(int_type.clone());
-    let let_binding = Term::let_binding("x", one, Term::variable("x").has_type(float_type));
+    let let_binding = Term::let_binding(x.clone(), one, x.has_type(float_type));
 
     let mut global_types = HashMap::new();
     global_types.insert("one", int_type);

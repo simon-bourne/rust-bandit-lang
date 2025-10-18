@@ -544,8 +544,8 @@ impl<'src> TermReference<'src> for Term<'src> {
 }
 
 impl<'src> VariableBinding<Term<'src>> {
-    pub fn variable_name(&mut self) -> Option<&'src str> {
-        self.variable.variable_name()
+    pub fn variable_name(&self) -> Option<&'src str> {
+        self.variable.clone().variable_name()
     }
 
     fn fresh_variables(&mut self) -> Self {

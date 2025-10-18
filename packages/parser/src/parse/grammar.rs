@@ -30,7 +30,7 @@ fn function_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, FunctionDe
     (
         identifier(),
         opt(preceded(Operator::HasType, term)),
-        opt(preceded(Operator::Assign, term)),
+        preceded(Operator::Assign, term),
     )
         .map(|(name, typ, value)| FunctionDefinition::new(name, typ, value))
 }
@@ -88,26 +88,9 @@ fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(
         Keyword::Let,
-        (
-            identifier(),
-            opt(preceded(Operator::HasType, term)),
-            Operator::Assign,
-            term,
-            Operator::Implies,
-            term,
-        ),
+        (term, Operator::Assign, term, Operator::Implies, term),
     )
-    .map(|(var, typ, _assign, variable_value, _linend, in_term)| {
-        Term::let_binding(
-            var,
-            if let Some(typ) = typ {
-                variable_value.has_type(typ)
-            } else {
-                variable_value
-            },
-            in_term,
-        )
-    })
+    .map(|(var, _assign, value, _linend, in_term)| Term::let_binding(var, value, in_term))
 }
 
 fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
@@ -116,7 +99,7 @@ fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 }
 
 fn unknown<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    Token::Unknown.map(|_| Term::unknown_value())
+    Token::Unknown.map(|_| Term::unknown())
 }
 
 fn variable<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {

@@ -1,15 +1,15 @@
-Bool : Type
-Int : Type
-Float : Type
+Bool : Type = _
+Int : Type = _
+Float : Type = _
     
-one : Int
-pi : Float
-true : Bool
-abs : Int → Int
-add : Int → Int → Int
-id : ∀a ⇒ a → a
-float_to_int : Float → Int
-polymorphic : ∀a ⇒ a
-scoped : ∀a ⇒ (∀s ⇒ s → a) → a
+one : Int = _
+pi : Float = _
+true : Bool = _
+abs : Int → Int = _
+add : Int → Int → Int = _
+id : ∀a ⇒ a → a = _
+float_to_int : Float → Int = _
+polymorphic : ∀a ⇒ a = _
+scoped : ∀a ⇒ (∀s ⇒ s → a) → a = _
 
 f = one
