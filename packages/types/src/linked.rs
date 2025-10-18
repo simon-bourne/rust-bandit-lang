@@ -115,7 +115,7 @@ impl<'src> Term<'src> {
     /// $$
     pub(crate) fn let_binding(
         value: Self,
-        binding: VariableBinding<'src, Self>,
+        binding: VariableBinding<Self>,
         constraints: &Constraints<'src>,
     ) -> Self {
         Self::add_unify_constraint(value.typ(), binding.variable.typ(), constraints);
@@ -138,7 +138,7 @@ impl<'src> Term<'src> {
     ///
     /// We don't use indexed type universes, as this isn't a theorem proving
     /// language.
-    pub(crate) fn pi(binding: VariableBinding<'src, Self>) -> Self {
+    pub(crate) fn pi(binding: VariableBinding<Self>) -> Self {
         Self::new(GenericTerm::Pi(binding))
     }
 
@@ -154,7 +154,7 @@ impl<'src> Term<'src> {
     ///     \Gamma \vdash \lambda x : A . \\: e : \Pi x : A . \\: B
     /// }
     /// $$
-    pub(crate) fn lambda(binding: VariableBinding<'src, Self>) -> Self {
+    pub(crate) fn lambda(binding: VariableBinding<Self>) -> Self {
         Self::new(GenericTerm::Lambda(binding))
     }
 
@@ -206,12 +206,7 @@ impl<'src> Term<'src> {
     }
 
     fn pi_type(bound_variable: Self, result_type: Self, evaluation: Evaluation) -> Self {
-        Self::new(GenericTerm::pi(
-            None,
-            bound_variable,
-            result_type,
-            evaluation,
-        ))
+        Self::new(GenericTerm::pi(bound_variable, result_type, evaluation))
     }
 
     fn new(term: GenericTerm<'src, Self>) -> Self {
@@ -485,6 +480,14 @@ impl<'src> Term<'src> {
             TermEnum::Link { .. } => unreachable!("Links should be collapsed at this point"),
         })
     }
+
+    fn variable_name(&mut self) -> Option<&'src str> {
+        let GenericTerm::Variable(Variable::Local { name, .. }) = &*self.value() else {
+            panic!("Expected a variable")
+        };
+
+        *name
+    }
 }
 
 impl fmt::Debug for Term<'_> {
@@ -540,14 +543,17 @@ impl<'src> TermReference<'src> for Term<'src> {
     }
 }
 
-impl<'src> VariableBinding<'src, Term<'src>> {
+impl<'src> VariableBinding<Term<'src>> {
+    pub fn variable_name(&mut self) -> Option<&'src str> {
+        self.variable.variable_name()
+    }
+
     fn fresh_variables(&mut self) -> Self {
         let variable = self.allocate_fresh_variable();
         let in_term = self.in_term.fresh_variables();
         self.free_fresh_variable();
 
         Self {
-            name: self.name,
             variable,
             in_term,
             evaluation: self.evaluation,
@@ -585,12 +591,10 @@ impl<'src> VariableBinding<'src, Term<'src>> {
         Term::unify_recurse(&mut binding0.variable.typ(), &mut binding1.variable.typ()).await?;
 
         // Keep the name if we can
-        if binding0.name.is_some() {
+        if binding0.variable_name().is_some() {
             binding1.variable.replace_with(&binding0.variable);
-            binding1.name = binding0.name;
         } else {
             binding0.variable.replace_with(&binding1.variable);
-            binding0.name = binding1.name;
         }
 
         Term::unify_recurse(&mut binding0.in_term, &mut binding1.in_term).await

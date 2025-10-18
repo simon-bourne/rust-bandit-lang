@@ -111,7 +111,7 @@ impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
             }
             Self::Let { value, binding } => pretty_let(value, binding, parent, layout),
             Self::Pi(binding) => {
-                if binding.name.is_none() {
+                if binding.variable_name().is_none() {
                     let layout = layout.without_types();
                     Operator::Arrow(binding.evaluation).to_document(
                         parent,
