@@ -2,11 +2,11 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{InferenceError, Result, constraints::Constraints, linked, source};
 
-#[derive(Clone)]
 enum Global<'a> {
     Linked(linked::Term<'a>),
     Source(source::Term<'a>),
 }
+
 pub type GlobalValues<'a> = HashMap<&'a str, source::Term<'a>>;
 
 pub struct Context<'a> {
