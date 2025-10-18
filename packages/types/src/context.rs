@@ -49,14 +49,10 @@ impl<'a> Context<'a> {
 
     pub(crate) fn in_scope<Output>(
         &mut self,
-        name: Option<&'a str>,
+        name: &'a str,
         variable_value: linked::Term<'a>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Output {
-        let Some(name) = name else {
-            return f(self);
-        };
-
         self.local_variables
             .entry(name)
             .or_default()

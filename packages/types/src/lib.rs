@@ -75,16 +75,15 @@ enum GenericTerm<'src, Term: TermReference<'src>> {
     },
     Let {
         value: Term,
-        binding: VariableBinding<'src, Term>,
+        binding: VariableBinding<Term>,
     },
-    Pi(VariableBinding<'src, Term>),
-    Lambda(VariableBinding<'src, Term>),
+    Pi(VariableBinding<Term>),
+    Lambda(VariableBinding<Term>),
 }
 
 impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
-    fn pi(name: Option<&'src str>, variable: Term, in_term: Term, evaluation: Evaluation) -> Self {
+    fn pi(variable: Term, in_term: Term, evaluation: Evaluation) -> Self {
         Self::Pi(VariableBinding {
-            name,
             variable,
             in_term,
             evaluation,
@@ -107,7 +106,6 @@ impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
             Self::Let { binding, .. } => binding.in_term.typ(),
             Self::Pi(_) => new(Self::Type),
             Self::Lambda(binding) => new(Self::pi(
-                binding.name,
                 binding.variable.clone(),
                 binding.in_term.typ(),
                 binding.evaluation,
@@ -116,15 +114,8 @@ impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
     }
 }
 
-struct VariableBinding<'src, Term: TermReference<'src>> {
-    name: Option<&'src str>,
+struct VariableBinding<Term> {
     variable: Term,
     in_term: Term,
     evaluation: Evaluation,
-}
-
-impl<'src, Term: TermReference<'src>> VariableBinding<'src, Term> {
-    fn binding_type(&self) -> Term {
-        self.variable.typ()
-    }
 }

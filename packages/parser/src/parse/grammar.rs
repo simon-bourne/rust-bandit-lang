@@ -45,9 +45,7 @@ fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     separated_foldr1(
         function_applications(),
         Operator::To,
-        |input_type, _, output_type| {
-            Term::pi_type(None, input_type, output_type, Evaluation::Dynamic)
-        },
+        |input_type, _, output_type| Term::function_type(input_type, output_type),
     )
 }
 
@@ -82,9 +80,9 @@ fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(
         Keyword::Forall,
-        separated_pair(variable_binding(), Operator::Implies, term),
+        separated_pair(term, Operator::Implies, term),
     )
-    .map(|((var, typ), term)| Term::pi_type(Some(var), typ, term, Evaluation::Static))
+    .map(|(variable, in_term)| Term::pi_type(variable, in_term, Evaluation::Static))
 }
 
 fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
@@ -113,18 +111,8 @@ fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 }
 
 fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    preceded(
-        Token::Lambda,
-        separated_pair(variable_binding(), Operator::Implies, term),
-    )
-    .map(|((var, typ), term)| Term::lambda(var, typ, term))
-}
-
-fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, (&'src str, Term<'src>)> {
-    (
-        identifier(),
-        opt(preceded(Operator::HasType, term)).map(|typ| typ.unwrap_or_else(Term::unknown_type)),
-    )
+    preceded(Token::Lambda, separated_pair(term, Operator::Implies, term))
+        .map(|(variable, in_term)| Term::lambda(variable, in_term))
 }
 
 fn unknown<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {

@@ -35,8 +35,8 @@ impl<T: Pretty> Pretty for &'_ T {
     }
 }
 
-impl<'src, Term: TermReference<'src>> VariableBinding<'src, Term> {
-    fn to_document(
+impl<Term: Pretty> VariableBinding<Term> {
+    pub fn to_document(
         &self,
         binder: &str,
         parent: Option<(Operator, Side)>,
@@ -46,7 +46,7 @@ impl<'src, Term: TermReference<'src>> VariableBinding<'src, Term> {
             parent.is_some(),
             [
                 Document::as_string(binder),
-                has_type(self.name, &self.binding_type()).to_document(None, layout),
+                self.variable.to_document(None, layout),
                 Document::text(" ⇒ "),
                 self.in_term.to_document(None, layout),
             ],
@@ -109,33 +109,7 @@ impl<'src, Term: TermReference<'src>> Pretty for GenericTerm<'src, Term> {
             Self::Unknown { typ } => {
                 has_type(WithId::new(self, None), typ).to_document(parent, layout)
             }
-            Self::Let { value, binding } => {
-                let typ = &value.typ();
-
-                let assignment = Operator::Equals.to_document(
-                    None,
-                    &has_type(binding.name, typ),
-                    value,
-                    layout,
-                    layout.without_types().variable_value(),
-                );
-
-                let symbol = match binding.evaluation {
-                    Evaluation::Static => "static",
-                    Evaluation::Dynamic => "let",
-                };
-
-                parenthesize_if(
-                    parent.is_some(),
-                    [
-                        Document::text(symbol),
-                        Document::text(" "),
-                        assignment,
-                        Document::text(" ⇒ "),
-                        binding.in_term.to_document(None, layout),
-                    ],
-                )
-            }
+            Self::Let { value, binding } => pretty_let(value, binding, parent, layout),
             Self::Pi(binding) => {
                 if binding.name.is_none() {
                     let layout = layout.without_types();
@@ -174,7 +148,38 @@ impl Pretty for Option<&str> {
     }
 }
 
-fn parenthesize_if(condition: bool, docs: impl IntoIterator<Item = Document>) -> Document {
+pub fn pretty_let<Term: Pretty>(
+    value: &impl Pretty,
+    binding: &VariableBinding<Term>,
+    parent: Option<(Operator, Side)>,
+    layout: Layout,
+) -> Document {
+    let symbol = match binding.evaluation {
+        Evaluation::Static => "static",
+        Evaluation::Dynamic => "let",
+    };
+
+    let assignment = Operator::Equals.to_document(
+        None,
+        &binding.variable,
+        value,
+        layout,
+        layout.without_types().variable_value(),
+    );
+
+    parenthesize_if(
+        parent.is_some(),
+        [
+            Document::text(symbol),
+            Document::text(" "),
+            assignment,
+            Document::text(" ⇒ "),
+            binding.in_term.to_document(None, layout),
+        ],
+    )
+}
+
+pub fn parenthesize_if(condition: bool, docs: impl IntoIterator<Item = Document>) -> Document {
     let docs = Document::concat(docs);
 
     if condition {
