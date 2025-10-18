@@ -34,7 +34,9 @@ impl Test for &str {
     }
 
     fn fails(self) {
-        assert!(infer_types(self).is_err());
+        if let Ok(term) = infer_types(self) {
+            panic!("Expected error, got '{}'", term.to_pretty_string(80))
+        }
     }
 }
 
