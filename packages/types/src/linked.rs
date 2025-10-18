@@ -68,21 +68,24 @@ impl<'src> Term<'src> {
         constraints: &Constraints<'src>,
     ) -> Self {
         constraints.add({
-            // We need fresh variables as we'll be instantiating the variable bound by
-            // `function.typ()` with `argument`. We don't want to modify any linked
-            // occurrences of `function`.
-            let mut function_type = function.typ().fresh_variables();
-            clone!(argument, typ);
+            clone!(function, argument, mut typ);
 
             async move {
-                let mut variable = Self::local_variable(None, Self::unknown_type());
-                Self::unify(
-                    &mut Term::pi_type(variable.clone(), typ, evaluation),
-                    &mut function_type,
-                )
-                .await?;
-                Self::unify(&mut variable.typ(), &mut argument.typ()).await?;
-                variable.replace_with(&argument);
+                let variable = Self::local_variable(None, argument.typ());
+                let mut function_type =
+                    Self::pi_type(variable.clone(), Self::unknown_type(), evaluation);
+                Self::unify(&mut function_type, &mut function.typ()).await?;
+
+                let mut result_type = if let GenericTerm::Pi(binding) =
+                    &mut *function_type.fresh_variables().value()
+                {
+                    binding.variable.replace_with(&argument);
+                    binding.in_term.clone()
+                } else {
+                    panic!("Expected a PI type")
+                };
+
+                Self::unify(&mut typ, &mut result_type).await?;
                 Ok(())
             }
         });
