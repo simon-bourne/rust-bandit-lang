@@ -8,12 +8,9 @@ fn infer_kinds() {
     let m = Term::variable("m");
     let a = Term::variable("a");
     let ctx = &mut Context::new([]);
-    let constructor_type = Term::lambda(
-        m.clone(),
-        Term::lambda(a.clone(), Term::apply(m, a)),
-    )
-    .link(ctx)
-    .unwrap();
+    let constructor_type = Term::lambda(m.clone(), Term::lambda(a.clone(), Term::apply(m, a)))
+        .link(ctx)
+        .unwrap();
     ctx.constraints().solve().unwrap();
 
     assert_eq!(

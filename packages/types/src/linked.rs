@@ -12,9 +12,9 @@ use crate::{
 mod pretty;
 
 #[derive(Clone)]
-pub struct Term<'src>(SharedMut<TermEnum<'src>>);
+pub struct Term<'src>(SharedMut<IndirectTerm<'src>>);
 
-enum TermEnum<'src> {
+enum IndirectTerm<'src> {
     Value { term: GenericTerm<'src, Term<'src>> },
     // TODO: Can links cause circular references?
     Link { target: Term<'src> },
@@ -210,7 +210,7 @@ impl<'src> Term<'src> {
     }
 
     fn new(term: GenericTerm<'src, Self>) -> Self {
-        Self(SharedMut::new(TermEnum::Value { term }))
+        Self(SharedMut::new(IndirectTerm::Value { term }))
     }
 
     fn is_local_variable(&mut self) -> bool {
@@ -455,7 +455,7 @@ impl<'src> Term<'src> {
 
     fn replace_with(&mut self, other: &Self) {
         self.collapse_links();
-        self.0.replace_with(TermEnum::Link {
+        self.0.replace_with(IndirectTerm::Link {
             target: other.clone(),
         });
         *self = other.clone();
@@ -465,7 +465,7 @@ impl<'src> Term<'src> {
         // Collapse links from the bottom up so they are also collapsed for other
         // terms that reference this chain.
         *self = {
-            let TermEnum::Link { target } = &mut *self.0.borrow_mut() else {
+            let IndirectTerm::Link { target } = &mut *self.0.borrow_mut() else {
                 return;
             };
             target.collapse_links();
@@ -476,8 +476,8 @@ impl<'src> Term<'src> {
     fn value<'a>(&'a mut self) -> RefMut<'a, GenericTerm<'src, Self>> {
         self.collapse_links();
         RefMut::map(self.0.borrow_mut(), |x| match x {
-            TermEnum::Value { term, .. } => term,
-            TermEnum::Link { .. } => unreachable!("Links should be collapsed at this point"),
+            IndirectTerm::Value { term, .. } => term,
+            IndirectTerm::Link { .. } => unreachable!("Links should be collapsed at this point"),
         })
     }
 
@@ -530,15 +530,15 @@ impl<'src> TermReference<'src> for Term<'src> {
 
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
-            TermEnum::Value { term, .. } => term.is_known(),
-            TermEnum::Link { target } => target.is_known(),
+            IndirectTerm::Value { term, .. } => term.is_known(),
+            IndirectTerm::Link { target } => target.is_known(),
         }
     }
 
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            TermEnum::Value { term, .. } => term.typ(Self::new, Variable::typ),
-            TermEnum::Link { target } => target.typ(),
+            IndirectTerm::Value { term, .. } => term.typ(Self::new, Variable::typ),
+            IndirectTerm::Link { target } => target.typ(),
         }
     }
 }

@@ -1,13 +1,14 @@
-use super::{TermEnum, Term, Variable};
+use super::{IndirectTerm, Term, Variable};
 use crate::{
-    pretty::{has_type, pretty_let, BinaryOperator, Document, Layout, Operator, Side}, GenericTerm, Pretty, TermReference
+    GenericTerm, Pretty, TermReference,
+    pretty::{BinaryOperator, Document, Layout, Operator, Side, has_type, pretty_let},
 };
 
 impl Pretty for Term<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match &*self.0.borrow() {
-            TermEnum::Value { term, .. } => term.to_document(parent, layout),
-            TermEnum::Link { target } => target.to_document(parent, layout),
+            IndirectTerm::Value { term, .. } => term.to_document(parent, layout),
+            IndirectTerm::Link { target } => target.to_document(parent, layout),
         }
     }
 }
