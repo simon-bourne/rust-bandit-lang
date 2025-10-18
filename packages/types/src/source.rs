@@ -139,6 +139,18 @@ impl<'src> Term<'src> {
             _ => Err(InferenceError),
         }
     }
+
+    fn link_variable(&self, ctx: &mut Context<'src>) -> Result<linked::Term<'src>> {
+        Ok(match self.0.as_ref() {
+            TermEnum::HasType { term, typ } => Ok(term
+                .link_variable(ctx)?
+                .has_type(typ.link(ctx)?, ctx.constraints()))?,
+            TermEnum::Variable(name) => {
+                linked::Term::local_variable(Some(name), linked::Term::unknown_type())
+            }
+            _ => Err(InferenceError)?,
+        })
+    }
 }
 
 type Binding<'src> = VariableBinding<Term<'src>>;
@@ -168,7 +180,7 @@ enum TermEnum<'src> {
 impl<'src> Binding<'src> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<linked::Term<'src>>> {
         let name = self.variable.variable_name()?;
-        let variable = linked::Term::local_variable(Some(name), linked::Term::unknown_type());
+        let variable = self.variable.link_variable(ctx)?;
         let in_term = ctx.in_scope(name, variable.clone(), |ctx| self.in_term.link(ctx))?;
 
         Ok(VariableBinding {
