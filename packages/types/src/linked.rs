@@ -218,6 +218,13 @@ impl<'src> Term<'src> {
         Self(SharedMut::new(TermEnum::Value { term }))
     }
 
+    fn is_local_variable(&mut self) -> bool {
+        matches!(
+            &*self.value(),
+            GenericTerm::Variable(Variable::Local { .. })
+        )
+    }
+
     fn unify_type(&mut self, constraints: &Constraints<'src>) {
         let mut typ = self.typ();
 
@@ -225,7 +232,7 @@ impl<'src> Term<'src> {
     }
 
     async fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
-        if other.value().is_local_variable() {
+        if other.is_local_variable() {
             return Ok(ControlFlow::Continue(()));
         }
 
@@ -483,12 +490,6 @@ impl<'src> Term<'src> {
 impl fmt::Debug for Term<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.debug(f)
-    }
-}
-
-impl<'src> GenericTerm<'src, Term<'src>> {
-    fn is_local_variable(&self) -> bool {
-        matches!(self, Self::Variable(Variable::Local { .. }))
     }
 }
 
