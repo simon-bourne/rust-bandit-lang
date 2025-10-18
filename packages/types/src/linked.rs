@@ -483,7 +483,7 @@ impl<'src> Term<'src> {
 
     fn variable_name(&mut self) -> Option<&'src str> {
         let GenericTerm::Variable(Variable::Local { name, .. }) = &*self.value() else {
-            panic!("Expected a variable")
+            return None;
         };
 
         *name
