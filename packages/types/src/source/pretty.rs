@@ -21,7 +21,7 @@ impl Pretty for Term<'_> {
             TermEnum::Pi(binding) => binding.to_document("∀", parent, layout),
             TermEnum::FunctionType(input_type, output_type) => Operator::Arrow(Evaluation::Dynamic)
                 .to_document(parent, input_type, output_type, layout, layout),
-            TermEnum::Lambda(binding) => binding.to_document("∀", parent, layout),
+            TermEnum::Lambda(binding) => binding.to_document("\\", parent, layout),
             TermEnum::HasType { term, typ } => {
                 Operator::HasType.to_document(parent, term, typ, layout, layout)
             }
