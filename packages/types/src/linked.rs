@@ -15,18 +15,18 @@ mod pretty;
 pub struct Term<'src>(SharedMut<IndirectTerm<'src>>);
 
 enum IndirectTerm<'src> {
-    Value { term: GenericTerm<'src, Term<'src>> },
+    Value { term: TermEnum<'src, Term<'src>> },
     // TODO: Can links cause circular references?
     Link { target: Term<'src> },
 }
 
 impl<'src> Term<'src> {
     pub fn typ() -> Self {
-        Self::new(GenericTerm::Type)
+        Self::new(TermEnum::Type)
     }
 
     pub fn unknown(typ: Self) -> Self {
-        Self::new(GenericTerm::Unknown { typ })
+        Self::new(TermEnum::Unknown { typ })
     }
 
     pub fn unknown_value() -> Self {
@@ -38,11 +38,11 @@ impl<'src> Term<'src> {
     }
 
     pub fn local_variable(name: Option<&'src str>, typ: Self) -> Self {
-        Self::new(GenericTerm::Variable(Variable::local(name, typ)))
+        Self::new(TermEnum::Variable(Variable::local(name, typ)))
     }
 
     pub fn constant(name: &'src str, value: Self) -> Self {
-        Self::new(GenericTerm::Variable(Variable::Global { name, value }))
+        Self::new(TermEnum::Variable(Variable::Global { name, value }))
     }
 
     #[cfg_attr(doc, katexit)]
@@ -76,7 +76,7 @@ impl<'src> Term<'src> {
                     Self::pi_type(variable.clone(), Self::unknown_type(), evaluation);
                 Self::unify(&mut function_type, &mut function.typ().fresh_variables()).await?;
 
-                let mut result_type = if let GenericTerm::Pi(binding) =
+                let mut result_type = if let TermEnum::Pi(binding) =
                     &mut *function_type.fresh_variables().value()
                 {
                     binding.variable.replace_with(&argument);
@@ -92,7 +92,7 @@ impl<'src> Term<'src> {
 
         typ.unify_type(constraints);
 
-        Self::new(GenericTerm::Apply {
+        Self::new(TermEnum::Apply {
             function,
             argument,
             typ,
@@ -122,7 +122,7 @@ impl<'src> Term<'src> {
         constraints: &Constraints<'src>,
     ) -> Self {
         Self::add_unify_constraint(value.typ(), binding.variable.typ(), constraints);
-        Self::new(GenericTerm::Let { value, binding })
+        Self::new(TermEnum::Let { value, binding })
     }
 
     #[cfg_attr(doc, katexit)]
@@ -142,7 +142,7 @@ impl<'src> Term<'src> {
     /// We don't use indexed type universes, as this isn't a theorem proving
     /// language.
     pub(crate) fn pi(binding: VariableBinding<Self>) -> Self {
-        Self::new(GenericTerm::Pi(binding))
+        Self::new(TermEnum::Pi(binding))
     }
 
     #[cfg_attr(doc, katexit)]
@@ -158,7 +158,7 @@ impl<'src> Term<'src> {
     /// }
     /// $$
     pub(crate) fn lambda(binding: VariableBinding<Self>) -> Self {
-        Self::new(GenericTerm::Lambda(binding))
+        Self::new(TermEnum::Lambda(binding))
     }
 
     /// Create a copy of `self`, making a fresh variable for every binding.
@@ -172,34 +172,34 @@ impl<'src> Term<'src> {
         let mut value = self.value();
 
         Self::new(match &mut *value {
-            GenericTerm::Variable(Variable::Local {
+            TermEnum::Variable(Variable::Local {
                 fresh: Some(fresh), ..
             }) => {
                 return fresh.clone();
             }
-            GenericTerm::Variable(Variable::Local { .. }) | GenericTerm::Unknown { .. } => {
+            TermEnum::Variable(Variable::Local { .. }) | TermEnum::Unknown { .. } => {
                 drop(value);
                 return self.clone();
             }
-            GenericTerm::Variable(Variable::Global { name, value }) => {
-                GenericTerm::Variable(Variable::Global {
+            TermEnum::Variable(Variable::Global { name, value }) => {
+                TermEnum::Variable(Variable::Global {
                     name,
                     value: value.fresh_variables(),
                 })
             }
-            GenericTerm::Let { value, binding } => GenericTerm::Let {
+            TermEnum::Let { value, binding } => TermEnum::Let {
                 value: value.fresh_variables(),
                 binding: binding.fresh_variables(),
             },
-            GenericTerm::Pi(binding) => GenericTerm::Pi(binding.fresh_variables()),
-            GenericTerm::Lambda(binding) => GenericTerm::Lambda(binding.fresh_variables()),
-            GenericTerm::Type => GenericTerm::Type,
-            GenericTerm::Apply {
+            TermEnum::Pi(binding) => TermEnum::Pi(binding.fresh_variables()),
+            TermEnum::Lambda(binding) => TermEnum::Lambda(binding.fresh_variables()),
+            TermEnum::Type => TermEnum::Type,
+            TermEnum::Apply {
                 function,
                 argument,
                 typ,
                 evaluation,
-            } => GenericTerm::Apply {
+            } => TermEnum::Apply {
                 function: function.fresh_variables(),
                 argument: argument.fresh_variables(),
                 typ: typ.fresh_variables(),
@@ -209,17 +209,17 @@ impl<'src> Term<'src> {
     }
 
     fn pi_type(bound_variable: Self, result_type: Self, evaluation: Evaluation) -> Self {
-        Self::new(GenericTerm::pi(bound_variable, result_type, evaluation))
+        Self::new(TermEnum::pi(bound_variable, result_type, evaluation))
     }
 
-    fn new(term: GenericTerm<'src, Self>) -> Self {
+    fn new(term: TermEnum<'src, Self>) -> Self {
         Self(SharedMut::new(IndirectTerm::Value { term }))
     }
 
     fn is_local_variable(&mut self) -> bool {
         matches!(
             &*self.value(),
-            GenericTerm::Variable(Variable::Local { .. })
+            TermEnum::Variable(Variable::Local { .. })
         )
     }
 
@@ -234,7 +234,7 @@ impl<'src> Term<'src> {
             return Ok(ControlFlow::Continue(()));
         }
 
-        let mut typ = if let GenericTerm::Unknown { typ } = &mut *self.value() {
+        let mut typ = if let TermEnum::Unknown { typ } = &mut *self.value() {
             typ.clone()
         } else {
             return Ok(ControlFlow::Continue(()));
@@ -246,13 +246,13 @@ impl<'src> Term<'src> {
     }
 
     async fn unify_implicit_parameter(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
-        if let GenericTerm::Pi(binding) = &*other.value()
+        if let TermEnum::Pi(binding) = &*other.value()
             && binding.evaluation == Evaluation::Static
         {
             return Ok(ControlFlow::Continue(()));
         }
 
-        let (mut variable, mut in_term) = if let GenericTerm::Pi(binding) = &mut *self.value()
+        let (mut variable, mut in_term) = if let TermEnum::Pi(binding) = &mut *self.value()
             && binding.evaluation == Evaluation::Static
         {
             (binding.variable.clone(), binding.in_term.clone())
@@ -312,7 +312,7 @@ impl<'src> Term<'src> {
         let borrowed = self.value();
 
         match &*borrowed {
-            GenericTerm::Apply {
+            TermEnum::Apply {
                 function, argument, ..
             } => {
                 clone!(function, argument);
@@ -320,7 +320,7 @@ impl<'src> Term<'src> {
                 self.evaluate_apply(function, argument).await?;
                 Box::pin(self.evaluate_node()).await?;
             }
-            GenericTerm::Let {
+            TermEnum::Let {
                 value,
                 binding:
                     VariableBinding {
@@ -348,16 +348,16 @@ impl<'src> Term<'src> {
         // For example, in the term `(\x ⇒ x) y`, the child term `(\x ⇒ x)` could be
         // shared with other terms, so we want to modify a copy of it.
         match &mut *function.fresh_variables().value() {
-            GenericTerm::Lambda(VariableBinding {
+            TermEnum::Lambda(VariableBinding {
                 variable, in_term, ..
             }) => {
                 variable.replace_with(&argument);
                 self.replace_with(in_term);
             }
-            GenericTerm::Apply { .. } | GenericTerm::Let { .. } => {}
-            GenericTerm::Variable { .. } => {}
-            GenericTerm::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
-            GenericTerm::Pi(_) | GenericTerm::Type => Err(InferenceError)?,
+            TermEnum::Apply { .. } | TermEnum::Let { .. } => {}
+            TermEnum::Variable { .. } => {}
+            TermEnum::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
+            TermEnum::Pi(_) | TermEnum::Type => Err(InferenceError)?,
         }
 
         Ok(())
@@ -379,10 +379,10 @@ impl<'src> Term<'src> {
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
-            (GenericTerm::Type, GenericTerm::Type) => {}
+            (TermEnum::Type, TermEnum::Type) => {}
             (
-                GenericTerm::Variable(Variable::Global { name, value }),
-                GenericTerm::Variable(Variable::Global {
+                TermEnum::Variable(Variable::Global { name, value }),
+                TermEnum::Variable(Variable::Global {
                     name: name1,
                     value: value1,
                 }),
@@ -392,13 +392,13 @@ impl<'src> Term<'src> {
                 Self::unify_recurse(&mut value, &mut value1).await?
             }
             (
-                GenericTerm::Apply {
+                TermEnum::Apply {
                     function,
                     argument,
                     typ,
                     evaluation,
                 },
-                GenericTerm::Apply {
+                TermEnum::Apply {
                     function: function1,
                     argument: argument1,
                     typ: typ1,
@@ -419,8 +419,8 @@ impl<'src> Term<'src> {
                 Self::unify_recurse(&mut typ, &mut typ1).await?;
             }
             (
-                GenericTerm::Let { value, binding },
-                GenericTerm::Let {
+                TermEnum::Let { value, binding },
+                TermEnum::Let {
                     value: value1,
                     binding: binding1,
                 },
@@ -428,22 +428,22 @@ impl<'src> Term<'src> {
                 Self::unify_recurse(value, value1).await?;
                 VariableBinding::unify(binding, binding1).await?
             }
-            (GenericTerm::Pi(binding0), GenericTerm::Pi(binding1))
+            (TermEnum::Pi(binding0), TermEnum::Pi(binding1))
                 if binding0.evaluation == binding1.evaluation =>
             {
                 VariableBinding::unify(binding0, binding1).await?
             }
-            (GenericTerm::Lambda(binding0), GenericTerm::Lambda(binding1)) => {
+            (TermEnum::Lambda(binding0), TermEnum::Lambda(binding1)) => {
                 VariableBinding::unify(binding0, binding1).await?
             }
             // It's safer to explicitly ignore each variant
-            (GenericTerm::Type, _rhs)
-            | (GenericTerm::Apply { .. }, _rhs)
-            | (GenericTerm::Variable { .. }, _rhs)
-            | (GenericTerm::Unknown { .. }, _rhs)
-            | (GenericTerm::Let { .. }, _rhs)
-            | (GenericTerm::Pi(_), _rhs)
-            | (GenericTerm::Lambda(_), _rhs) => Err(InferenceError)?,
+            (TermEnum::Type, _rhs)
+            | (TermEnum::Apply { .. }, _rhs)
+            | (TermEnum::Variable { .. }, _rhs)
+            | (TermEnum::Unknown { .. }, _rhs)
+            | (TermEnum::Let { .. }, _rhs)
+            | (TermEnum::Pi(_), _rhs)
+            | (TermEnum::Lambda(_), _rhs) => Err(InferenceError)?,
         }
 
         Ok(())
@@ -476,7 +476,7 @@ impl<'src> Term<'src> {
         };
     }
 
-    fn value<'a>(&'a mut self) -> RefMut<'a, GenericTerm<'src, Self>> {
+    fn value<'a>(&'a mut self) -> RefMut<'a, TermEnum<'src, Self>> {
         self.collapse_links();
         RefMut::map(self.0.borrow_mut(), |x| match x {
             IndirectTerm::Value { term, .. } => term,
@@ -485,7 +485,7 @@ impl<'src> Term<'src> {
     }
 
     fn variable_name(&mut self) -> Option<&'src str> {
-        let GenericTerm::Variable(Variable::Local { name, .. }) = &*self.value() else {
+        let TermEnum::Variable(Variable::Local { name, .. }) = &*self.value() else {
             return None;
         };
 
@@ -499,7 +499,7 @@ impl fmt::Debug for Term<'_> {
     }
 }
 
-enum GenericTerm<'src, Term: TermReference<'src>> {
+enum TermEnum<'src, Term: TermReference<'src>> {
     Type,
     Apply {
         function: Term,
@@ -519,7 +519,7 @@ enum GenericTerm<'src, Term: TermReference<'src>> {
     Lambda(VariableBinding<Term>),
 }
 
-impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
+impl<'src, Term: TermReference<'src>> TermEnum<'src, Term> {
     fn pi(variable: Term, in_term: Term, evaluation: Evaluation) -> Self {
         Self::Pi(VariableBinding {
             variable,
@@ -617,13 +617,13 @@ impl<'src> VariableBinding<Term<'src>> {
     }
 
     fn allocate_fresh_variable(&mut self) -> Term<'src> {
-        let GenericTerm::Variable(Variable::Local { name, fresh, typ }) =
+        let TermEnum::Variable(Variable::Local { name, fresh, typ }) =
             &mut *self.variable.value()
         else {
             return self.variable.fresh_variables();
         };
 
-        let variable = Term::new(GenericTerm::Variable(Variable::local(
+        let variable = Term::new(TermEnum::Variable(Variable::local(
             *name,
             typ.fresh_variables(),
         )));
@@ -634,7 +634,7 @@ impl<'src> VariableBinding<Term<'src>> {
     }
 
     fn free_fresh_variable(&mut self) {
-        if let GenericTerm::Variable(Variable::Local { fresh, .. }) = &mut *self.variable.value() {
+        if let TermEnum::Variable(Variable::Local { fresh, .. }) = &mut *self.variable.value() {
             *fresh = None;
         }
     }

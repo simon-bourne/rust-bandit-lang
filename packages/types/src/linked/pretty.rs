@@ -1,7 +1,7 @@
 use super::{IndirectTerm, Term, Variable};
 use crate::{
     Pretty, TermReference,
-    linked::GenericTerm,
+    linked::TermEnum,
     pretty::{BinaryOperator, Document, Layout, Operator, Side, has_type, pretty_let},
 };
 
@@ -25,7 +25,7 @@ impl Pretty for Variable<'_> {
     }
 }
 
-impl<'src> Pretty for GenericTerm<'src, Term<'src>> {
+impl<'src> Pretty for TermEnum<'src, Term<'src>> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self {
             Self::Type => Document::text("Type"),
