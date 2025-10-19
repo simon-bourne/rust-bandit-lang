@@ -78,7 +78,7 @@ impl<'src> Term<'src> {
                 let variable = Self::variable(None, argument.typ());
                 let mut function_type =
                     Self::pi_type(variable.clone(), Self::unknown_type(), evaluation);
-                Self::unify(&mut function_type, &mut function.typ().fresh_variables()).await?;
+                Self::unify(&mut function_type, &mut function.typ()).await?;
 
                 let mut result_type =
                     if let TermEnum::Pi(binding) = &mut *function_type.fresh_variables().value() {
@@ -254,18 +254,16 @@ impl<'src> Term<'src> {
             return Ok(ControlFlow::Continue(()));
         }
 
-        let (mut variable, mut in_term) = if let TermEnum::Pi(binding) = &mut *self.value()
+        let mut binding = if let TermEnum::Pi(binding) = &mut *self.value()
             && binding.evaluation == Evaluation::Static
         {
-            (binding.variable.clone(), binding.in_term.clone())
+            binding.fresh_variables()
         } else {
             return Ok(ControlFlow::Continue(()));
         };
 
-        variable.replace_with(&Self::unknown_value());
-        Self::unify_recurse(&mut in_term, other).await?;
-        // We replaced the variable, so make sure we don't leave the binding around
-        self.replace_with(other);
+        binding.variable.replace_with(&Self::unknown_value());
+        Self::unify_recurse(&mut binding.in_term, other).await?;
         Ok(ControlFlow::Break(()))
     }
 
