@@ -76,14 +76,13 @@ impl<'src> Term<'src> {
                     Self::pi_type(variable.clone(), Self::unknown_type(), evaluation);
                 Self::unify(&mut function_type, &mut function.typ().fresh_variables()).await?;
 
-                let mut result_type = if let TermEnum::Pi(binding) =
-                    &mut *function_type.fresh_variables().value()
-                {
-                    binding.variable.replace_with(&argument);
-                    binding.in_term.clone()
-                } else {
-                    panic!("Expected a PI type")
-                };
+                let mut result_type =
+                    if let TermEnum::Pi(binding) = &mut *function_type.fresh_variables().value() {
+                        binding.variable.replace_with(&argument);
+                        binding.in_term.clone()
+                    } else {
+                        panic!("Expected a PI type")
+                    };
 
                 Self::unify(&mut typ, &mut result_type).await?;
                 Ok(())
@@ -217,10 +216,7 @@ impl<'src> Term<'src> {
     }
 
     fn is_local_variable(&mut self) -> bool {
-        matches!(
-            &*self.value(),
-            TermEnum::Variable(Variable::Local { .. })
-        )
+        matches!(&*self.value(), TermEnum::Variable(Variable::Local { .. }))
     }
 
     fn unify_type(&mut self, constraints: &Constraints<'src>) {
@@ -617,8 +613,7 @@ impl<'src> VariableBinding<Term<'src>> {
     }
 
     fn allocate_fresh_variable(&mut self) -> Term<'src> {
-        let TermEnum::Variable(Variable::Local { name, fresh, typ }) =
-            &mut *self.variable.value()
+        let TermEnum::Variable(Variable::Local { name, fresh, typ }) = &mut *self.variable.value()
         else {
             return self.variable.fresh_variables();
         };
