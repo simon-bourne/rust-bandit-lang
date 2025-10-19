@@ -209,8 +209,12 @@ impl<'src> Term<'src> {
         })
     }
 
-    fn pi_type(bound_variable: Self, result_type: Self, evaluation: Evaluation) -> Self {
-        Self::new(TermEnum::pi(bound_variable, result_type, evaluation))
+    fn pi_type(variable: Self, result_type: Self, evaluation: Evaluation) -> Self {
+        Self::new(TermEnum::Pi(VariableBinding {
+            variable,
+            in_term: result_type,
+            evaluation,
+        }))
     }
 
     fn new(term: TermEnum<'src>) -> Self {
@@ -529,14 +533,6 @@ enum TermEnum<'src> {
 }
 
 impl<'src> TermEnum<'src> {
-    fn pi(variable: Term<'src>, in_term: Term<'src>, evaluation: Evaluation) -> Self {
-        Self::Pi(VariableBinding {
-            variable,
-            in_term,
-            evaluation,
-        })
-    }
-
     fn is_known(&self) -> bool {
         !matches!(self, Self::Unknown { .. })
     }
@@ -549,11 +545,11 @@ impl<'src> TermEnum<'src> {
             }
             Self::Constant { value, .. } => value.typ(),
             Self::Let { binding, .. } => binding.in_term.typ(),
-            Self::Lambda(binding) => Term::new(Self::pi(
+            Self::Lambda(binding) => Term::pi_type(
                 binding.variable.clone(),
                 binding.in_term.typ(),
                 binding.evaluation,
-            )),
+            ),
         }
     }
 }
