@@ -15,7 +15,7 @@ mod pretty;
 pub struct Term<'src>(SharedMut<IndirectTerm<'src>>);
 
 enum IndirectTerm<'src> {
-    Value { term: TermEnum<'src, Term<'src>> },
+    Value { term: TermEnum<'src> },
     // TODO: Can links cause circular references?
     Link { target: Term<'src> },
 }
@@ -211,7 +211,7 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::pi(bound_variable, result_type, evaluation))
     }
 
-    fn new(term: TermEnum<'src, Self>) -> Self {
+    fn new(term: TermEnum<'src>) -> Self {
         Self(SharedMut::new(IndirectTerm::Value { term }))
     }
 
@@ -472,7 +472,7 @@ impl<'src> Term<'src> {
         };
     }
 
-    fn value<'a>(&'a mut self) -> RefMut<'a, TermEnum<'src, Self>> {
+    fn value<'a>(&'a mut self) -> RefMut<'a, TermEnum<'src>> {
         self.collapse_links();
         RefMut::map(self.0.borrow_mut(), |x| match x {
             IndirectTerm::Value { term, .. } => term,
@@ -495,28 +495,28 @@ impl fmt::Debug for Term<'_> {
     }
 }
 
-enum TermEnum<'src, Term: TermReference<'src>> {
+enum TermEnum<'src> {
     Type,
     Apply {
-        function: Term,
-        argument: Term,
-        typ: Term,
+        function: Term<'src>,
+        argument: Term<'src>,
+        typ: Term<'src>,
         evaluation: Evaluation,
     },
-    Variable(Term::Variable),
+    Variable(Variable<'src>),
     Unknown {
-        typ: Term,
+        typ: Term<'src>,
     },
     Let {
-        value: Term,
-        binding: VariableBinding<Term>,
+        value: Term<'src>,
+        binding: VariableBinding<Term<'src>>,
     },
-    Pi(VariableBinding<Term>),
-    Lambda(VariableBinding<Term>),
+    Pi(VariableBinding<Term<'src>>),
+    Lambda(VariableBinding<Term<'src>>),
 }
 
-impl<'src, Term: TermReference<'src>> TermEnum<'src, Term> {
-    fn pi(variable: Term, in_term: Term, evaluation: Evaluation) -> Self {
+impl<'src> TermEnum<'src> {
+    fn pi(variable: Term<'src>, in_term: Term<'src>, evaluation: Evaluation) -> Self {
         Self::Pi(VariableBinding {
             variable,
             in_term,
@@ -528,18 +528,13 @@ impl<'src, Term: TermReference<'src>> TermEnum<'src, Term> {
         !matches!(self, Self::Unknown { .. })
     }
 
-    fn typ(
-        &self,
-        new: impl FnOnce(Self) -> Term,
-        type_of_variable: impl FnOnce(&Term::Variable) -> Term,
-    ) -> Term {
+    fn typ(&self) -> Term<'src> {
         match self {
-            Self::Type => new(Self::Type),
+            Self::Type | Self::Pi(_) => Term::typ(),
             Self::Apply { typ, .. } | Self::Unknown { typ } => typ.clone(),
-            Self::Variable(variable) => type_of_variable(variable),
+            Self::Variable(variable) => variable.typ(),
             Self::Let { binding, .. } => binding.in_term.typ(),
-            Self::Pi(_) => new(Self::Type),
-            Self::Lambda(binding) => new(Self::pi(
+            Self::Lambda(binding) => Term::new(Self::pi(
                 binding.variable.clone(),
                 binding.in_term.typ(),
                 binding.evaluation,
@@ -589,7 +584,7 @@ impl<'src> TermReference<'src> for Term<'src> {
 
     fn typ(&self) -> Self {
         match &*self.0.borrow() {
-            IndirectTerm::Value { term, .. } => term.typ(Self::new, Variable::typ),
+            IndirectTerm::Value { term, .. } => term.typ(),
             IndirectTerm::Link { target } => target.typ(),
         }
     }

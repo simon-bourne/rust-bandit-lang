@@ -25,7 +25,7 @@ impl Pretty for Variable<'_> {
     }
 }
 
-impl<'src> Pretty for TermEnum<'src, Term<'src>> {
+impl<'src> Pretty for TermEnum<'src> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self {
             Self::Type => Document::text("Type"),
