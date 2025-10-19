@@ -26,7 +26,6 @@ pub fn compile(source: &str) -> Result<()> {
     println!("After type inference:");
 
     for (name, value) in ctx.constants() {
-        // TODO: We need a `linked::Constant : Pretty`
         println!(
             "{name} = {}",
             value

@@ -42,8 +42,6 @@ impl<'a> Constraints<'a> {
             if self.0.borrow().is_empty() && pending.is_empty() {
                 // We didn't solve any constraints, so we're stuck
                 if !any_solved {
-                    // TODO: Are futures guaranteed not to yield unless they are waiting on
-                    // something?
                     return Err(InferenceError);
                 } else {
                     return Ok(());

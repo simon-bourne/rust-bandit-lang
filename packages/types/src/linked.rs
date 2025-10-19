@@ -16,7 +16,6 @@ pub struct Term<'src>(SharedMut<IndirectTerm<'src>>);
 
 enum IndirectTerm<'src> {
     Value { term: TermEnum<'src> },
-    // TODO: Can links cause circular references?
     Link { target: Term<'src> },
 }
 
@@ -286,17 +285,12 @@ impl<'src> Term<'src> {
         if Self::is_same(x, y)
             || x.unify_unknown(y).await?.is_break()
             || y.unify_unknown(x).await?.is_break()
-            // TODO: Does this belong before or after evaluate?
             || x.unify_implicit_parameter(y).await?.is_break()
             || y.unify_implicit_parameter(x).await?.is_break()
         {
             return Ok(());
         }
 
-        // TODO: Should we evaluate here? We're recursing down and evaluating here, then
-        // doing the same at each level when unifying. Maybe it's better to `evaluate`
-        // once before unification? Or do we want to evaluate bit by bit as we unify
-        // each level? We should be able to infer more types that way.
         x.evaluate_node().await?;
         y.evaluate_node().await?;
 
