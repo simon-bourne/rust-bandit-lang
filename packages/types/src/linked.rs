@@ -164,6 +164,14 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::Lambda(binding))
     }
 
+    pub(crate) fn variable_name(&mut self) -> Option<&'src str> {
+        let TermEnum::Variable { name, .. } = &*self.value() else {
+            return None;
+        };
+
+        *name
+    }
+
     /// Create a copy of `self`, making a fresh variable for every binding.
     ///
     /// This allows us to modify the copy and substitute variables without
@@ -482,14 +490,6 @@ impl<'src> Term<'src> {
             IndirectTerm::Value { term, .. } => term,
             IndirectTerm::Link { .. } => unreachable!("Links should be collapsed at this point"),
         })
-    }
-
-    fn variable_name(&mut self) -> Option<&'src str> {
-        let TermEnum::Variable { name, .. } = &*self.value() else {
-            return None;
-        };
-
-        *name
     }
 
     fn is_known(&self) -> bool {

@@ -132,14 +132,6 @@ impl<'src> Term<'src> {
         Self(Rc::new(term))
     }
 
-    fn variable_name(&self) -> Result<&'src str> {
-        match self.0.as_ref() {
-            TermEnum::Variable(name) => Ok(*name),
-            TermEnum::HasType { term, .. } => term.variable_name(),
-            _ => Err(InferenceError),
-        }
-    }
-
     fn link_variable(&self, ctx: &mut Context<'src>) -> Result<linked::Term<'src>> {
         Ok(match self.0.as_ref() {
             TermEnum::HasType { term, typ } => Ok(term
@@ -179,9 +171,8 @@ enum TermEnum<'src> {
 
 impl<'src> Binding<'src> {
     fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<linked::Term<'src>>> {
-        let name = self.variable.variable_name()?;
         let variable = self.variable.link_variable(ctx)?;
-        let in_term = ctx.in_scope(name, variable.clone(), |ctx| self.in_term.link(ctx))?;
+        let in_term = ctx.in_scope(variable.clone(), |ctx| self.in_term.link(ctx))?;
 
         Ok(VariableBinding {
             variable,

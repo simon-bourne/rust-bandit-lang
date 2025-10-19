@@ -47,11 +47,11 @@ impl<'a> Context<'a> {
 
     pub(crate) fn in_scope<Output>(
         &mut self,
-        name: &'a str,
-        variable_value: linked::Term<'a>,
+        mut variable: linked::Term<'a>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Output {
-        self.variables.entry(name).or_default().push(variable_value);
+        let name = variable.variable_name().expect("Expected a variable");
+        self.variables.entry(name).or_default().push(variable);
         let output = f(self);
 
         if self.variables.get_mut(name).unwrap().pop().is_none() {
