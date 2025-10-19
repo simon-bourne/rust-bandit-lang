@@ -237,6 +237,8 @@ impl<'src> Term<'src> {
     }
 
     async fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
+        // TODO: We need a better way to detect scope escape. `∀a. _` should unify with
+        // `∀a. a`.
         if other.is_variable() {
             return Ok(ControlFlow::Continue(()));
         }
