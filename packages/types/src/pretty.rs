@@ -3,7 +3,7 @@ use std::fmt;
 use derive_more::Constructor;
 use pretty::RcDoc;
 
-use super::{TermReference, VariableBinding};
+use super::VariableBinding;
 use crate::Evaluation;
 
 pub trait Pretty {
@@ -58,20 +58,6 @@ impl<Term: Pretty> VariableBinding<Term> {
 pub struct TypeAnnotated<Value: Pretty, Type: Pretty> {
     value: Value,
     typ: Option<Type>,
-}
-
-pub fn has_type<'a, 'src, Value, Type>(
-    value: Value,
-    typ: &'a Type,
-) -> TypeAnnotated<Value, &'a Type>
-where
-    Value: Pretty,
-    Type: TermReference<'src> + 'a,
-{
-    TypeAnnotated {
-        value,
-        typ: typ.is_known().then_some(typ),
-    }
 }
 
 impl<Value: Pretty, Type: Pretty> Pretty for TypeAnnotated<Value, Type> {

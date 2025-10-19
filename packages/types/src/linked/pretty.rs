@@ -2,7 +2,7 @@ use super::{IndirectTerm, Term};
 use crate::{
     Pretty, TermReference,
     linked::TermEnum,
-    pretty::{BinaryOperator, Document, Layout, Operator, Side, has_type, pretty_let},
+    pretty::{BinaryOperator, Document, Layout, Operator, Side, TypeAnnotated, pretty_let},
 };
 
 impl Pretty for Term<'_> {
@@ -84,4 +84,11 @@ impl<Id, Value: Pretty> Pretty for WithId<Id, Value> {
             name_doc
         }
     }
+}
+
+fn has_type<'a, 'src, Value: Pretty>(
+    value: Value,
+    typ: &'a Term<'src>,
+) -> TypeAnnotated<Value, &'a Term<'src>> {
+    TypeAnnotated::new(value, typ.is_known().then_some(typ))
 }
