@@ -11,7 +11,7 @@ fn infer_kinds() {
     let constructor_type = Term::lambda(m.clone(), Term::lambda(a.clone(), Term::apply(m, a)))
         .link(ctx)
         .unwrap();
-    ctx.constraints().solve().unwrap();
+    ctx.infer_types().unwrap();
 
     assert_eq!(
         constructor_type.to_pretty_string(80),
@@ -35,5 +35,5 @@ fn let_error() {
     let ctx = &mut Context::new(global_types);
     let_binding.link(ctx).unwrap();
 
-    assert!(ctx.constraints().solve().is_err());
+    assert!(ctx.infer_types().is_err());
 }
