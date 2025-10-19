@@ -29,10 +29,10 @@ impl<'src> Pretty for TermEnum<'src> {
             )
             .to_document(parent, layout),
             Self::Variable { name, typ, .. } => {
-                WithId::new(self, has_type(name, typ)).to_document(parent, layout)
+                has_type(WithId::new(self, name), typ).to_document(parent, layout)
             }
             Self::Constant { name, value } => {
-                WithId::new(self, has_type(name, &value.typ())).to_document(parent, layout)
+                has_type(WithId::new(self, name), &value.typ()).to_document(parent, layout)
             }
             Self::Unknown { typ } => {
                 has_type(WithId::new(self, None), typ).to_document(parent, layout)
