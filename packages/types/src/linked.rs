@@ -21,7 +21,7 @@ enum IndirectTerm<'src> {
 }
 
 impl<'src> Term<'src> {
-    pub fn typ() -> Self {
+    pub fn type_of_type() -> Self {
         Self::new(TermEnum::Type)
     }
 
@@ -34,7 +34,7 @@ impl<'src> Term<'src> {
     }
 
     pub fn unknown_type() -> Self {
-        Self::unknown(Self::typ())
+        Self::unknown(Self::type_of_type())
     }
 
     pub fn variable(name: Option<&'src str>, typ: Self) -> Self {
@@ -224,7 +224,7 @@ impl<'src> Term<'src> {
     fn unify_type(&mut self, constraints: &Constraints<'src>) {
         let mut typ = self.typ();
 
-        constraints.add(async move { Self::unify(&mut typ, &mut Self::typ()).await })
+        constraints.add(async move { Self::unify(&mut typ, &mut Self::type_of_type()).await })
     }
 
     async fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
@@ -543,7 +543,7 @@ impl<'src> TermEnum<'src> {
 
     fn typ(&self) -> Term<'src> {
         match self {
-            Self::Type | Self::Pi(_) => Term::typ(),
+            Self::Type | Self::Pi(_) => Term::type_of_type(),
             Self::Apply { typ, .. } | Self::Unknown { typ } | Self::Variable { typ, .. } => {
                 typ.clone()
             }

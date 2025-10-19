@@ -14,7 +14,7 @@ fn context<'src>(
     types: impl IntoIterator<Item = &'src str>,
     items: impl IntoIterator<Item = (&'src str, &'src str)>,
 ) -> Context<'src> {
-    let types = types.into_iter().map(|name| (name, Term::typ()));
+    let types = types.into_iter().map(|name| (name, Term::type_of_type()));
     let items = items
         .into_iter()
         .map(|(name, typ)| (name, Term::unknown().has_type(parse(typ))));

@@ -31,7 +31,7 @@ impl<'src> FunctionDefinition<'src> {
 pub struct Term<'src>(Rc<TermEnum<'src>>);
 
 impl<'src> Term<'src> {
-    pub fn typ() -> Self {
+    pub fn type_of_type() -> Self {
         Self::new(TermEnum::Type)
     }
 
@@ -98,7 +98,7 @@ impl<'src> Term<'src> {
         use linked::Term as Linked;
 
         Ok(match self.0.as_ref() {
-            TermEnum::Type => Linked::typ(),
+            TermEnum::Type => Linked::type_of_type(),
             TermEnum::Apply {
                 function,
                 argument,
