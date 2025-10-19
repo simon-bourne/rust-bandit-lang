@@ -166,11 +166,8 @@ impl<'src> Term<'src> {
 
     /// Create a copy of `self`, making a fresh variable for every binding.
     ///
-    /// Note that we can't just substitute a single variable, because variables
-    /// have a type that may depend on the variable we're substituting.
-    ///
-    /// For example, if we substitute `a` in the term `f : (a : Type) -> ((x :
-    /// a) -> (f x))`, we also need a fresh variable for `x`.
+    /// This allows us to modify the copy and substitute variables without
+    /// affecting the original.
     fn fresh_variables(&mut self) -> Self {
         let mut value = self.value();
 
