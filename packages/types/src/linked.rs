@@ -74,7 +74,7 @@ impl<'src> Term<'src> {
                 let variable = Self::local_variable(None, argument.typ());
                 let mut function_type =
                     Self::pi_type(variable.clone(), Self::unknown_type(), evaluation);
-                Self::unify(&mut function_type, &mut function.typ()).await?;
+                Self::unify(&mut function_type, &mut function.typ().fresh_variables()).await?;
 
                 let mut result_type = if let GenericTerm::Pi(binding) =
                     &mut *function_type.fresh_variables().value()
