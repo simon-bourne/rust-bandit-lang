@@ -1,3 +1,5 @@
+use derive_more::Constructor;
+
 use super::{IndirectTerm, Term};
 use crate::{
     Pretty,
@@ -58,15 +60,10 @@ impl<'src> Pretty for TermEnum<'src> {
     }
 }
 
+#[derive(Constructor)]
 struct WithId<Id, Value> {
     id: *const Id,
     value: Value,
-}
-
-impl<Id, Value> WithId<Id, Value> {
-    fn new(id: *const Id, value: Value) -> Self {
-        Self { id, value }
-    }
 }
 
 impl<Id, Value: Pretty> Pretty for WithId<Id, Value> {
