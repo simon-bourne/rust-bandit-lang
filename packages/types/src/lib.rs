@@ -48,8 +48,6 @@ pub type Result<T> = result::Result<T, InferenceError>;
 pub struct InferenceError;
 
 pub trait TermReference<'src>: Pretty + Clone + Sized {
-    type Variable: Pretty;
-
     fn is_known(&self) -> bool;
 
     fn typ(&self) -> Self;

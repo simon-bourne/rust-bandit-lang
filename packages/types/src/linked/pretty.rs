@@ -1,4 +1,4 @@
-use super::{IndirectTerm, Term, Variable};
+use super::{IndirectTerm, Term};
 use crate::{
     Pretty, TermReference,
     linked::TermEnum,
@@ -11,17 +11,6 @@ impl Pretty for Term<'_> {
             IndirectTerm::Value { term, .. } => term.to_document(parent, layout),
             IndirectTerm::Link { target } => target.to_document(parent, layout),
         }
-    }
-}
-
-impl Pretty for Variable<'_> {
-    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        let name = match self {
-            Self::Local { name, .. } => *name,
-            Self::Global { name, .. } => Some(*name),
-        };
-
-        has_type(name, &self.typ()).to_document(parent, layout)
     }
 }
 
@@ -39,7 +28,12 @@ impl<'src> Pretty for TermEnum<'src> {
                 typ,
             )
             .to_document(parent, layout),
-            Self::Variable(variable) => WithId::new(self, variable).to_document(parent, layout),
+            Self::Variable { name, typ, .. } => {
+                WithId::new(self, has_type(name, typ)).to_document(parent, layout)
+            }
+            Self::Constant { name, value } => {
+                WithId::new(self, has_type(name, &value.typ())).to_document(parent, layout)
+            }
             Self::Unknown { typ } => {
                 has_type(WithId::new(self, None), typ).to_document(parent, layout)
             }

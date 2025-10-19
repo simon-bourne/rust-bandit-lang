@@ -117,7 +117,7 @@ impl<'src> Term<'src> {
             }
             TermEnum::Pi(binding) => Linked::pi(binding.link(ctx)?),
             TermEnum::FunctionType(left, right) => Linked::pi(VariableBinding {
-                variable: linked::Term::local_variable(None, left.link(ctx)?),
+                variable: linked::Term::variable(None, left.link(ctx)?),
                 in_term: right.link(ctx)?,
                 evaluation: Evaluation::Dynamic,
             }),
@@ -146,7 +146,7 @@ impl<'src> Term<'src> {
                 .link_variable(ctx)?
                 .has_type(typ.link(ctx)?, ctx.constraints()))?,
             TermEnum::Variable(name) => {
-                linked::Term::local_variable(Some(name), linked::Term::unknown_type())
+                linked::Term::variable(Some(name), linked::Term::unknown_type())
             }
             _ => Err(InferenceError)?,
         })

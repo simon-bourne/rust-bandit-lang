@@ -37,12 +37,16 @@ impl<'src> Term<'src> {
         Self::unknown(Self::typ())
     }
 
-    pub fn local_variable(name: Option<&'src str>, typ: Self) -> Self {
-        Self::new(TermEnum::Variable(Variable::local(name, typ)))
+    pub fn variable(name: Option<&'src str>, typ: Self) -> Self {
+        Self::new(TermEnum::Variable {
+            name,
+            fresh: None,
+            typ,
+        })
     }
 
     pub fn constant(name: &'src str, value: Self) -> Self {
-        Self::new(TermEnum::Variable(Variable::Global { name, value }))
+        Self::new(TermEnum::Constant { name, value })
     }
 
     #[cfg_attr(doc, katexit)]
@@ -71,7 +75,7 @@ impl<'src> Term<'src> {
             clone!(function, argument, mut typ);
 
             async move {
-                let variable = Self::local_variable(None, argument.typ());
+                let variable = Self::variable(None, argument.typ());
                 let mut function_type =
                     Self::pi_type(variable.clone(), Self::unknown_type(), evaluation);
                 Self::unify(&mut function_type, &mut function.typ().fresh_variables()).await?;
@@ -171,21 +175,19 @@ impl<'src> Term<'src> {
         let mut value = self.value();
 
         Self::new(match &mut *value {
-            TermEnum::Variable(Variable::Local {
+            TermEnum::Variable {
                 fresh: Some(fresh), ..
-            }) => {
+            } => {
                 return fresh.clone();
             }
-            TermEnum::Variable(Variable::Local { .. }) | TermEnum::Unknown { .. } => {
+            TermEnum::Variable { fresh: None, .. } | TermEnum::Unknown { .. } => {
                 drop(value);
                 return self.clone();
             }
-            TermEnum::Variable(Variable::Global { name, value }) => {
-                TermEnum::Variable(Variable::Global {
-                    name,
-                    value: value.fresh_variables(),
-                })
-            }
+            TermEnum::Constant { name, value } => TermEnum::Constant {
+                name,
+                value: value.fresh_variables(),
+            },
             TermEnum::Let { value, binding } => TermEnum::Let {
                 value: value.fresh_variables(),
                 binding: binding.fresh_variables(),
@@ -215,8 +217,8 @@ impl<'src> Term<'src> {
         Self(SharedMut::new(IndirectTerm::Value { term }))
     }
 
-    fn is_local_variable(&mut self) -> bool {
-        matches!(&*self.value(), TermEnum::Variable(Variable::Local { .. }))
+    fn is_variable(&mut self) -> bool {
+        matches!(&*self.value(), TermEnum::Variable { .. })
     }
 
     fn unify_type(&mut self, constraints: &Constraints<'src>) {
@@ -226,7 +228,7 @@ impl<'src> Term<'src> {
     }
 
     async fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
-        if other.is_local_variable() {
+        if other.is_variable() {
             return Ok(ControlFlow::Continue(()));
         }
 
@@ -350,8 +352,10 @@ impl<'src> Term<'src> {
                 variable.replace_with(&argument);
                 self.replace_with(in_term);
             }
-            TermEnum::Apply { .. } | TermEnum::Let { .. } => {}
-            TermEnum::Variable { .. } => {}
+            TermEnum::Apply { .. }
+            | TermEnum::Let { .. }
+            | TermEnum::Variable { .. }
+            | TermEnum::Constant { .. } => {}
             TermEnum::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
             TermEnum::Pi(_) | TermEnum::Type => Err(InferenceError)?,
         }
@@ -377,11 +381,11 @@ impl<'src> Term<'src> {
         match (&mut *x_ref, &mut *y_ref) {
             (TermEnum::Type, TermEnum::Type) => {}
             (
-                TermEnum::Variable(Variable::Global { name, value }),
-                TermEnum::Variable(Variable::Global {
+                TermEnum::Constant { name, value },
+                TermEnum::Constant {
                     name: name1,
                     value: value1,
-                }),
+                },
             ) if name == name1 => {
                 clone!(mut value, mut value1);
                 drop((x_ref, y_ref));
@@ -436,6 +440,7 @@ impl<'src> Term<'src> {
             (TermEnum::Type, _rhs)
             | (TermEnum::Apply { .. }, _rhs)
             | (TermEnum::Variable { .. }, _rhs)
+            | (TermEnum::Constant { .. }, _rhs)
             | (TermEnum::Unknown { .. }, _rhs)
             | (TermEnum::Let { .. }, _rhs)
             | (TermEnum::Pi(_), _rhs)
@@ -481,7 +486,7 @@ impl<'src> Term<'src> {
     }
 
     fn variable_name(&mut self) -> Option<&'src str> {
-        let TermEnum::Variable(Variable::Local { name, .. }) = &*self.value() else {
+        let TermEnum::Variable { name, .. } = &*self.value() else {
             return None;
         };
 
@@ -503,7 +508,15 @@ enum TermEnum<'src> {
         typ: Term<'src>,
         evaluation: Evaluation,
     },
-    Variable(Variable<'src>),
+    Variable {
+        name: Option<&'src str>,
+        fresh: Option<Term<'src>>,
+        typ: Term<'src>,
+    },
+    Constant {
+        name: &'src str,
+        value: Term<'src>,
+    },
     Unknown {
         typ: Term<'src>,
     },
@@ -531,8 +544,10 @@ impl<'src> TermEnum<'src> {
     fn typ(&self) -> Term<'src> {
         match self {
             Self::Type | Self::Pi(_) => Term::typ(),
-            Self::Apply { typ, .. } | Self::Unknown { typ } => typ.clone(),
-            Self::Variable(variable) => variable.typ(),
+            Self::Apply { typ, .. } | Self::Unknown { typ } | Self::Variable { typ, .. } => {
+                typ.clone()
+            }
+            Self::Constant { value, .. } => value.typ(),
             Self::Let { binding, .. } => binding.in_term.typ(),
             Self::Lambda(binding) => Term::new(Self::pi(
                 binding.variable.clone(),
@@ -543,38 +558,7 @@ impl<'src> TermEnum<'src> {
     }
 }
 
-pub enum Variable<'src> {
-    Local {
-        name: Option<&'src str>,
-        fresh: Option<Term<'src>>,
-        typ: Term<'src>,
-    },
-    Global {
-        name: &'src str,
-        value: Term<'src>,
-    },
-}
-
-impl<'src> Variable<'src> {
-    fn local(name: Option<&'src str>, typ: Term<'src>) -> Self {
-        Self::Local {
-            name,
-            fresh: None,
-            typ,
-        }
-    }
-
-    fn typ(&self) -> Term<'src> {
-        match self {
-            Self::Local { typ, .. } => typ.clone(),
-            Self::Global { value, .. } => value.typ(),
-        }
-    }
-}
-
 impl<'src> TermReference<'src> for Term<'src> {
-    type Variable = Variable<'src>;
-
     fn is_known(&self) -> bool {
         match &*self.0.borrow() {
             IndirectTerm::Value { term, .. } => term.is_known(),
@@ -608,15 +592,11 @@ impl<'src> VariableBinding<Term<'src>> {
     }
 
     fn allocate_fresh_variable(&mut self) -> Term<'src> {
-        let TermEnum::Variable(Variable::Local { name, fresh, typ }) = &mut *self.variable.value()
-        else {
+        let TermEnum::Variable { name, fresh, typ } = &mut *self.variable.value() else {
             return self.variable.fresh_variables();
         };
 
-        let variable = Term::new(TermEnum::Variable(Variable::local(
-            *name,
-            typ.fresh_variables(),
-        )));
+        let variable = Term::variable(*name, typ.fresh_variables());
 
         assert!(fresh.is_none());
         *fresh = Some(variable.clone());
@@ -624,7 +604,7 @@ impl<'src> VariableBinding<Term<'src>> {
     }
 
     fn free_fresh_variable(&mut self) {
-        if let TermEnum::Variable(Variable::Local { fresh, .. }) = &mut *self.variable.value() {
+        if let TermEnum::Variable { fresh, .. } = &mut *self.variable.value() {
             *fresh = None;
         }
     }
