@@ -1,7 +1,7 @@
 use crate::{
     Evaluation, Pretty,
     pretty::{Document, Layout, Operator, Side, TypeAnnotated, pretty_let},
-    source::{FunctionDefinition, Term, TermEnum},
+    source::{Constant, Term, TermEnum},
 };
 
 impl Pretty for Term<'_> {
@@ -29,7 +29,7 @@ impl Pretty for Term<'_> {
     }
 }
 
-impl Pretty for FunctionDefinition<'_> {
+impl Pretty for Constant<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         let name = TypeAnnotated::new(self.name, self.typ.as_ref());
 

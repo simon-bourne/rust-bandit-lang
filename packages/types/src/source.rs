@@ -7,13 +7,13 @@ use crate::{Evaluation, InferenceError, Result, VariableBinding, context::Contex
 mod pretty;
 
 #[derive(Constructor)]
-pub struct FunctionDefinition<'src> {
+pub struct Constant<'src> {
     name: &'src str,
     typ: Option<Term<'src>>,
     value: Term<'src>,
 }
 
-impl<'src> FunctionDefinition<'src> {
+impl<'src> Constant<'src> {
     pub fn context(definitions: impl IntoIterator<Item = Self>) -> Context<'src> {
         Context::new(definitions.into_iter().map(|Self { name, typ, value }| {
             let value = if let Some(typ) = typ {
