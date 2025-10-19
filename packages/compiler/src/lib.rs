@@ -25,7 +25,7 @@ pub fn compile(source: &str) -> Result<()> {
     println!();
     println!("After type inference:");
 
-    for (name, value) in ctx.globals() {
+    for (name, value) in ctx.constants() {
         // TODO: We need a `linked::FunctionDefinition : Pretty`
         println!(
             "{name} = {}",

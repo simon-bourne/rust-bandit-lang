@@ -2,27 +2,25 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{InferenceError, Result, constraints::Constraints, linked, source};
 
-enum Global<'a> {
+enum Term<'a> {
     Linked(linked::Term<'a>),
     Source(source::Term<'a>),
 }
 
-pub type GlobalValues<'a> = HashMap<&'a str, source::Term<'a>>;
-
 pub struct Context<'a> {
-    local_variables: HashMap<&'a str, Vec<linked::Term<'a>>>,
-    global_variables: Rc<HashMap<&'a str, RefCell<Global<'a>>>>,
+    variables: HashMap<&'a str, Vec<linked::Term<'a>>>,
+    constants: Rc<HashMap<&'a str, RefCell<Term<'a>>>>,
     constraints: Constraints<'a>,
 }
 
 impl<'a> Context<'a> {
-    pub fn new(global_variables: impl IntoIterator<Item = (&'a str, source::Term<'a>)>) -> Self {
+    pub fn new(constants: impl IntoIterator<Item = (&'a str, source::Term<'a>)>) -> Self {
         Self {
-            local_variables: HashMap::new(),
-            global_variables: Rc::new(
-                global_variables
+            variables: HashMap::new(),
+            constants: Rc::new(
+                constants
                     .into_iter()
-                    .map(|(name, value)| (name, RefCell::new(Global::Source(value))))
+                    .map(|(name, value)| (name, RefCell::new(Term::Source(value))))
                     .collect(),
             ),
             constraints: Constraints::empty(),
@@ -30,17 +28,17 @@ impl<'a> Context<'a> {
     }
 
     pub fn infer_types(&self) -> Result<()> {
-        for value in self.global_variables.values() {
-            self.link_global(value)?;
+        for value in self.constants.values() {
+            self.link_constant(value)?;
         }
 
         self.constraints.solve()
     }
 
-    pub fn globals(&self) -> impl Iterator<Item = (&'a str, Result<linked::Term<'a>>)> {
-        self.global_variables
+    pub fn constants(&self) -> impl Iterator<Item = (&'a str, Result<linked::Term<'a>>)> {
+        self.constants
             .iter()
-            .map(|(name, value)| (*name, self.link_global(value)))
+            .map(|(name, value)| (*name, self.link_constant(value)))
     }
 
     pub fn constraints(&self) -> &Constraints<'a> {
@@ -53,14 +51,11 @@ impl<'a> Context<'a> {
         variable_value: linked::Term<'a>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Output {
-        self.local_variables
-            .entry(name)
-            .or_default()
-            .push(variable_value);
+        self.variables.entry(name).or_default().push(variable_value);
         let output = f(self);
 
-        if self.local_variables.get_mut(name).unwrap().pop().is_none() {
-            self.local_variables.remove(name);
+        if self.variables.get_mut(name).unwrap().pop().is_none() {
+            self.variables.remove(name);
         }
 
         output
@@ -72,24 +67,24 @@ impl<'a> Context<'a> {
         } else {
             linked::Term::constant(
                 name,
-                self.link_global(self.global_variables.get(name).ok_or(InferenceError)?)?,
+                self.link_constant(self.constants.get(name).ok_or(InferenceError)?)?,
             )
         })
     }
 
     fn lookup_local(&self, name: &'a str) -> Option<linked::Term<'a>> {
-        Some(self.local_variables.get(name)?.last()?.clone())
+        Some(self.variables.get(name)?.last()?.clone())
     }
 
-    fn link_global(&self, term: &RefCell<Global<'a>>) -> Result<linked::Term<'a>> {
+    fn link_constant(&self, term: &RefCell<Term<'a>>) -> Result<linked::Term<'a>> {
         let mut term = term.try_borrow_mut().map_err(|_| InferenceError)?;
 
         let typed_term = match &mut *term {
-            Global::Linked(term) => term.clone(),
-            Global::Source(term) => {
+            Term::Linked(term) => term.clone(),
+            Term::Source(term) => {
                 let mut global_ctx = Context {
-                    local_variables: HashMap::new(),
-                    global_variables: self.global_variables.clone(),
+                    variables: HashMap::new(),
+                    constants: self.constants.clone(),
                     constraints: self.constraints.clone(),
                 };
 
@@ -97,7 +92,7 @@ impl<'a> Context<'a> {
             }
         };
 
-        *term = Global::Linked(typed_term.clone());
+        *term = Term::Linked(typed_term.clone());
 
         Ok(typed_term)
     }
