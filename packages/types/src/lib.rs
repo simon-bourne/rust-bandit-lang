@@ -1,5 +1,7 @@
 use std::{
     cell::{Ref, RefCell, RefMut},
+    error::Error,
+    fmt,
     rc::Rc,
     result,
 };
@@ -47,6 +49,14 @@ pub type Result<T> = result::Result<T, InferenceError>;
 // TODO: Better error handling.
 #[derive(Debug)]
 pub struct InferenceError;
+
+impl fmt::Display for InferenceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("InferenceError")
+    }
+}
+
+impl Error for InferenceError {}
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Evaluation {
