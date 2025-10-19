@@ -5,8 +5,8 @@ use clonelet::clone;
 use katexit::katexit;
 
 use crate::{
-    Evaluation, GenericTerm, InferenceError, Pretty, Result, SharedMut, TermReference,
-    VariableBinding, constraints::Constraints,
+    Evaluation, InferenceError, Pretty, Result, SharedMut, TermReference, VariableBinding,
+    constraints::Constraints,
 };
 
 mod pretty;
@@ -496,6 +496,59 @@ impl<'src> Term<'src> {
 impl fmt::Debug for Term<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.debug(f)
+    }
+}
+
+enum GenericTerm<'src, Term: TermReference<'src>> {
+    Type,
+    Apply {
+        function: Term,
+        argument: Term,
+        typ: Term,
+        evaluation: Evaluation,
+    },
+    Variable(Term::Variable),
+    Unknown {
+        typ: Term,
+    },
+    Let {
+        value: Term,
+        binding: VariableBinding<Term>,
+    },
+    Pi(VariableBinding<Term>),
+    Lambda(VariableBinding<Term>),
+}
+
+impl<'src, Term: TermReference<'src>> GenericTerm<'src, Term> {
+    fn pi(variable: Term, in_term: Term, evaluation: Evaluation) -> Self {
+        Self::Pi(VariableBinding {
+            variable,
+            in_term,
+            evaluation,
+        })
+    }
+
+    fn is_known(&self) -> bool {
+        !matches!(self, Self::Unknown { .. })
+    }
+
+    fn typ(
+        &self,
+        new: impl FnOnce(Self) -> Term,
+        type_of_variable: impl FnOnce(&Term::Variable) -> Term,
+    ) -> Term {
+        match self {
+            Self::Type => new(Self::Type),
+            Self::Apply { typ, .. } | Self::Unknown { typ } => typ.clone(),
+            Self::Variable(variable) => type_of_variable(variable),
+            Self::Let { binding, .. } => binding.in_term.typ(),
+            Self::Pi(_) => new(Self::Type),
+            Self::Lambda(binding) => new(Self::pi(
+                binding.variable.clone(),
+                binding.in_term.typ(),
+                binding.evaluation,
+            )),
+        }
     }
 }
 

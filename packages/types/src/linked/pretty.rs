@@ -1,6 +1,7 @@
 use super::{IndirectTerm, Term, Variable};
 use crate::{
-    GenericTerm, Pretty, TermReference,
+    Pretty, TermReference,
+    linked::GenericTerm,
     pretty::{BinaryOperator, Document, Layout, Operator, Side, has_type, pretty_let},
 };
 
