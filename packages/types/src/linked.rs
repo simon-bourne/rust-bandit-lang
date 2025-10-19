@@ -5,7 +5,7 @@ use clonelet::clone;
 use katexit::katexit;
 
 use crate::{
-    Evaluation, InferenceError, Pretty, Result, SharedMut, TermReference, VariableBinding,
+    Evaluation, InferenceError, Pretty, Result, SharedMut, VariableBinding,
     constraints::Constraints,
 };
 
@@ -496,6 +496,14 @@ impl<'src> Term<'src> {
 
         *name
     }
+
+    fn is_known(&self) -> bool {
+        self.clone().value().is_known()
+    }
+
+    fn typ(&self) -> Self {
+        self.clone().value().typ()
+    }
 }
 
 impl fmt::Debug for Term<'_> {
@@ -551,16 +559,6 @@ impl<'src> TermEnum<'src> {
                 binding.evaluation,
             ),
         }
-    }
-}
-
-impl<'src> TermReference<'src> for Term<'src> {
-    fn is_known(&self) -> bool {
-        self.clone().value().is_known()
-    }
-
-    fn typ(&self) -> Self {
-        self.clone().value().typ()
     }
 }
 

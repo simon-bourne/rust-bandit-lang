@@ -1,6 +1,6 @@
 use super::{IndirectTerm, Term};
 use crate::{
-    Pretty, TermReference,
+    Pretty,
     linked::TermEnum,
     pretty::{BinaryOperator, Document, Layout, Operator, Side, TypeAnnotated, pretty_let},
 };

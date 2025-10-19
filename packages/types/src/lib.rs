@@ -47,12 +47,6 @@ pub type Result<T> = result::Result<T, InferenceError>;
 #[derive(Debug)]
 pub struct InferenceError;
 
-pub trait TermReference<'src>: Pretty + Clone + Sized {
-    fn is_known(&self) -> bool;
-
-    fn typ(&self) -> Self;
-}
-
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Evaluation {
     Static,
