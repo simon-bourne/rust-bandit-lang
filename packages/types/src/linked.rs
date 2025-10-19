@@ -560,17 +560,11 @@ impl<'src> TermEnum<'src> {
 
 impl<'src> TermReference<'src> for Term<'src> {
     fn is_known(&self) -> bool {
-        match &*self.0.borrow() {
-            IndirectTerm::Value { term, .. } => term.is_known(),
-            IndirectTerm::Link { target } => target.is_known(),
-        }
+        self.clone().value().is_known()
     }
 
     fn typ(&self) -> Self {
-        match &*self.0.borrow() {
-            IndirectTerm::Value { term, .. } => term.typ(),
-            IndirectTerm::Link { target } => target.typ(),
-        }
+        self.clone().value().typ()
     }
 }
 
