@@ -498,11 +498,23 @@ impl<'src> Term<'src> {
     }
 
     fn is_known(&self) -> bool {
-        self.clone().value().is_known()
+        !matches!(&*self.clone().value(), TermEnum::Unknown { .. })
     }
 
     fn typ(&self) -> Self {
-        self.clone().value().typ()
+        match &*self.clone().value() {
+            TermEnum::Type | TermEnum::Pi(_) => Term::type_of_type(),
+            TermEnum::Apply { typ, .. }
+            | TermEnum::Unknown { typ }
+            | TermEnum::Variable { typ, .. } => typ.clone(),
+            TermEnum::Constant { value, .. } => value.typ(),
+            TermEnum::Let { binding, .. } => binding.in_term.typ(),
+            TermEnum::Lambda(binding) => Term::pi_type(
+                binding.variable.clone(),
+                binding.in_term.typ(),
+                binding.evaluation,
+            ),
+        }
     }
 }
 
@@ -538,28 +550,6 @@ enum TermEnum<'src> {
     },
     Pi(VariableBinding<Term<'src>>),
     Lambda(VariableBinding<Term<'src>>),
-}
-
-impl<'src> TermEnum<'src> {
-    fn is_known(&self) -> bool {
-        !matches!(self, Self::Unknown { .. })
-    }
-
-    fn typ(&self) -> Term<'src> {
-        match self {
-            Self::Type | Self::Pi(_) => Term::type_of_type(),
-            Self::Apply { typ, .. } | Self::Unknown { typ } | Self::Variable { typ, .. } => {
-                typ.clone()
-            }
-            Self::Constant { value, .. } => value.typ(),
-            Self::Let { binding, .. } => binding.in_term.typ(),
-            Self::Lambda(binding) => Term::pi_type(
-                binding.variable.clone(),
-                binding.in_term.typ(),
-                binding.evaluation,
-            ),
-        }
-    }
 }
 
 impl<'src> VariableBinding<Term<'src>> {
