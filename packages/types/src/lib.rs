@@ -44,6 +44,7 @@ impl<T> Clone for SharedMut<T> {
 
 pub type Result<T> = result::Result<T, InferenceError>;
 
+// TODO: Better error handling.
 #[derive(Debug)]
 pub struct InferenceError;
 
