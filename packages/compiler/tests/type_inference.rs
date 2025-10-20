@@ -56,7 +56,7 @@ fn infer_types(input: &str) -> Result<core::Term<'_>, InferenceError> {
         ],
     );
 
-    let term = parse(input).link(ctx)?;
+    let term = parse(input).desugar(ctx)?;
     ctx.infer_types()?;
     Ok(term)
 }

@@ -91,37 +91,39 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::Variable(name))
     }
 
-    pub fn link(&self, ctx: &mut Context<'src>) -> Result<core::Term<'src>> {
-        use core::Term as Linked;
+    pub fn desugar(&self, ctx: &mut Context<'src>) -> Result<core::Term<'src>> {
+        use core::Term as Core;
 
         Ok(match self.0.as_ref() {
-            TermEnum::Type => Linked::type_of_type(),
+            TermEnum::Type => Core::type_of_type(),
             TermEnum::Apply {
                 function,
                 argument,
                 evaluation,
-            } => Linked::apply(
-                function.link(ctx)?,
-                argument.link(ctx)?,
-                Linked::unknown_type(),
+            } => Core::apply(
+                function.desugar(ctx)?,
+                argument.desugar(ctx)?,
+                Core::unknown_type(),
                 *evaluation,
                 ctx.constraints(),
             ),
             TermEnum::Variable(name) => ctx.lookup(name)?,
-            TermEnum::Unknown => Linked::unknown_value(),
-            TermEnum::Let { value, binding } => {
-                Linked::let_binding(value.link(ctx)?, binding.link(ctx)?, ctx.constraints())
-            }
-            TermEnum::Pi(binding) => Linked::pi(binding.link(ctx)?),
-            TermEnum::FunctionType(left, right) => Linked::pi(VariableBinding {
-                variable: core::Term::variable(None, left.link(ctx)?),
-                in_term: right.link(ctx)?,
+            TermEnum::Unknown => Core::unknown_value(),
+            TermEnum::Let { value, binding } => Core::let_binding(
+                value.desugar(ctx)?,
+                binding.desugar(ctx)?,
+                ctx.constraints(),
+            ),
+            TermEnum::Pi(binding) => Core::pi(binding.desugar(ctx)?),
+            TermEnum::FunctionType(left, right) => Core::pi(VariableBinding {
+                variable: Core::variable(None, left.desugar(ctx)?),
+                in_term: right.desugar(ctx)?,
                 evaluation: Evaluation::Dynamic,
             }),
-            TermEnum::Lambda(binding) => Linked::lambda(binding.link(ctx)?),
-            TermEnum::HasType { term, typ } => {
-                term.link(ctx)?.has_type(typ.link(ctx)?, ctx.constraints())
-            }
+            TermEnum::Lambda(binding) => Core::lambda(binding.desugar(ctx)?),
+            TermEnum::HasType { term, typ } => term
+                .desugar(ctx)?
+                .has_type(typ.desugar(ctx)?, ctx.constraints()),
         })
     }
 
@@ -129,11 +131,11 @@ impl<'src> Term<'src> {
         Self(Box::new(term))
     }
 
-    fn link_variable(&self, ctx: &mut Context<'src>) -> Result<core::Term<'src>> {
+    fn desugar_variable(&self, ctx: &mut Context<'src>) -> Result<core::Term<'src>> {
         Ok(match self.0.as_ref() {
             TermEnum::HasType { term, typ } => Ok(term
-                .link_variable(ctx)?
-                .has_type(typ.link(ctx)?, ctx.constraints()))?,
+                .desugar_variable(ctx)?
+                .has_type(typ.desugar(ctx)?, ctx.constraints()))?,
             TermEnum::Variable(name) => {
                 core::Term::variable(Some(name), core::Term::unknown_type())
             }
@@ -167,9 +169,9 @@ enum TermEnum<'src> {
 }
 
 impl<'src> Binding<'src> {
-    fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<core::Term<'src>>> {
-        let variable = self.variable.link_variable(ctx)?;
-        let in_term = ctx.in_scope(variable.clone(), |ctx| self.in_term.link(ctx))?;
+    fn desugar(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<core::Term<'src>>> {
+        let variable = self.variable.desugar_variable(ctx)?;
+        let in_term = ctx.in_scope(variable.clone(), |ctx| self.in_term.desugar(ctx))?;
 
         Ok(VariableBinding {
             variable,

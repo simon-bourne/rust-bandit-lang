@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use crate::{InferenceError, Result, ast, constraints::Constraints, core};
 
 enum Term<'a> {
-    Linked(core::Term<'a>),
+    Core(core::Term<'a>),
     Ast(ast::Term<'a>),
 }
 
@@ -29,7 +29,7 @@ impl<'a> Context<'a> {
 
     pub fn infer_types(&self) -> Result<()> {
         for value in self.constants.values() {
-            self.link_constant(value)?;
+            self.desugar_constant(value)?;
         }
 
         self.constraints.solve()
@@ -38,7 +38,7 @@ impl<'a> Context<'a> {
     pub fn constants(&self) -> impl Iterator<Item = (&'a str, Result<core::Term<'a>>)> {
         self.constants
             .iter()
-            .map(|(name, value)| (*name, self.link_constant(value)))
+            .map(|(name, value)| (*name, self.desugar_constant(value)))
     }
 
     pub fn constraints(&self) -> &Constraints<'a> {
@@ -67,7 +67,7 @@ impl<'a> Context<'a> {
         } else {
             core::Term::constant(
                 name,
-                self.link_constant(self.constants.get(name).ok_or(InferenceError)?)?,
+                self.desugar_constant(self.constants.get(name).ok_or(InferenceError)?)?,
             )
         })
     }
@@ -76,11 +76,11 @@ impl<'a> Context<'a> {
         Some(self.variables.get(name)?.last()?.clone())
     }
 
-    fn link_constant(&self, term: &RefCell<Term<'a>>) -> Result<core::Term<'a>> {
+    fn desugar_constant(&self, term: &RefCell<Term<'a>>) -> Result<core::Term<'a>> {
         let mut term = term.try_borrow_mut().map_err(|_| InferenceError)?;
 
         let typed_term = match &mut *term {
-            Term::Linked(term) => term.clone(),
+            Term::Core(term) => term.clone(),
             Term::Ast(term) => {
                 let mut global_ctx = Context {
                     variables: HashMap::new(),
@@ -88,11 +88,11 @@ impl<'a> Context<'a> {
                     constraints: self.constraints.clone(),
                 };
 
-                term.link(&mut global_ctx)?
+                term.desugar(&mut global_ctx)?
             }
         };
 
-        *term = Term::Linked(typed_term.clone());
+        *term = Term::Core(typed_term.clone());
 
         Ok(typed_term)
     }
