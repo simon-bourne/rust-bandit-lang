@@ -71,7 +71,7 @@ impl<'src> Term<'src> {
         constraints: &Constraints<'src>,
     ) -> Self {
         constraints.add({
-            clone!(function, argument, mut typ);
+            clone!(function, mut argument, mut typ);
 
             async move {
                 let variable = Self::variable(None, argument.typ());
@@ -80,9 +80,8 @@ impl<'src> Term<'src> {
                 Self::unify(&mut function_type, &mut function.typ()).await?;
 
                 let mut result_type =
-                    if let TermEnum::Pi(binding) = &mut *function_type.fresh_variables().value() {
-                        binding.variable.replace_with(&argument);
-                        binding.in_term.clone()
+                    if let TermEnum::Pi(binding) = &mut *function_type.value() {
+                        binding.in_term.substitute(&mut binding.variable, &mut argument)
                     } else {
                         panic!("Expected a PI type")
                     };
@@ -169,6 +168,48 @@ impl<'src> Term<'src> {
         };
 
         *name
+    }
+
+    fn substitute(&mut self, old: &mut Term<'src>, new: &mut Term<'src>) -> Self {
+        if Self::is_same(self, old) {
+            return new.clone();
+        }
+
+        let mut value = self.value();
+
+        Self::new(match &mut *value {
+            TermEnum::Variable { name, typ, .. } => TermEnum::Variable {
+                name: *name,
+                fresh: None,
+                typ: typ.substitute(old, new),
+            },
+            TermEnum::Unknown { .. } => {
+                drop(value);
+                return self.clone();
+            }
+            TermEnum::Constant { name, value } => TermEnum::Constant {
+                name,
+                value: value.substitute(old, new),
+            },
+            TermEnum::Let { value, binding } => TermEnum::Let {
+                value: value.substitute(old, new),
+                binding: binding.substitute(old, new),
+            },
+            TermEnum::Pi(binding) => TermEnum::Pi(binding.substitute(old, new)),
+            TermEnum::Lambda(binding) => TermEnum::Lambda(binding.substitute(old, new)),
+            TermEnum::Type => TermEnum::Type,
+            TermEnum::Apply {
+                function,
+                argument,
+                typ,
+                evaluation,
+            } => TermEnum::Apply {
+                function: function.substitute(old, new),
+                argument: argument.substitute(old, new),
+                typ: typ.substitute(old, new),
+                evaluation: *evaluation,
+            },
+        })
     }
 
     /// Create a copy of `self`, making a fresh variable for every binding.
@@ -546,6 +587,20 @@ enum TermEnum<'src> {
 impl<'src> VariableBinding<Term<'src>> {
     pub fn variable_name(&self) -> Option<&'src str> {
         self.variable.clone().variable_name()
+    }
+
+    fn substitute(&mut self, old: &mut Term<'src>, new: &mut Term<'src>) -> Self {
+        let variable = if Term::is_same(&mut self.variable, old) {
+            new.clone()
+        } else {
+            self.variable.clone()
+        };
+
+        Self {
+            variable,
+            in_term: self.in_term.substitute(old, new),
+            evaluation: self.evaluation,
+        }
     }
 
     fn fresh_variables(&mut self) -> Self {
