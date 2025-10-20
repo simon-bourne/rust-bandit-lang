@@ -37,11 +37,7 @@ impl<'src> Term<'src> {
     }
 
     pub fn variable(name: Option<&'src str>, typ: Self) -> Self {
-        Self::new(TermEnum::Variable {
-            name,
-            fresh: None,
-            typ,
-        })
+        Self::new(TermEnum::Variable { name, typ })
     }
 
     pub fn constant(name: &'src str, value: Self) -> Self {
@@ -179,7 +175,6 @@ impl<'src> Term<'src> {
         Self::new(match &mut *value {
             TermEnum::Variable { name, typ, .. } => TermEnum::Variable {
                 name: *name,
-                fresh: None,
                 typ: typ.substitute(old, new),
             },
             TermEnum::Unknown { .. } => {
@@ -206,48 +201,6 @@ impl<'src> Term<'src> {
                 function: function.substitute(old, new),
                 argument: argument.substitute(old, new),
                 typ: typ.substitute(old, new),
-                evaluation: *evaluation,
-            },
-        })
-    }
-
-    /// Create a copy of `self`, making a fresh variable for every binding.
-    ///
-    /// This allows us to modify the copy and substitute variables without
-    /// affecting the original.
-    fn fresh_variables(&mut self) -> Self {
-        let mut value = self.value();
-
-        Self::new(match &mut *value {
-            TermEnum::Variable {
-                fresh: Some(fresh), ..
-            } => {
-                return fresh.clone();
-            }
-            TermEnum::Variable { fresh: None, .. } | TermEnum::Unknown { .. } => {
-                drop(value);
-                return self.clone();
-            }
-            TermEnum::Constant { name, value } => TermEnum::Constant {
-                name,
-                value: value.fresh_variables(),
-            },
-            TermEnum::Let { value, binding } => TermEnum::Let {
-                value: value.fresh_variables(),
-                binding: binding.fresh_variables(),
-            },
-            TermEnum::Pi(binding) => TermEnum::Pi(binding.fresh_variables()),
-            TermEnum::Lambda(binding) => TermEnum::Lambda(binding.fresh_variables()),
-            TermEnum::Type => TermEnum::Type,
-            TermEnum::Apply {
-                function,
-                argument,
-                typ,
-                evaluation,
-            } => TermEnum::Apply {
-                function: function.fresh_variables(),
-                argument: argument.fresh_variables(),
-                typ: typ.fresh_variables(),
                 evaluation: *evaluation,
             },
         })
@@ -381,13 +334,15 @@ impl<'src> Term<'src> {
     async fn evaluate_apply(&mut self, mut function: Self, argument: Self) -> Result<()> {
         Box::pin(function.evaluate_node()).await?;
 
+        // TODO:
         // We need fresh variables if the function is a lambda, because we'll be
         // substituting the lambda's argument with a variable from outside the function
         // term.
         //
         // For example, in the term `(\x ⇒ x) y`, the child term `(\x ⇒ x)` could be
         // shared with other terms, so we want to modify a copy of it.
-        match &mut *function.fresh_variables().value() {
+        // TODO: What about unknowns?
+        match &mut *function.value() {
             TermEnum::Lambda(VariableBinding {
                 variable, in_term, ..
             }) => {
@@ -564,7 +519,6 @@ enum TermEnum<'src> {
     },
     Variable {
         name: Option<&'src str>,
-        fresh: Option<Term<'src>>,
         typ: Term<'src>,
     },
     Constant {
@@ -596,36 +550,6 @@ impl<'src> VariableBinding<Term<'src>> {
             variable: self.variable.substitute(old, new),
             in_term: self.in_term.substitute(old, new),
             evaluation: self.evaluation,
-        }
-    }
-
-    fn fresh_variables(&mut self) -> Self {
-        let variable = self.allocate_fresh_variable();
-        let in_term = self.in_term.fresh_variables();
-        self.free_fresh_variable();
-
-        Self {
-            variable,
-            in_term,
-            evaluation: self.evaluation,
-        }
-    }
-
-    fn allocate_fresh_variable(&mut self) -> Term<'src> {
-        let TermEnum::Variable { name, fresh, typ } = &mut *self.variable.value() else {
-            return self.variable.fresh_variables();
-        };
-
-        let variable = Term::variable(*name, typ.fresh_variables());
-
-        assert!(fresh.is_none());
-        *fresh = Some(variable.clone());
-        variable
-    }
-
-    fn free_fresh_variable(&mut self) {
-        if let TermEnum::Variable { fresh, .. } = &mut *self.variable.value() {
-            *fresh = None;
         }
     }
 
