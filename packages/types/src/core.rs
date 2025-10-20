@@ -79,12 +79,13 @@ impl<'src> Term<'src> {
                     Self::pi_type(variable.clone(), Self::unknown_type(), evaluation);
                 Self::unify(&mut function_type, &mut function.typ()).await?;
 
-                let mut result_type =
-                    if let TermEnum::Pi(binding) = &mut *function_type.value() {
-                        binding.in_term.substitute(&mut binding.variable, &mut argument)
-                    } else {
-                        panic!("Expected a PI type")
-                    };
+                let mut result_type = if let TermEnum::Pi(binding) = &mut *function_type.value() {
+                    binding
+                        .in_term
+                        .substitute(&mut binding.variable, &mut argument)
+                } else {
+                    panic!("Expected a PI type")
+                };
 
                 Self::unify(&mut typ, &mut result_type).await?;
                 Ok(())
