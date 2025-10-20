@@ -80,9 +80,7 @@ impl<'src> Term<'src> {
                 Self::unify(&mut function_type, &mut function.typ()).await?;
 
                 let mut result_type = if let TermEnum::Pi(binding) = &mut *function_type.value() {
-                    binding
-                        .in_term
-                        .substitute(&mut binding.variable, &mut argument)
+                    binding.apply(&mut argument)
                 } else {
                     panic!("Expected a PI type")
                 };
@@ -302,17 +300,15 @@ impl<'src> Term<'src> {
             return Ok(ControlFlow::Continue(()));
         }
 
-        let mut in_term = if let TermEnum::Pi(binding) = &mut *self.value()
+        let mut typ = if let TermEnum::Pi(binding) = &mut *self.value()
             && binding.evaluation == Evaluation::Static
         {
-            binding
-                .in_term
-                .substitute(&mut binding.variable, &mut Self::unknown_value())
+            binding.apply(&mut Self::unknown_value())
         } else {
             return Ok(ControlFlow::Continue(()));
         };
 
-        Self::unify_recurse(&mut in_term, other).await?;
+        Self::unify_recurse(&mut typ, other).await?;
         Ok(ControlFlow::Break(()))
     }
 
@@ -589,6 +585,10 @@ enum TermEnum<'src> {
 impl<'src> VariableBinding<Term<'src>> {
     pub fn variable_name(&self) -> Option<&'src str> {
         self.variable.clone().variable_name()
+    }
+
+    fn apply(&mut self, argument: &mut Term<'src>) -> Term<'src> {
+        self.in_term.substitute(&mut self.variable, argument)
     }
 
     fn substitute(&mut self, old: &mut Term<'src>, new: &mut Term<'src>) -> Self {
