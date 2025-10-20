@@ -374,8 +374,8 @@ impl<'src> Term<'src> {
     }
 
     async fn unify_known(x: &mut Self, y: &mut Self) -> Result<()> {
-        // TODO: Find a way to not borrow `x` and `y` across await for
-        // `VariableBinding::unify`
+        // `await_holding_refcell_ref` gives false positives. We `drop((x_ref, y_ref))`
+        // before awaiting for all cases below.
         #![allow(clippy::await_holding_refcell_ref)]
         let mut x_ref = x.value();
         let mut y_ref = y.value();
@@ -428,16 +428,22 @@ impl<'src> Term<'src> {
                     binding: binding1,
                 },
             ) => {
-                Self::unify_recurse(value, value1).await?;
-                VariableBinding::unify(binding, binding1).await?
+                clone!(mut value, mut value1, mut binding, mut binding1);
+                drop((x_ref, y_ref));
+                Self::unify_recurse(&mut value, &mut value1).await?;
+                VariableBinding::unify(&mut binding, &mut binding1).await?
             }
             (TermEnum::Pi(binding0), TermEnum::Pi(binding1))
                 if binding0.evaluation == binding1.evaluation =>
             {
-                VariableBinding::unify(binding0, binding1).await?
+                clone!(mut binding0, mut binding1);
+                drop((x_ref, y_ref));
+                VariableBinding::unify(&mut binding0, &mut binding1).await?
             }
             (TermEnum::Lambda(binding0), TermEnum::Lambda(binding1)) => {
-                VariableBinding::unify(binding0, binding1).await?
+                clone!(mut binding0, mut binding1);
+                drop((x_ref, y_ref));
+                VariableBinding::unify(&mut binding0, &mut binding1).await?
             }
             // It's safer to explicitly ignore each variant
             (TermEnum::Type, _rhs)

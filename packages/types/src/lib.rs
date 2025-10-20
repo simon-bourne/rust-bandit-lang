@@ -64,6 +64,7 @@ pub enum Evaluation {
     Dynamic,
 }
 
+#[derive(Clone)]
 struct VariableBinding<Term> {
     variable: Term,
     in_term: Term,
