@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use derive_more::Constructor;
 
 use crate::{Evaluation, InferenceError, Result, VariableBinding, context::Context, linked};
@@ -27,8 +25,7 @@ impl<'src> Constant<'src> {
     }
 }
 
-#[derive(Clone)]
-pub struct Term<'src>(Rc<TermEnum<'src>>);
+pub struct Term<'src>(Box<TermEnum<'src>>);
 
 impl<'src> Term<'src> {
     pub fn type_of_type() -> Self {
@@ -129,7 +126,7 @@ impl<'src> Term<'src> {
     }
 
     fn new(term: TermEnum<'src>) -> Self {
-        Self(Rc::new(term))
+        Self(Box::new(term))
     }
 
     fn link_variable(&self, ctx: &mut Context<'src>) -> Result<linked::Term<'src>> {
