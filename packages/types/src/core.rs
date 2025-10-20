@@ -302,16 +302,17 @@ impl<'src> Term<'src> {
             return Ok(ControlFlow::Continue(()));
         }
 
-        let mut binding = if let TermEnum::Pi(binding) = &mut *self.value()
+        let mut in_term = if let TermEnum::Pi(binding) = &mut *self.value()
             && binding.evaluation == Evaluation::Static
         {
-            binding.fresh_variables()
+            binding
+                .in_term
+                .substitute(&mut binding.variable, &mut Self::unknown_value())
         } else {
             return Ok(ControlFlow::Continue(()));
         };
 
-        binding.variable.replace_with(&Self::unknown_value());
-        Self::unify_recurse(&mut binding.in_term, other).await?;
+        Self::unify_recurse(&mut in_term, other).await?;
         Ok(ControlFlow::Break(()))
     }
 
