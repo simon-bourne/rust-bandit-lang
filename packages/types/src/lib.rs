@@ -6,11 +6,11 @@ use std::{
     result,
 };
 
+pub mod ast;
 mod constraints;
 pub mod context;
 pub mod linked;
 mod pretty;
-pub mod source;
 
 pub use pretty::Pretty;
 

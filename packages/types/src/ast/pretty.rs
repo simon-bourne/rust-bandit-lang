@@ -1,7 +1,7 @@
 use crate::{
     Evaluation, Pretty,
+    ast::{Constant, Term, TermEnum},
     pretty::{Document, Layout, Operator, Side, TypeAnnotated, pretty_let},
-    source::{Constant, Term, TermEnum},
 };
 
 impl Pretty for Term<'_> {

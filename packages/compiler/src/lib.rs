@@ -3,7 +3,7 @@ use bandit_parser::{
     lex::{SrcToken, Token},
     parse::definitions,
 };
-use bandit_types::{Pretty, source::Constant};
+use bandit_types::{Pretty, ast::Constant};
 use winnow::Parser;
 
 pub fn compile(source: &str) -> Result<()> {

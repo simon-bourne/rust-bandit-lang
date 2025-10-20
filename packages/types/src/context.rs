@@ -1,10 +1,10 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{InferenceError, Result, constraints::Constraints, linked, source};
+use crate::{InferenceError, Result, ast, constraints::Constraints, linked};
 
 enum Term<'a> {
     Linked(linked::Term<'a>),
-    Source(source::Term<'a>),
+    Ast(ast::Term<'a>),
 }
 
 pub struct Context<'a> {
@@ -14,13 +14,13 @@ pub struct Context<'a> {
 }
 
 impl<'a> Context<'a> {
-    pub fn new(constants: impl IntoIterator<Item = (&'a str, source::Term<'a>)>) -> Self {
+    pub fn new(constants: impl IntoIterator<Item = (&'a str, ast::Term<'a>)>) -> Self {
         Self {
             variables: HashMap::new(),
             constants: Rc::new(
                 constants
                     .into_iter()
-                    .map(|(name, value)| (name, RefCell::new(Term::Source(value))))
+                    .map(|(name, value)| (name, RefCell::new(Term::Ast(value))))
                     .collect(),
             ),
             constraints: Constraints::empty(),
@@ -81,7 +81,7 @@ impl<'a> Context<'a> {
 
         let typed_term = match &mut *term {
             Term::Linked(term) => term.clone(),
-            Term::Source(term) => {
+            Term::Ast(term) => {
                 let mut global_ctx = Context {
                     variables: HashMap::new(),
                     constants: self.constants.clone(),
