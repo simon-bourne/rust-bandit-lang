@@ -79,13 +79,11 @@ impl<'src> Term<'src> {
                     Self::pi_type(variable.clone(), Self::unknown_type(), evaluation);
                 Self::unify(&mut function_type, &mut function.typ()).await?;
 
-                let mut result_type =
-                    if let TermEnum::Pi(binding) = &mut *function_type.fresh_variables().value() {
-                        binding.variable.replace_with(&argument);
-                        binding.in_term.clone()
-                    } else {
-                        panic!("Expected a PI type")
-                    };
+                let mut result_type = if let TermEnum::Pi(binding) = &mut *function_type.value() {
+                    binding.apply(&argument)
+                } else {
+                    panic!("Expected a PI type")
+                };
 
                 Self::unify(&mut typ, &mut result_type).await?;
                 Ok(())
@@ -260,16 +258,15 @@ impl<'src> Term<'src> {
             return Ok(ControlFlow::Continue(()));
         }
 
-        let mut binding = if let TermEnum::Pi(binding) = &mut *self.value()
+        let mut in_term = if let TermEnum::Pi(binding) = &mut *self.value()
             && binding.evaluation == Evaluation::Static
         {
-            binding.fresh_variables()
+            binding.apply(&Self::unknown_value())
         } else {
             return Ok(ControlFlow::Continue(()));
         };
 
-        binding.variable.replace_with(&Self::unknown_value());
-        Self::unify_recurse(&mut binding.in_term, other).await?;
+        Self::unify_recurse(&mut in_term, other).await?;
         Ok(ControlFlow::Break(()))
     }
 
@@ -552,6 +549,23 @@ enum TermEnum<'src> {
 impl<'src> VariableBinding<Term<'src>> {
     pub fn variable_name(&self) -> Option<&'src str> {
         self.variable.clone().variable_name()
+    }
+
+    fn apply(&mut self, argument: &Term<'src>) -> Term<'src> {
+        // We only need to substitute `self.variable` and copy everything else, but
+        // allocating `fresh_variables` is:
+        //
+        // - Safer as we don't have to make sure we copy other variables when we
+        //   substitute them
+        // - Easier as we don't have to write `substitute` methods
+        let Self {
+            mut variable,
+            in_term,
+            ..
+        } = self.fresh_variables();
+
+        variable.replace_with(argument);
+        in_term
     }
 
     fn fresh_variables(&mut self) -> Self {
