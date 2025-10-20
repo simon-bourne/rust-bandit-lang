@@ -590,14 +590,8 @@ impl<'src> VariableBinding<Term<'src>> {
     }
 
     fn substitute(&mut self, old: &mut Term<'src>, new: &mut Term<'src>) -> Self {
-        let variable = if Term::is_same(&mut self.variable, old) {
-            new.clone()
-        } else {
-            self.variable.clone()
-        };
-
         Self {
-            variable,
+            variable: self.variable.substitute(old, new),
             in_term: self.in_term.substitute(old, new),
             evaluation: self.evaluation,
         }
