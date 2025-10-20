@@ -3,7 +3,7 @@ use derive_more::Constructor;
 use super::{IndirectTerm, Term};
 use crate::{
     Pretty,
-    linked::TermEnum,
+    core::TermEnum,
     pretty::{BinaryOperator, Document, Layout, Operator, Side, TypeAnnotated, pretty_let},
 };
 

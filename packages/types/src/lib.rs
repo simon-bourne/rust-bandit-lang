@@ -9,7 +9,7 @@ use std::{
 pub mod ast;
 mod constraints;
 pub mod context;
-pub mod linked;
+pub mod core;
 mod pretty;
 
 pub use pretty::Pretty;

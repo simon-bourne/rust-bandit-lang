@@ -1,14 +1,14 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{InferenceError, Result, ast, constraints::Constraints, linked};
+use crate::{InferenceError, Result, ast, constraints::Constraints, core};
 
 enum Term<'a> {
-    Linked(linked::Term<'a>),
+    Linked(core::Term<'a>),
     Ast(ast::Term<'a>),
 }
 
 pub struct Context<'a> {
-    variables: HashMap<&'a str, Vec<linked::Term<'a>>>,
+    variables: HashMap<&'a str, Vec<core::Term<'a>>>,
     constants: Rc<HashMap<&'a str, RefCell<Term<'a>>>>,
     constraints: Constraints<'a>,
 }
@@ -35,7 +35,7 @@ impl<'a> Context<'a> {
         self.constraints.solve()
     }
 
-    pub fn constants(&self) -> impl Iterator<Item = (&'a str, Result<linked::Term<'a>>)> {
+    pub fn constants(&self) -> impl Iterator<Item = (&'a str, Result<core::Term<'a>>)> {
         self.constants
             .iter()
             .map(|(name, value)| (*name, self.link_constant(value)))
@@ -47,7 +47,7 @@ impl<'a> Context<'a> {
 
     pub(crate) fn in_scope<Output>(
         &mut self,
-        mut variable: linked::Term<'a>,
+        mut variable: core::Term<'a>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Output {
         let name = variable.variable_name().expect("Expected a variable");
@@ -61,22 +61,22 @@ impl<'a> Context<'a> {
         output
     }
 
-    pub(crate) fn lookup(&mut self, name: &'a str) -> Result<linked::Term<'a>> {
+    pub(crate) fn lookup(&mut self, name: &'a str) -> Result<core::Term<'a>> {
         Ok(if let Some(local) = self.lookup_local(name) {
             local
         } else {
-            linked::Term::constant(
+            core::Term::constant(
                 name,
                 self.link_constant(self.constants.get(name).ok_or(InferenceError)?)?,
             )
         })
     }
 
-    fn lookup_local(&self, name: &'a str) -> Option<linked::Term<'a>> {
+    fn lookup_local(&self, name: &'a str) -> Option<core::Term<'a>> {
         Some(self.variables.get(name)?.last()?.clone())
     }
 
-    fn link_constant(&self, term: &RefCell<Term<'a>>) -> Result<linked::Term<'a>> {
+    fn link_constant(&self, term: &RefCell<Term<'a>>) -> Result<core::Term<'a>> {
         let mut term = term.try_borrow_mut().map_err(|_| InferenceError)?;
 
         let typed_term = match &mut *term {

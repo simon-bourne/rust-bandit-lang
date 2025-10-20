@@ -1,6 +1,6 @@
 use derive_more::Constructor;
 
-use crate::{Evaluation, InferenceError, Result, VariableBinding, context::Context, linked};
+use crate::{Evaluation, InferenceError, Result, VariableBinding, context::Context, core};
 
 mod pretty;
 
@@ -91,8 +91,8 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::Variable(name))
     }
 
-    pub fn link(&self, ctx: &mut Context<'src>) -> Result<linked::Term<'src>> {
-        use linked::Term as Linked;
+    pub fn link(&self, ctx: &mut Context<'src>) -> Result<core::Term<'src>> {
+        use core::Term as Linked;
 
         Ok(match self.0.as_ref() {
             TermEnum::Type => Linked::type_of_type(),
@@ -114,7 +114,7 @@ impl<'src> Term<'src> {
             }
             TermEnum::Pi(binding) => Linked::pi(binding.link(ctx)?),
             TermEnum::FunctionType(left, right) => Linked::pi(VariableBinding {
-                variable: linked::Term::variable(None, left.link(ctx)?),
+                variable: core::Term::variable(None, left.link(ctx)?),
                 in_term: right.link(ctx)?,
                 evaluation: Evaluation::Dynamic,
             }),
@@ -129,13 +129,13 @@ impl<'src> Term<'src> {
         Self(Box::new(term))
     }
 
-    fn link_variable(&self, ctx: &mut Context<'src>) -> Result<linked::Term<'src>> {
+    fn link_variable(&self, ctx: &mut Context<'src>) -> Result<core::Term<'src>> {
         Ok(match self.0.as_ref() {
             TermEnum::HasType { term, typ } => Ok(term
                 .link_variable(ctx)?
                 .has_type(typ.link(ctx)?, ctx.constraints()))?,
             TermEnum::Variable(name) => {
-                linked::Term::variable(Some(name), linked::Term::unknown_type())
+                core::Term::variable(Some(name), core::Term::unknown_type())
             }
             _ => Err(InferenceError)?,
         })
@@ -167,7 +167,7 @@ enum TermEnum<'src> {
 }
 
 impl<'src> Binding<'src> {
-    fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<linked::Term<'src>>> {
+    fn link(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<core::Term<'src>>> {
         let variable = self.variable.link_variable(ctx)?;
         let in_term = ctx.in_scope(variable.clone(), |ctx| self.in_term.link(ctx))?;
 
