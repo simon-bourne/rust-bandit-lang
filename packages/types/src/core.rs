@@ -75,8 +75,7 @@ impl<'src> Term<'src> {
 
             async move {
                 let variable = Self::variable(None, argument.typ());
-                let mut function_type =
-                    Self::pi_type(variable.clone(), Self::unknown_type(), evaluation);
+                let mut function_type = Self::pi_type(variable, Self::unknown_type(), evaluation);
                 Self::unify(&mut function_type, &mut function.typ()).await?;
 
                 let mut result_type = if let TermEnum::Pi(binding) = &mut *function_type.value() {
