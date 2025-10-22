@@ -1,26 +1,17 @@
 use derive_more::Constructor;
 
-use super::{IndirectTerm, Term};
+use super::Term;
 use crate::{
     Pretty,
     core::TermEnum,
     pretty::{BinaryOperator, Document, Layout, Operator, Side, TypeAnnotated, pretty_let},
 };
 
-impl Pretty for Term<'_> {
+impl<'src> Pretty for Term<'src> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        match &*self.0.borrow() {
-            IndirectTerm::Value { term, .. } => term.to_document(parent, layout),
-            IndirectTerm::Link { target } => target.to_document(parent, layout),
-        }
-    }
-}
-
-impl<'src> Pretty for TermEnum<'src> {
-    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        match self {
-            Self::Type => Document::text("Type"),
-            Self::Apply {
+        match &*self.clone().value() {
+            TermEnum::Type => Document::text("Type"),
+            TermEnum::Apply {
                 function,
                 argument,
                 typ,
@@ -30,17 +21,17 @@ impl<'src> Pretty for TermEnum<'src> {
                 typ,
             )
             .to_document(parent, layout),
-            Self::Variable { name, typ, .. } => {
+            TermEnum::Variable { name, typ, .. } => {
                 has_type(WithId::new(self, name), typ).to_document(parent, layout)
             }
-            Self::Constant { name, value } => {
+            TermEnum::Constant { name, value } => {
                 has_type(WithId::new(self, name), &value.typ()).to_document(parent, layout)
             }
-            Self::Unknown { typ } => {
+            TermEnum::Unknown { typ } => {
                 has_type(WithId::new(self, None), typ).to_document(parent, layout)
             }
-            Self::Let { value, binding } => pretty_let(value, binding, parent, layout),
-            Self::Pi(binding) => {
+            TermEnum::Let { value, binding } => pretty_let(value, binding, parent, layout),
+            TermEnum::Pi(binding) => {
                 if binding.variable_name().is_none() {
                     let layout = layout.without_types();
                     Operator::Arrow(binding.evaluation).to_document(
@@ -55,18 +46,18 @@ impl<'src> Pretty for TermEnum<'src> {
                 }
             }
             // TODO: Static (`=>`) and dynamic (`->`) bindings
-            Self::Lambda(binding) => binding.to_document(r"\", parent, layout),
+            TermEnum::Lambda(binding) => binding.to_document(r"\", parent, layout),
         }
     }
 }
 
 #[derive(Constructor)]
-struct WithId<Id, Value> {
-    id: *const Id,
+struct WithId<'a, 'src, Value> {
+    id: &'a Term<'src>,
     value: Value,
 }
 
-impl<Id, Value: Pretty> Pretty for WithId<Id, Value> {
+impl<'a, 'src, Value: Pretty> Pretty for WithId<'a, 'src, Value> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         let name_doc = self.value.to_document(parent, layout);
 
@@ -74,7 +65,7 @@ impl<Id, Value: Pretty> Pretty for WithId<Id, Value> {
             Document::concat([
                 name_doc,
                 Document::text("["),
-                Document::text(format!("{:?}", self.id)),
+                Document::text(format!("{:?}", self.id.0.id())),
                 Document::text("]"),
             ])
         } else {

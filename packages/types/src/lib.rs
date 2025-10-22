@@ -36,6 +36,10 @@ impl<T> SharedMut<T> {
     pub fn replace_with(&self, x: T) -> T {
         RefCell::replace(self.0.as_ref(), x)
     }
+
+    pub fn id(&self) -> impl fmt::Debug {
+        Rc::as_ptr(&self.0)
+    }
 }
 
 impl<T> Clone for SharedMut<T> {
