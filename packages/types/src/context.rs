@@ -50,7 +50,10 @@ impl<'a> Context<'a> {
         mut variable: core::Term<'a>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Output {
-        let name = variable.variable_name().expect("Expected a variable");
+        let Some(name) = variable.variable_name() else {
+            return f(self);
+        };
+
         self.variables.entry(name).or_default().push(variable);
         let output = f(self);
 
