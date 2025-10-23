@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use bandit_types::{Pretty, ast::Term, context::Context};
+use bandit_types::{
+    Pretty,
+    ast::{Context, Term},
+};
 
 #[test]
 fn infer_kinds() {

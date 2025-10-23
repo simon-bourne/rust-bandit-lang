@@ -1,8 +1,11 @@
 use derive_more::Constructor;
 
-use crate::{Evaluation, InferenceError, Result, VariableBinding, context::Context, core};
+use crate::{Evaluation, InferenceError, Result, VariableBinding, core};
 
+mod context;
 mod pretty;
+
+pub use context::Context;
 
 #[derive(Constructor)]
 pub struct Constant<'src> {

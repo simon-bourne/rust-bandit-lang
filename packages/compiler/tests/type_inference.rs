@@ -2,7 +2,11 @@ use bandit_parser::{
     lex::{SrcToken, Token},
     parse::term,
 };
-use bandit_types::{InferenceError, Pretty, ast::Term, context::Context, core};
+use bandit_types::{
+    InferenceError, Pretty,
+    ast::{Context, Term},
+    core,
+};
 use winnow::Parser;
 
 fn parse(input: &str) -> Term<'_> {

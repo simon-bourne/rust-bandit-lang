@@ -8,7 +8,6 @@ use std::{
 
 pub mod ast;
 mod constraints;
-pub mod context;
 pub mod core;
 mod pretty;
 
