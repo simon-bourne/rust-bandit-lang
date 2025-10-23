@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{InferenceError, Result, ast, constraints::Constraints, core};
+use crate::{InferenceError, Level, Result, ast, core};
 
 enum Term<'a> {
     Core(core::Term<'a>),
@@ -8,54 +8,36 @@ enum Term<'a> {
 }
 
 pub struct Context<'a> {
-    variables: HashMap<&'a str, Vec<core::Term<'a>>>,
-    constants: Rc<HashMap<&'a str, RefCell<Term<'a>>>>,
-    constraints: Constraints<'a>,
+    variables: HashMap<&'a str, Vec<Level>>,
+    current_level: Level,
 }
 
-impl<'a> Context<'a> {
-    pub fn new(constants: impl IntoIterator<Item = (&'a str, ast::Term<'a>)>) -> Self {
+impl<'src> Context<'src> {
+    pub fn new(constants: impl IntoIterator<Item = (&'src str, ast::Term<'src>)>) -> Self {
         Self {
             variables: HashMap::new(),
-            constants: Rc::new(
-                constants
-                    .into_iter()
-                    .map(|(name, value)| (name, RefCell::new(Term::Ast(value))))
-                    .collect(),
-            ),
-            constraints: Constraints::empty(),
+            current_level: Level(0),
         }
     }
 
     pub fn infer_types(&self) -> Result<()> {
-        for value in self.constants.values() {
-            self.desugar_constant(value)?;
-        }
-
-        self.constraints.solve()
-    }
-
-    pub fn constants(&self) -> impl Iterator<Item = (&'a str, Result<core::Term<'a>>)> {
-        self.constants
-            .iter()
-            .map(|(name, value)| (*name, self.desugar_constant(value)))
-    }
-
-    pub fn constraints(&self) -> &Constraints<'a> {
-        &self.constraints
+        todo!()
     }
 
     pub(crate) fn in_scope<Output>(
         &mut self,
-        mut variable: core::Term<'a>,
+        name: Option<&'src str>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Output {
-        let Some(name) = variable.variable_name() else {
-            return f(self);
-        };
+        let Some(name) = name else { return f(self) };
 
-        self.variables.entry(name).or_default().push(variable);
+        self.variables
+            .entry(name)
+            .or_default()
+            .push(self.current_level);
+        self.current_level.push();
         let output = f(self);
+        self.current_level.pop();
 
         if self.variables.get_mut(name).unwrap().pop().is_none() {
             self.variables.remove(name);
@@ -64,39 +46,14 @@ impl<'a> Context<'a> {
         output
     }
 
-    pub(crate) fn lookup(&mut self, name: &'a str) -> Result<core::Term<'a>> {
-        Ok(if let Some(local) = self.lookup_local(name) {
-            local
-        } else {
-            core::Term::constant(
-                name,
-                self.desugar_constant(self.constants.get(name).ok_or(InferenceError)?)?,
-            )
-        })
+    pub(crate) fn lookup(&mut self, name: &'src str) -> Result<core::Term<'src>> {
+        self.lookup_local(name).ok_or_else(|| InferenceError)
     }
 
-    fn lookup_local(&self, name: &'a str) -> Option<core::Term<'a>> {
-        Some(self.variables.get(name)?.last()?.clone())
-    }
-
-    fn desugar_constant(&self, term: &RefCell<Term<'a>>) -> Result<core::Term<'a>> {
-        let mut term = term.try_borrow_mut().map_err(|_| InferenceError)?;
-
-        let typed_term = match &mut *term {
-            Term::Core(term) => term.clone(),
-            Term::Ast(term) => {
-                let mut global_ctx = Context {
-                    variables: HashMap::new(),
-                    constants: self.constants.clone(),
-                    constraints: self.constraints.clone(),
-                };
-
-                term.desugar(&mut global_ctx)?
-            }
-        };
-
-        *term = Term::Core(typed_term.clone());
-
-        Ok(typed_term)
+    fn lookup_local(&self, name: &'src str) -> Option<core::Term<'src>> {
+        let level = self.variables.get(name)?.last()?;
+        
+        
+        core::Term::variable(name, self.variables.get(name)?.last()?.clone())
     }
 }

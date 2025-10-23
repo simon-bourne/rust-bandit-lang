@@ -6,12 +6,27 @@ use std::{
     result,
 };
 
+pub use pretty::Pretty;
+
 pub mod ast;
 mod constraints;
 pub mod core;
 mod pretty;
 
-pub use pretty::Pretty;
+struct DeBruijnIndex(usize);
+
+#[derive(Copy, Clone)]
+struct Level(usize);
+
+impl Level {
+    pub fn push(self) -> Self {
+        Self(self.0 + 1)
+    }
+
+    pub fn pop(self) -> Self {
+        Self(self.0 - 1)
+    }
+}
 
 struct SharedMut<T>(Rc<RefCell<T>>);
 
@@ -65,11 +80,4 @@ impl Error for InferenceError {}
 pub enum Evaluation {
     Static,
     Dynamic,
-}
-
-#[derive(Clone)]
-struct VariableBinding<Term> {
-    variable: Term,
-    in_term: Term,
-    evaluation: Evaluation,
 }

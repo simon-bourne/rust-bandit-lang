@@ -1,6 +1,6 @@
 use derive_more::Constructor;
 
-use crate::{Evaluation, InferenceError, Result, VariableBinding, core};
+use crate::{Evaluation, Result, core};
 
 mod context;
 mod pretty;
@@ -55,7 +55,7 @@ impl<'src> Term<'src> {
         })
     }
 
-    pub fn let_binding(variable: Self, value: Self, in_term: Self) -> Self {
+    pub fn let_binding(variable: Variable<'src>, value: Self, in_term: Self) -> Self {
         Self::new(TermEnum::Let {
             value,
             binding: VariableBinding {
@@ -66,7 +66,7 @@ impl<'src> Term<'src> {
         })
     }
 
-    pub fn pi_type(variable: Self, in_term: Self, evaluation: Evaluation) -> Self {
+    pub fn pi_type(variable: Variable<'src>, in_term: Self, evaluation: Evaluation) -> Self {
         Self::new(TermEnum::Pi(VariableBinding {
             variable,
             in_term,
@@ -78,7 +78,7 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::FunctionType(input_type, output_type))
     }
 
-    pub fn lambda(variable: Self, in_term: Self) -> Self {
+    pub fn lambda(variable: Variable<'src>, in_term: Self) -> Self {
         Self::new(TermEnum::Lambda(VariableBinding {
             variable,
             in_term,
@@ -103,52 +103,27 @@ impl<'src> Term<'src> {
                 function,
                 argument,
                 evaluation,
-            } => Core::apply(
-                function.desugar(ctx)?,
-                argument.desugar(ctx)?,
-                Core::unknown_type(),
-                *evaluation,
-                ctx.constraints(),
-            ),
+            } => Core::apply(function.desugar(ctx)?, argument.desugar(ctx)?, *evaluation),
             TermEnum::Variable(name) => ctx.lookup(name)?,
-            TermEnum::Unknown => Core::unknown_value(),
-            TermEnum::Let { value, binding } => Core::let_binding(
-                value.desugar(ctx)?,
-                binding.desugar(ctx)?,
-                ctx.constraints(),
-            ),
+            TermEnum::Unknown => Core::unknown(),
+            TermEnum::Let { value, binding } => {
+                Core::let_binding(value.desugar(ctx)?, binding.desugar(ctx)?)
+            }
             TermEnum::Pi(binding) => Core::pi(binding.desugar(ctx)?),
-            TermEnum::FunctionType(left, right) => Core::pi(VariableBinding {
-                variable: Core::variable(None, left.desugar(ctx)?),
-                in_term: right.desugar(ctx)?,
-                evaluation: Evaluation::Dynamic,
-            }),
+            TermEnum::FunctionType(left, right) => Core::pi(core::VariableBinding::new(
+                left.desugar(ctx)?,
+                right.desugar(ctx)?,
+                Evaluation::Dynamic,
+            )),
             TermEnum::Lambda(binding) => Core::lambda(binding.desugar(ctx)?),
-            TermEnum::HasType { term, typ } => term
-                .desugar(ctx)?
-                .has_type(typ.desugar(ctx)?, ctx.constraints()),
+            TermEnum::HasType { term, typ } => term.desugar(ctx)?.has_type(typ.desugar(ctx)?),
         })
     }
 
     fn new(term: TermEnum<'src>) -> Self {
         Self(Box::new(term))
     }
-
-    fn desugar_variable(&self, ctx: &mut Context<'src>) -> Result<core::Term<'src>> {
-        Ok(match self.0.as_ref() {
-            TermEnum::HasType { term, typ } => Ok(term
-                .desugar_variable(ctx)?
-                .has_type(typ.desugar(ctx)?, ctx.constraints()))?,
-            TermEnum::Variable(name) => {
-                core::Term::variable(Some(name), core::Term::unknown_type())
-            }
-            TermEnum::Unknown => core::Term::variable(None, core::Term::unknown_type()),
-            _ => Err(InferenceError)?,
-        })
-    }
 }
-
-type Binding<'src> = VariableBinding<Term<'src>>;
 
 enum TermEnum<'src> {
     Type,
@@ -161,26 +136,38 @@ enum TermEnum<'src> {
     Unknown,
     Let {
         value: Term<'src>,
-        binding: Binding<'src>,
+        binding: VariableBinding<'src>,
     },
-    Pi(Binding<'src>),
+    Pi(VariableBinding<'src>),
     FunctionType(Term<'src>, Term<'src>),
-    Lambda(Binding<'src>),
+    Lambda(VariableBinding<'src>),
     HasType {
         term: Term<'src>,
         typ: Term<'src>,
     },
 }
 
-impl<'src> Binding<'src> {
-    fn desugar(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<core::Term<'src>>> {
-        let variable = self.variable.desugar_variable(ctx)?;
-        let in_term = ctx.in_scope(variable.clone(), |ctx| self.in_term.desugar(ctx))?;
+struct VariableBinding<'src> {
+    variable: Variable<'src>,
+    in_term: Term<'src>,
+    evaluation: Evaluation,
+}
 
-        Ok(VariableBinding {
-            variable,
-            in_term,
-            evaluation: self.evaluation,
-        })
+impl<'src> VariableBinding<'src> {
+    fn desugar(&self, ctx: &mut Context<'src>) -> Result<core::VariableBinding<'src>> {
+        let in_term = ctx.in_scope(self.variable.name, |ctx| self.in_term.desugar(ctx))?;
+
+        let typ = if let Some(typ) = self.variable.typ.as_ref() {
+            typ.desugar(ctx)?
+        } else {
+            core::Term::unknown()
+        };
+
+        Ok(core::VariableBinding::new(typ, in_term, self.evaluation))
     }
+}
+
+struct Variable<'src> {
+    name: Option<&'src str>,
+    typ: Option<Term<'src>>,
 }

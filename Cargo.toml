@@ -18,7 +18,6 @@ logos = "0.15.0"
 xtask-base = { git = "https://github.com/simon-bourne/rust-xtask-base" }
 pretty = "0.12.3"
 winnow = "0.7"
-katexit = "0.1.5"
 futures = "0.3.31"
 clonelet = "0.2.0"
 clap = "4.5.49"
