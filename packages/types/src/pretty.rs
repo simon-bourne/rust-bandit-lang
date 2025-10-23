@@ -4,7 +4,7 @@ use derive_more::Constructor;
 use pretty::RcDoc;
 
 use super::VariableBinding;
-use crate::Evaluation;
+use crate::{Evaluation, Variable};
 
 pub trait Pretty {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document;
@@ -35,7 +35,7 @@ impl<T: Pretty> Pretty for &'_ T {
     }
 }
 
-impl<Term: Pretty> VariableBinding<Term> {
+impl<'src, Term: Pretty> VariableBinding<'src, Term> {
     pub fn to_document(
         &self,
         binder: &str,
@@ -51,6 +51,16 @@ impl<Term: Pretty> VariableBinding<Term> {
                 self.in_term.to_document(None, layout),
             ],
         )
+    }
+}
+
+impl<'src, Term: Pretty> Pretty for Variable<'src, Term> {
+    fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
+        if let Some(typ) = self.typ.as_ref() {
+            BinaryOperator(self.name, Operator::HasType, typ).to_document(parent, layout)
+        } else {
+            self.name.to_document(parent, layout)
+        }
     }
 }
 

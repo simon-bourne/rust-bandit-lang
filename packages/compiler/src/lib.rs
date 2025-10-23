@@ -25,10 +25,5 @@ pub fn compile(source: &str) -> Result<()> {
     println!();
     println!("After type inference:");
 
-    for (name, value) in ctx.constants() {
-        let value = value?.to_pretty_string(80);
-        println!("{name} = {value}",)
-    }
-
-    Ok(())
+    todo!()
 }

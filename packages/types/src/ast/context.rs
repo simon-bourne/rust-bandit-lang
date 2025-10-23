@@ -1,22 +1,17 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
-use crate::{InferenceError, Level, Result, ast, core};
+use crate::{DeBruijnIndex, InferenceError, Result, ast, core};
 
-enum Term<'a> {
-    Core(core::Term<'a>),
-    Ast(ast::Term<'a>),
-}
-
-pub struct Context<'a> {
-    variables: HashMap<&'a str, Vec<Level>>,
+pub struct Context<'src> {
+    variables: HashMap<&'src str, Vec<Level>>,
     current_level: Level,
 }
 
 impl<'src> Context<'src> {
-    pub fn new(constants: impl IntoIterator<Item = (&'src str, ast::Term<'src>)>) -> Self {
+    pub fn new(_constants: impl IntoIterator<Item = (&'src str, ast::Term<'src>)>) -> Self {
         Self {
             variables: HashMap::new(),
-            current_level: Level(0),
+            current_level: Level::top(),
         }
     }
 
@@ -29,7 +24,9 @@ impl<'src> Context<'src> {
         name: Option<&'src str>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Output {
-        let Some(name) = name else { return f(self) };
+        let Some(name) = name else {
+            return f(self);
+        };
 
         self.variables
             .entry(name)
@@ -47,13 +44,34 @@ impl<'src> Context<'src> {
     }
 
     pub(crate) fn lookup(&mut self, name: &'src str) -> Result<core::Term<'src>> {
-        self.lookup_local(name).ok_or_else(|| InferenceError)
+        self.lookup_local(name).ok_or(InferenceError)
     }
 
     fn lookup_local(&self, name: &'src str) -> Option<core::Term<'src>> {
-        let level = self.variables.get(name)?.last()?;
-        
-        
-        core::Term::variable(name, self.variables.get(name)?.last()?.clone())
+        let variable_level = self.variables.get(name)?.last()?;
+        let de_bruijn_index = variable_level.de_bruijn_index(self.current_level);
+
+        Some(core::Term::variable(name, de_bruijn_index))
+    }
+}
+
+#[derive(Copy, Clone)]
+struct Level(usize);
+
+impl Level {
+    pub fn top() -> Self {
+        Self(0)
+    }
+
+    pub fn push(&mut self) {
+        self.0 += 1;
+    }
+
+    pub fn pop(&mut self) {
+        self.0 -= 1;
+    }
+
+    pub fn de_bruijn_index(self, current_level: Self) -> DeBruijnIndex {
+        DeBruijnIndex(current_level.0 - self.0 - 1)
     }
 }

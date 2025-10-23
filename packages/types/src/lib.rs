@@ -1,66 +1,13 @@
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    error::Error,
-    fmt,
-    rc::Rc,
-    result,
-};
+use std::{error::Error, fmt, result};
 
+use derive_more::Constructor;
 pub use pretty::Pretty;
 
 pub mod ast;
-mod constraints;
 pub mod core;
 mod pretty;
 
-struct DeBruijnIndex(usize);
-
-#[derive(Copy, Clone)]
-struct Level(usize);
-
-impl Level {
-    pub fn push(self) -> Self {
-        Self(self.0 + 1)
-    }
-
-    pub fn pop(self) -> Self {
-        Self(self.0 - 1)
-    }
-}
-
-struct SharedMut<T>(Rc<RefCell<T>>);
-
-impl<T> SharedMut<T> {
-    pub fn new(x: T) -> Self {
-        Self(Rc::new(RefCell::new(x)))
-    }
-
-    pub fn is_same(x: &Self, y: &Self) -> bool {
-        Rc::ptr_eq(&x.0, &y.0)
-    }
-
-    pub fn borrow(&self) -> Ref<'_, T> {
-        self.0.borrow()
-    }
-
-    pub fn borrow_mut(&self) -> RefMut<'_, T> {
-        self.0.borrow_mut()
-    }
-
-    pub fn replace_with(&self, x: T) -> T {
-        RefCell::replace(self.0.as_ref(), x)
-    }
-
-    pub fn id(&self) -> impl fmt::Debug {
-        Rc::as_ptr(&self.0)
-    }
-}
-
-impl<T> Clone for SharedMut<T> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
+pub struct DeBruijnIndex(usize);
 
 pub type Result<T> = result::Result<T, InferenceError>;
 
@@ -80,4 +27,17 @@ impl Error for InferenceError {}
 pub enum Evaluation {
     Static,
     Dynamic,
+}
+
+#[derive(Constructor)]
+pub struct VariableBinding<'src, Term> {
+    variable: Variable<'src, Term>,
+    in_term: Term,
+    evaluation: Evaluation,
+}
+
+#[derive(Constructor)]
+pub struct Variable<'src, Term> {
+    name: Option<&'src str>,
+    typ: Option<Term>,
 }

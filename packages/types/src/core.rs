@@ -1,8 +1,6 @@
 use std::marker::PhantomData;
 
-use derive_more::Constructor;
-
-use crate::{DeBruijnIndex, Evaluation};
+use crate::{DeBruijnIndex, Evaluation, VariableBinding};
 
 mod pretty;
 
@@ -34,26 +32,19 @@ impl<'src> Term<'src> {
         todo!()
     }
 
-    pub fn let_binding(value: Self, binding: VariableBinding) -> Self {
+    pub fn let_binding(value: Self, binding: VariableBinding<'src, Self>) -> Self {
         todo!()
     }
 
-    pub fn pi(binding: VariableBinding) -> Self {
+    pub fn pi(binding: VariableBinding<'src, Self>) -> Self {
         todo!()
     }
 
-    pub fn lambda(binding: VariableBinding) -> Self {
+    pub fn lambda(binding: VariableBinding<'src, Self>) -> Self {
         todo!()
     }
 
     pub fn infer_type(&self) -> Self {
         todo!()
     }
-}
-
-#[derive(Constructor)]
-pub struct VariableBinding<'src> {
-    typ: Term<'src>,
-    in_term: Term<'src>,
-    evaluation: Evaluation,
 }

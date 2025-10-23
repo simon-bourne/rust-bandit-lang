@@ -2,7 +2,7 @@
 // TODO: Newline to separate let binding and expression.
 // TODO: Static and dynamic type construction `T → U`, `T ⇒ U`, `∀x : T → U`,
 // and `∀x : T ⇒ U`
-use bandit_types::{Evaluation, ast::Constant};
+use bandit_types::{Evaluation, Variable, ast::Constant};
 use winnow::{
     Parser as _, Result,
     combinator::{
@@ -80,7 +80,7 @@ fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(
         Keyword::Forall,
-        separated_pair(term, Operator::Implies, term),
+        separated_pair(variable_binding(), Operator::Implies, term),
     )
     .map(|(variable, in_term)| Term::pi_type(variable, in_term, Evaluation::Static))
 }
@@ -88,18 +88,35 @@ fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(
         Keyword::Let,
-        (term, Operator::Assign, term, Operator::Implies, term),
+        (
+            variable_binding(),
+            Operator::Assign,
+            term,
+            Operator::Implies,
+            term,
+        ),
     )
     .map(|(var, _assign, value, _linend, in_term)| Term::let_binding(var, value, in_term))
 }
 
 fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    preceded(Token::Lambda, separated_pair(term, Operator::Implies, term))
-        .map(|(variable, in_term)| Term::lambda(variable, in_term))
+    preceded(
+        Token::Lambda,
+        separated_pair(variable_binding(), Operator::Implies, term),
+    )
+    .map(|(variable, in_term)| Term::lambda(variable, in_term))
 }
 
 fn unknown<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     Token::Unknown.map(|_| Term::unknown())
+}
+
+fn variable_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Variable<'src, Term<'src>>> {
+    (
+        alt((identifier().map(Some), Token::Unknown.value(None))),
+        opt(preceded(Operator::HasType, term)),
+    )
+        .map(|(var, typ)| Variable::new(var, typ))
 }
 
 fn variable<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
