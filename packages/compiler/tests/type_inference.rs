@@ -140,7 +140,7 @@ fn infer_implicit_argument_isolation() {
 
 // TODO: Implement a scope escape check
 #[test]
-#[ignore = "This tests the occurs check, which is not implemented yet"]
+#[ignore = "This tests the scope escape check, which is not implemented yet"]
 fn scope_escape() {
     "scoped @ _ id".fails()
 }
