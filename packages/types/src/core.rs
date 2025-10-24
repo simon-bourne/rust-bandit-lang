@@ -222,10 +222,6 @@ impl<'src> Term<'src> {
         Self(SharedMut::new(IndirectTerm::Value { term }))
     }
 
-    fn is_variable(&mut self) -> bool {
-        matches!(&*self.value(), TermEnum::Variable { .. })
-    }
-
     fn unify_type(&mut self, constraints: &Constraints<'src>) {
         let mut typ = self.typ();
 
@@ -233,12 +229,6 @@ impl<'src> Term<'src> {
     }
 
     async fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
-        // TODO: We need a better way to detect scope escape. `∀a. _` should unify with
-        // `∀a. a`.
-        if other.is_variable() {
-            return Ok(ControlFlow::Continue(()));
-        }
-
         let mut typ = if let TermEnum::Unknown { typ } = &mut *self.value() {
             typ.clone()
         } else {

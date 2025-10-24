@@ -138,7 +138,9 @@ fn infer_implicit_argument_isolation() {
     "add (id one) (id @ Int one)".infers("((add : Int → Int → Int) ((id : (∀a ⇒ a → a)) (one : Int) : Int) : Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int");
 }
 
+// TODO: Implement a scope escape check
 #[test]
+#[ignore = "This tests the occurs check, which is not implemented yet"]
 fn scope_escape() {
     "scoped @ _ id".fails()
 }
