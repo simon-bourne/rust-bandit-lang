@@ -140,7 +140,8 @@ impl<'src> Term<'src> {
     ///
     /// We don't use indexed type universes, as this isn't a theorem proving
     /// language.
-    pub(crate) fn pi(binding: VariableBinding<Self>) -> Self {
+    pub(crate) fn pi(mut binding: VariableBinding<Self>, constraints: &Constraints<'src>) -> Self {
+        binding.in_term.unify_type(constraints);
         Self::new(TermEnum::Pi(binding))
     }
 

@@ -134,6 +134,11 @@ fn infer_implicit_argument() {
 }
 
 #[test]
+fn infer_type_is_type() {
+    "∀a ⇒ a".infers("∀a : Type ⇒ a : Type");
+}
+
+#[test]
 fn infer_implicit_argument_isolation() {
     "add (id one) (id @ Int one)".infers("((add : Int → Int → Int) ((id : (∀a ⇒ a → a)) (one : Int) : Int) : Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int");
 }

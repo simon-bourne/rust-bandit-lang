@@ -117,12 +117,15 @@ impl<'src> Term<'src> {
                 binding.desugar(ctx)?,
                 ctx.constraints(),
             ),
-            TermEnum::Pi(binding) => Core::pi(binding.desugar(ctx)?),
-            TermEnum::FunctionType(left, right) => Core::pi(VariableBinding {
-                variable: Core::variable(None, left.desugar(ctx)?),
-                in_term: right.desugar(ctx)?,
-                evaluation: Evaluation::Dynamic,
-            }),
+            TermEnum::Pi(binding) => Core::pi(binding.desugar(ctx)?, ctx.constraints()),
+            TermEnum::FunctionType(left, right) => Core::pi(
+                VariableBinding {
+                    variable: Core::variable(None, left.desugar(ctx)?),
+                    in_term: right.desugar(ctx)?,
+                    evaluation: Evaluation::Dynamic,
+                },
+                ctx.constraints(),
+            ),
             TermEnum::Lambda(binding) => Core::lambda(binding.desugar(ctx)?),
             TermEnum::HasType { term, typ } => term
                 .desugar(ctx)?
