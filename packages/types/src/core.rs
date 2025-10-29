@@ -223,13 +223,30 @@ impl<'src> Term<'src> {
         Self(SharedMut::new(IndirectTerm::Value { term }))
     }
 
+    fn add_unify_constraint(mut x: Self, mut y: Self, constraints: &Constraints<'src>) {
+        constraints.add(async move { Self::unify(&mut x, &mut y).await })
+    }
+
+    fn is_reducible(&mut self) -> bool {
+        match &*self.value() {
+            // TODO: Apply isn't always reducible
+            TermEnum::Apply { .. } => true,
+            TermEnum::Let { .. } => true,
+            _ => false,
+        }
+    }
+
     fn unify_type(&mut self, constraints: &Constraints<'src>) {
         let mut typ = self.typ();
 
         constraints.add(async move { Self::unify(&mut typ, &mut Self::type_of_type()).await })
     }
 
-    async fn unify_unknown(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
+    fn unify_unknown(
+        &mut self,
+        other: &mut Self,
+        reducible: &mut Vec<(Self, Self)>,
+    ) -> Result<ControlFlow<()>> {
         let mut typ = if let TermEnum::Unknown { typ } = &mut *self.value() {
             typ.clone()
         } else {
@@ -237,11 +254,15 @@ impl<'src> Term<'src> {
         };
 
         self.replace_with(other);
-        Self::unify_recurse(&mut typ, &mut other.typ()).await?;
+        Self::unify_upto_eval(&mut typ, &mut other.typ(), reducible)?;
         Ok(ControlFlow::Break(()))
     }
 
-    async fn unify_implicit_parameter(&mut self, other: &mut Self) -> Result<ControlFlow<()>> {
+    fn unify_implicit_parameter(
+        &mut self,
+        other: &mut Self,
+        reducible: &mut Vec<(Self, Self)>,
+    ) -> Result<ControlFlow<()>> {
         if let TermEnum::Pi(binding) = &*other.value()
             && binding.evaluation == Evaluation::Static
         {
@@ -256,114 +277,101 @@ impl<'src> Term<'src> {
             return Ok(ControlFlow::Continue(()));
         };
 
-        Self::unify_recurse(&mut in_term, other).await?;
+        Self::unify_upto_eval(&mut in_term, other, reducible)?;
         Ok(ControlFlow::Break(()))
     }
 
-    fn add_unify_constraint(mut x: Self, mut y: Self, constraints: &Constraints<'src>) {
-        constraints.add(async move { Self::unify(&mut x, &mut y).await })
-    }
-
-    async fn unify_recurse(x: &mut Self, y: &mut Self) -> Result<()> {
-        Box::pin(Self::unify(x, y)).await
-    }
-
-    async fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
+    fn unify_upto_eval(
+        x: &mut Self,
+        y: &mut Self,
+        reducible: &mut Vec<(Self, Self)>,
+    ) -> Result<()> {
         if Self::is_same(x, y)
-            || x.unify_unknown(y).await?.is_break()
-            || y.unify_unknown(x).await?.is_break()
-            || x.unify_implicit_parameter(y).await?.is_break()
-            || y.unify_implicit_parameter(x).await?.is_break()
+            || x.unify_unknown(y, reducible)?.is_break()
+            || y.unify_unknown(x, reducible)?.is_break()
+            || x.unify_implicit_parameter(y, reducible)?.is_break()
+            || y.unify_implicit_parameter(x, reducible)?.is_break()
         {
             return Ok(());
         }
-
-        x.evaluate_node().await?;
-        y.evaluate_node().await?;
 
         if Self::is_same(x, y) {
             return Ok(());
         }
 
-        Self::unify_known(x, y).await?;
+        if x.is_reducible() || y.is_reducible() {
+            reducible.push((x.clone(), y.clone()));
+            return Ok(());
+        }
+
+        Self::unify_known(x, y, reducible)?;
         x.replace_with(y);
 
         Ok(())
     }
 
-    async fn evaluate_node(&mut self) -> Result<()> {
-        // This lint gives a false positive. All the `match` arms below `drop(borrowed)`
-        // before awaiting
-        #![allow(clippy::await_holding_refcell_ref)]
+    async fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
+        loop {
+            let mut reducible = Vec::new();
+            Self::unify_upto_eval(x, y, &mut reducible)?;
 
-        // TODO: Wait for unknowns to be evaluated
-        let borrowed = self.value();
+            if reducible.is_empty() {
+                return Ok(());
+            }
 
-        match &*borrowed {
+            for (mut x, mut y) in reducible {
+                // TODO: await unknowns
+                x.evaluate()?;
+                y.evaluate()?;
+            }
+        }
+    }
+
+    fn evaluate(&mut self) -> Result<()> {
+        // TODO: This does evaluation by substitution, which is very inefficient. We
+        // should use a stack and De Bruijn Indices.
+        let mut borrow = self.value();
+
+        match &mut *borrow {
             TermEnum::Apply {
                 function, argument, ..
             } => {
-                clone!(function, argument);
-                drop(borrowed);
-                self.evaluate_apply(function, argument).await?;
-                Box::pin(self.evaluate_node()).await?;
+                let reduced = function.evaluate_apply(argument)?;
+                drop(borrow);
+                self.replace_with(&reduced);
             }
-            TermEnum::Let {
-                value,
-                binding:
-                    VariableBinding {
-                        variable, in_term, ..
-                    },
-            } => {
-                clone!(variable, value, in_term);
-                drop(borrowed);
-                self.evaluate_let(variable, value, in_term).await?;
-                Box::pin(self.evaluate_node()).await?;
+            TermEnum::Let { value, binding } => {
+                value.evaluate()?;
+                let reduced = binding.apply(value);
+                drop(borrow);
+                self.replace_with(&reduced);
             }
-            _ => {}
+            _ => (),
         }
 
         Ok(())
     }
 
-    async fn evaluate_apply(&mut self, mut function: Self, argument: Self) -> Result<()> {
-        Box::pin(function.evaluate_node()).await?;
+    fn evaluate_apply(&mut self, argument: &mut Self) -> Result<Self> {
+        self.evaluate()?;
+        argument.evaluate()?;
+        let mut value = self.value();
 
-        // We need fresh variables if the function is a lambda, because we'll be
-        // substituting the lambda's argument with a variable from outside the function
-        // term.
-        //
-        // For example, in the term `(\x ⇒ x) y`, the child term `(\x ⇒ x)` could be
-        // shared with other terms, so we want to modify a copy of it.
-        match &mut *function.fresh_variables().value() {
-            TermEnum::Lambda(VariableBinding {
-                variable, in_term, ..
-            }) => {
-                variable.replace_with(&argument);
-                self.replace_with(in_term);
-            }
+        match &mut *value {
+            TermEnum::Lambda(binding) => Ok(binding.apply(argument)),
             TermEnum::Apply { .. }
             | TermEnum::Let { .. }
             | TermEnum::Variable { .. }
-            | TermEnum::Constant { .. } => {}
+            | TermEnum::Constant { .. } => {
+                drop(value);
+                Ok(self.clone())
+            }
             TermEnum::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
             TermEnum::Pi(_) | TermEnum::Type => Err(InferenceError)?,
         }
-
-        Ok(())
     }
 
-    /// Evaluate an expression of the form `let variable = value in expression`
-    async fn evaluate_let(&mut self, mut variable: Self, value: Self, in_term: Self) -> Result<()> {
-        variable.replace_with(&value);
-        self.replace_with(&in_term);
-        Ok(())
-    }
-
-    async fn unify_known(x: &mut Self, y: &mut Self) -> Result<()> {
-        // `await_holding_refcell_ref` gives false positives. We `drop((x_ref, y_ref))`
-        // before awaiting for all cases below.
-        #![allow(clippy::await_holding_refcell_ref)]
+    fn unify_known(x: &mut Self, y: &mut Self, reducible: &mut Vec<(Self, Self)>) -> Result<()> {
         let mut x_ref = x.value();
         let mut y_ref = y.value();
 
@@ -376,11 +384,7 @@ impl<'src> Term<'src> {
                     name: name1,
                     value: value1,
                 },
-            ) if name == name1 => {
-                clone!(mut value, mut value1);
-                drop((x_ref, y_ref));
-                Self::unify_recurse(&mut value, &mut value1).await?
-            }
+            ) if name == name1 => Self::unify_upto_eval(value, value1, reducible)?,
             (
                 TermEnum::Apply {
                     function,
@@ -395,18 +399,9 @@ impl<'src> Term<'src> {
                     evaluation: evaluation1,
                 },
             ) if evaluation == evaluation1 => {
-                clone!(
-                    mut function,
-                    mut function1,
-                    mut argument,
-                    mut argument1,
-                    mut typ,
-                    mut typ1
-                );
-                drop((x_ref, y_ref));
-                Self::unify_recurse(&mut function, &mut function1).await?;
-                Self::unify_recurse(&mut argument, &mut argument1).await?;
-                Self::unify_recurse(&mut typ, &mut typ1).await?;
+                Self::unify_upto_eval(function, function1, reducible)?;
+                Self::unify_upto_eval(argument, argument1, reducible)?;
+                Self::unify_upto_eval(typ, typ1, reducible)?;
             }
             (
                 TermEnum::Let { value, binding },
@@ -415,22 +410,16 @@ impl<'src> Term<'src> {
                     binding: binding1,
                 },
             ) => {
-                clone!(mut value, mut value1, mut binding, mut binding1);
-                drop((x_ref, y_ref));
-                Self::unify_recurse(&mut value, &mut value1).await?;
-                VariableBinding::unify(&mut binding, &mut binding1).await?
+                Self::unify_upto_eval(value, value1, reducible)?;
+                VariableBinding::unify(binding, binding1, reducible)?
             }
             (TermEnum::Pi(binding0), TermEnum::Pi(binding1))
                 if binding0.evaluation == binding1.evaluation =>
             {
-                clone!(mut binding0, mut binding1);
-                drop((x_ref, y_ref));
-                VariableBinding::unify(&mut binding0, &mut binding1).await?
+                VariableBinding::unify(binding0, binding1, reducible)?
             }
             (TermEnum::Lambda(binding0), TermEnum::Lambda(binding1)) => {
-                clone!(mut binding0, mut binding1);
-                drop((x_ref, y_ref));
-                VariableBinding::unify(&mut binding0, &mut binding1).await?
+                VariableBinding::unify(binding0, binding1, reducible)?
             }
             // It's safer to explicitly ignore each variant
             (TermEnum::Type, _rhs)
@@ -588,12 +577,20 @@ impl<'src> VariableBinding<Term<'src>> {
         }
     }
 
-    async fn unify(binding0: &mut Self, binding1: &mut Self) -> Result<()> {
+    fn unify(
+        binding0: &mut Self,
+        binding1: &mut Self,
+        reducible: &mut Vec<(Term<'src>, Term<'src>)>,
+    ) -> Result<()> {
         if binding0.evaluation != binding1.evaluation {
             return Err(InferenceError);
         }
 
-        Term::unify_recurse(&mut binding0.variable.typ(), &mut binding1.variable.typ()).await?;
+        Term::unify_upto_eval(
+            &mut binding0.variable.typ(),
+            &mut binding1.variable.typ(),
+            reducible,
+        )?;
 
         // Keep the name if we can
         if binding0.variable_name().is_some() {
@@ -602,6 +599,6 @@ impl<'src> VariableBinding<Term<'src>> {
             binding0.variable.replace_with(&binding1.variable);
         }
 
-        Term::unify_recurse(&mut binding0.in_term, &mut binding1.in_term).await
+        Term::unify_upto_eval(&mut binding0.in_term, &mut binding1.in_term, reducible)
     }
 }
