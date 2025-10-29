@@ -554,12 +554,8 @@ impl<'src> VariableBinding<Term<'src>> {
     }
 
     fn apply(&mut self, argument: &Term<'src>) -> Term<'src> {
-        // We only need to substitute `self.variable` and copy everything else, but
-        // allocating `fresh_variables` is:
-        //
-        // - Safer as we don't have to make sure we copy other variables when we
-        //   substitute them
-        // - Easier as we don't have to write `substitute` methods
+        // TODO: We need to think about how this works for the type of unknowns, as we
+        // just clone the unknown. Same for free variables.
         let Self {
             mut variable,
             in_term,
