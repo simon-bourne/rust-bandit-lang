@@ -79,7 +79,7 @@ impl<'src> Term<'src> {
                 Self::unify(&mut function_type, &mut function.typ()).await?;
 
                 let mut result_type = if let TermEnum::Pi(binding) = &mut *function_type.value() {
-                    binding.apply(&argument)
+                    binding.apply(&argument)?
                 } else {
                     panic!("Expected a PI type")
                 };
@@ -179,36 +179,36 @@ impl<'src> Term<'src> {
     ///
     /// We replace the type of `Unknown`s with a fresh type, so variables can be
     /// substituted in their type.
-    fn fresh_variables(&mut self) -> Self {
-        let mut value = self.value();
+    fn fresh_variables(&mut self) -> Result<Self> {
+        let mut value = self.try_value()?;
 
-        Self::new(match &mut *value {
+        Ok(Self::new(match &mut *value {
             TermEnum::Variable {
                 fresh: Some(fresh), ..
             } => {
-                return fresh.clone();
+                return Ok(fresh.clone());
             }
             TermEnum::Variable { fresh: None, .. } => {
                 drop(value);
-                return self.clone();
+                return Ok(self.clone());
             }
             TermEnum::Unknown { typ } => {
                 // We create a fresh type so we can substitute variables
-                let fresh_type = &typ.fresh_variables();
+                let fresh_type = &typ.fresh_variables()?;
                 typ.replace_with(fresh_type);
                 drop(value);
-                return self.clone();
+                return Ok(self.clone());
             }
             TermEnum::Constant { name, value } => TermEnum::Constant {
                 name,
-                value: value.fresh_variables(),
+                value: value.fresh_variables()?,
             },
             TermEnum::Let { value, binding } => TermEnum::Let {
-                value: value.fresh_variables(),
-                binding: binding.fresh_variables(),
+                value: value.fresh_variables()?,
+                binding: binding.fresh_variables()?,
             },
-            TermEnum::Pi(binding) => TermEnum::Pi(binding.fresh_variables()),
-            TermEnum::Lambda(binding) => TermEnum::Lambda(binding.fresh_variables()),
+            TermEnum::Pi(binding) => TermEnum::Pi(binding.fresh_variables()?),
+            TermEnum::Lambda(binding) => TermEnum::Lambda(binding.fresh_variables()?),
             TermEnum::Type => TermEnum::Type,
             TermEnum::Apply {
                 function,
@@ -216,12 +216,12 @@ impl<'src> Term<'src> {
                 typ,
                 evaluation,
             } => TermEnum::Apply {
-                function: function.fresh_variables(),
-                argument: argument.fresh_variables(),
-                typ: typ.fresh_variables(),
+                function: function.fresh_variables()?,
+                argument: argument.fresh_variables()?,
+                typ: typ.fresh_variables()?,
                 evaluation: *evaluation,
             },
-        })
+        }))
     }
 
     fn pi_type(variable: Self, result_type: Self, evaluation: Evaluation) -> Self {
@@ -285,7 +285,7 @@ impl<'src> Term<'src> {
         let mut in_term = if let TermEnum::Pi(binding) = &mut *self.value()
             && binding.evaluation == Evaluation::Static
         {
-            binding.apply(&Self::unknown_value())
+            binding.apply(&Self::unknown_value())?
         } else {
             return Ok(ControlFlow::Continue(()));
         };
@@ -354,7 +354,7 @@ impl<'src> Term<'src> {
             }
             TermEnum::Let { value, binding } => {
                 value.evaluate()?;
-                let mut reduced = binding.apply(value);
+                let mut reduced = binding.apply(value)?;
                 reduced.evaluate()?;
                 drop(borrow);
                 self.replace_with(&reduced);
@@ -371,7 +371,7 @@ impl<'src> Term<'src> {
         let mut value = self.value();
 
         match &mut *value {
-            TermEnum::Lambda(binding) => Ok(binding.apply(argument)),
+            TermEnum::Lambda(binding) => Ok(binding.apply(argument)?),
             TermEnum::Apply { .. }
             | TermEnum::Let { .. }
             | TermEnum::Variable { .. }
@@ -463,6 +463,8 @@ impl<'src> Term<'src> {
         *self = other.clone();
     }
 
+    // TODO: Go through all uses of this and see if we should be using
+    // `try_collapse_links`
     fn collapse_links(&mut self) {
         self.try_collapse_links().unwrap()
     }
@@ -480,13 +482,14 @@ impl<'src> Term<'src> {
             let IndirectTerm::Link { target } = &mut *borrow else {
                 return Ok(());
             };
-            target.collapse_links();
+            target.try_collapse_links()?;
             target.clone()
         };
 
         Ok(())
     }
 
+    // TODO: Go through all uses of this and see if we should be using `try_value`
     fn value<'a>(&'a mut self) -> RefMut<'a, TermEnum<'src>> {
         self.try_value().unwrap()
     }
@@ -566,7 +569,7 @@ impl<'src> VariableBinding<Term<'src>> {
         self.variable.clone().variable_name()
     }
 
-    fn apply(&mut self, argument: &Term<'src>) -> Term<'src> {
+    fn apply(&mut self, argument: &Term<'src>) -> Result<Term<'src>> {
         // We need all bound variables to be fresh, as this variable might appear in the
         // type of other bound variables. e.g. `∀a. ∀b. b : a`. Free variables don't
         // need to be fresh, as this variable would be out of scope. For example, `b` is
@@ -575,34 +578,34 @@ impl<'src> VariableBinding<Term<'src>> {
             mut variable,
             in_term,
             ..
-        } = self.fresh_variables();
+        } = self.fresh_variables()?;
 
         variable.replace_with(argument);
-        in_term
+        Ok(in_term)
     }
 
-    fn fresh_variables(&mut self) -> Self {
-        let variable = self.allocate_fresh_variable();
-        let in_term = self.in_term.fresh_variables();
+    fn fresh_variables(&mut self) -> Result<Self> {
+        let variable = self.allocate_fresh_variable()?;
+        let in_term = self.in_term.fresh_variables()?;
         self.free_fresh_variable();
 
-        Self {
+        Ok(Self {
             variable,
             in_term,
             evaluation: self.evaluation,
-        }
+        })
     }
 
-    fn allocate_fresh_variable(&mut self) -> Term<'src> {
+    fn allocate_fresh_variable(&mut self) -> Result<Term<'src>> {
         let TermEnum::Variable { name, fresh, typ } = &mut *self.variable.value() else {
             return self.variable.fresh_variables();
         };
 
-        let variable = Term::variable(*name, typ.fresh_variables());
+        let variable = Term::variable(*name, typ.fresh_variables()?);
 
         assert!(fresh.is_none());
         *fresh = Some(variable.clone());
-        variable
+        Ok(variable)
     }
 
     fn free_fresh_variable(&mut self) {

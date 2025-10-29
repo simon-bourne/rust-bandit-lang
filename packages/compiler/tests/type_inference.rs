@@ -151,10 +151,6 @@ fn scope_escape() {
 }
 
 #[test]
-// TODO: Implement an occurs check
-// Currently, this will happily infer an infinite type (and create `Rc` circular references). It
-// will stack overflow when we try and convert the term to a string.
-#[ignore = "This tests the occurs check, which is not implemented yet"]
 fn occurs_check() {
     r"\x ⇒ x x".fails();
 }
