@@ -555,7 +555,8 @@ impl<'src> VariableBinding<Term<'src>> {
 
     fn apply(&mut self, argument: &Term<'src>) -> Term<'src> {
         // TODO: We need to think about how this works for the type of unknowns, as we
-        // just clone the unknown. Same for free variables.
+        // just clone the unknown. Free variables aren't a problem, as references to
+        // this variable in their types would be out of scope.
         let Self {
             mut variable,
             in_term,
