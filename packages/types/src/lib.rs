@@ -1,5 +1,5 @@
 use std::{
-    cell::{Ref, RefCell, RefMut},
+    cell::{BorrowMutError, Ref, RefCell, RefMut},
     error::Error,
     fmt,
     rc::Rc,
@@ -30,6 +30,10 @@ impl<T> SharedMut<T> {
 
     pub fn borrow_mut(&self) -> RefMut<'_, T> {
         self.0.borrow_mut()
+    }
+
+    pub fn try_borrow_mut(&self) -> result::Result<RefMut<'_, T>, BorrowMutError> {
+        self.0.try_borrow_mut()
     }
 
     pub fn replace_with(&self, x: T) -> T {

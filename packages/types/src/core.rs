@@ -372,8 +372,8 @@ impl<'src> Term<'src> {
     }
 
     fn unify_known(x: &mut Self, y: &mut Self, reducible: &mut Vec<(Self, Self)>) -> Result<()> {
-        let mut x_ref = x.value();
-        let mut y_ref = y.value();
+        let mut x_ref = x.try_value()?;
+        let mut y_ref = y.try_value()?;
 
         // TODO: Can we use mutable borrowing to do the occurs check for us?
         match (&mut *x_ref, &mut *y_ref) {
@@ -451,23 +451,40 @@ impl<'src> Term<'src> {
     }
 
     fn collapse_links(&mut self) {
+        self.try_collapse_links().unwrap()
+    }
+
+    fn try_collapse_links(&mut self) -> Result<()> {
         // Collapse links from the bottom up so they are also collapsed for other
         // terms that reference this chain.
+
         *self = {
-            let IndirectTerm::Link { target } = &mut *self.0.borrow_mut() else {
-                return;
+            let mut borrow = self.0.try_borrow_mut().map_err(|_| InferenceError)?;
+
+            let IndirectTerm::Link { target } = &mut *borrow else {
+                return Ok(());
             };
             target.collapse_links();
             target.clone()
         };
+
+        Ok(())
     }
 
     fn value<'a>(&'a mut self) -> RefMut<'a, TermEnum<'src>> {
-        self.collapse_links();
-        RefMut::map(self.0.borrow_mut(), |x| match x {
+        self.try_value().unwrap()
+    }
+
+    fn try_value<'a>(&'a mut self) -> Result<RefMut<'a, TermEnum<'src>>> {
+        self.try_collapse_links()?;
+        let borrow = self.0.try_borrow_mut().map_err(|_| InferenceError)?;
+
+        Ok(RefMut::map(borrow, |x| match x {
             IndirectTerm::Value { term, .. } => term,
-            IndirectTerm::Link { .. } => unreachable!("Links should be collapsed at this point"),
-        })
+            IndirectTerm::Link { .. } => {
+                unreachable!("Links should be collapsed at this point")
+            }
+        }))
     }
 
     fn is_known(&self) -> bool {

@@ -156,7 +156,7 @@ fn scope_escape() {
 // will stack overflow when we try and convert the term to a string.
 #[ignore = "This tests the occurs check, which is not implemented yet"]
 fn occurs_check() {
-    r"\x ⇒ x x".infers("");
+    r"\x ⇒ x x".fails();
 }
 
 #[test]
