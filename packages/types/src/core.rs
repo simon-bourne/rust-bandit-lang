@@ -173,6 +173,12 @@ impl<'src> Term<'src> {
     ///
     /// This allows us to modify the copy and substitute variables without
     /// affecting the original.
+    ///
+    /// We don't create copies of free variables, as substituting a bound
+    /// variable in the type of a free variable would be out of scope.
+    ///
+    /// We replace the type of `Unknown`s with a fresh type, so variables can be
+    /// substituted in their type.
     fn fresh_variables(&mut self) -> Self {
         let mut value = self.value();
 
@@ -182,7 +188,14 @@ impl<'src> Term<'src> {
             } => {
                 return fresh.clone();
             }
-            TermEnum::Variable { fresh: None, .. } | TermEnum::Unknown { .. } => {
+            TermEnum::Variable { fresh: None, .. } => {
+                drop(value);
+                return self.clone();
+            }
+            TermEnum::Unknown { typ } => {
+                // We create a fresh type so we can substitute variables
+                let fresh_type = &typ.fresh_variables();
+                typ.replace_with(fresh_type);
                 drop(value);
                 return self.clone();
             }
@@ -554,9 +567,10 @@ impl<'src> VariableBinding<Term<'src>> {
     }
 
     fn apply(&mut self, argument: &Term<'src>) -> Term<'src> {
-        // TODO: We need to think about how this works for the type of unknowns, as we
-        // just clone the unknown. Free variables aren't a problem, as references to
-        // this variable in their types would be out of scope.
+        // We need all bound variables to be fresh, as this variable might appear in the
+        // type of other bound variables. e.g. `∀a. ∀b. b : a`. Free variables don't
+        // need to be fresh, as this variable would be out of scope. For example, `b` is
+        // out of scope when used in the type of `a` here: `∀a : b. ∀b. a : b`.
         let Self {
             mut variable,
             in_term,
