@@ -342,7 +342,8 @@ impl<'src> Term<'src> {
             }
             TermEnum::Let { value, binding } => {
                 value.evaluate()?;
-                let reduced = binding.apply(value);
+                let mut reduced = binding.apply(value);
+                reduced.evaluate()?;
                 drop(borrow);
                 self.replace_with(&reduced);
             }
