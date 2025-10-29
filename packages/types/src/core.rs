@@ -311,20 +311,19 @@ impl<'src> Term<'src> {
     }
 
     async fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
-        loop {
-            let mut reducible = Vec::new();
-            Self::unify_upto_eval(x, y, &mut reducible)?;
+        let mut reducible = Vec::new();
+        Self::unify_upto_eval(x, y, &mut reducible)?;
 
-            if reducible.is_empty() {
-                return Ok(());
-            }
-
-            for (mut x, mut y) in reducible {
+        while !reducible.is_empty() {
+            for (mut x, mut y) in mem::take(&mut reducible) {
                 // TODO: await unknowns
                 x.evaluate()?;
                 y.evaluate()?;
+                Self::unify_upto_eval(&mut x, &mut y, &mut reducible)?;
             }
         }
+
+        Ok(())
     }
 
     fn evaluate(&mut self) -> Result<()> {
