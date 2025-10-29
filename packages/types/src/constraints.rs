@@ -42,7 +42,7 @@ impl<'a> Constraints<'a> {
             if self.0.borrow().is_empty() && pending.is_empty() {
                 // We didn't solve any constraints, so we're stuck
                 if !any_solved {
-                    return Err(InferenceError);
+                    return Err(InferenceError::CouldntInferAllTypes);
                 } else {
                     return Ok(());
                 }

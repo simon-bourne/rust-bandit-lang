@@ -1,4 +1,4 @@
-use std::{cell::RefMut, fmt, ops::ControlFlow};
+use std::{cell::RefMut, fmt, mem, ops::ControlFlow};
 
 use clonelet::clone;
 #[cfg(doc)]
@@ -367,7 +367,7 @@ impl<'src> Term<'src> {
                 Ok(self.clone())
             }
             TermEnum::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
-            TermEnum::Pi(_) | TermEnum::Type => Err(InferenceError)?,
+            TermEnum::Pi(_) | TermEnum::Type => Err(InferenceError::UnexpectedTypeDuringEval)?,
         }
     }
 
@@ -429,7 +429,7 @@ impl<'src> Term<'src> {
             | (TermEnum::Unknown { .. }, _rhs)
             | (TermEnum::Let { .. }, _rhs)
             | (TermEnum::Pi(_), _rhs)
-            | (TermEnum::Lambda(_), _rhs) => Err(InferenceError)?,
+            | (TermEnum::Lambda(_), _rhs) => Err(InferenceError::CouldntUnify)?,
         }
 
         Ok(())
@@ -459,7 +459,10 @@ impl<'src> Term<'src> {
         // terms that reference this chain.
 
         *self = {
-            let mut borrow = self.0.try_borrow_mut().map_err(|_| InferenceError)?;
+            let mut borrow = self
+                .0
+                .try_borrow_mut()
+                .map_err(|_| InferenceError::InfiniteTerm)?;
 
             let IndirectTerm::Link { target } = &mut *borrow else {
                 return Ok(());
@@ -477,7 +480,10 @@ impl<'src> Term<'src> {
 
     fn try_value<'a>(&'a mut self) -> Result<RefMut<'a, TermEnum<'src>>> {
         self.try_collapse_links()?;
-        let borrow = self.0.try_borrow_mut().map_err(|_| InferenceError)?;
+        let borrow = self
+            .0
+            .try_borrow_mut()
+            .map_err(|_| InferenceError::InfiniteTerm)?;
 
         Ok(RefMut::map(borrow, |x| match x {
             IndirectTerm::Value { term, .. } => term,
@@ -600,7 +606,7 @@ impl<'src> VariableBinding<Term<'src>> {
         reducible: &mut Vec<(Term<'src>, Term<'src>)>,
     ) -> Result<()> {
         if binding0.evaluation != binding1.evaluation {
-            return Err(InferenceError);
+            return Err(InferenceError::CouldntUnify);
         }
 
         Term::unify_upto_eval(

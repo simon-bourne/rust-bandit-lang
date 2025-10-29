@@ -55,11 +55,27 @@ pub type Result<T> = result::Result<T, InferenceError>;
 
 // TODO: Better error handling.
 #[derive(Debug)]
-pub struct InferenceError;
+pub enum InferenceError {
+    InvalidVariable,
+    CouldntInferAllTypes,
+    UnexpectedTypeDuringEval,
+    CouldntUnify,
+    InfiniteTerm,
+    VariableNotFound,
+    TopLevelCircularDependency,
+}
 
 impl fmt::Display for InferenceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("InferenceError")
+        f.write_str(match self {
+            InferenceError::InvalidVariable => "InvalidVariable",
+            InferenceError::CouldntInferAllTypes => "CouldntInferAllTypes",
+            InferenceError::UnexpectedTypeDuringEval => "UnexpectedTypeDuringEval",
+            InferenceError::CouldntUnify => "CouldntUnify",
+            InferenceError::InfiniteTerm => "InfiniteTerm",
+            InferenceError::VariableNotFound => "VariableNotFound",
+            InferenceError::TopLevelCircularDependency => "TopLevelCircularDependency",
+        })
     }
 }
 

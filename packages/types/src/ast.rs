@@ -146,7 +146,7 @@ impl<'src> Term<'src> {
                 core::Term::variable(Some(name), core::Term::unknown_type())
             }
             TermEnum::Unknown => core::Term::variable(None, core::Term::unknown_type()),
-            _ => Err(InferenceError)?,
+            _ => Err(InferenceError::InvalidVariable)?,
         })
     }
 }

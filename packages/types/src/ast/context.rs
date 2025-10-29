@@ -70,7 +70,11 @@ impl<'a> Context<'a> {
         } else {
             core::Term::constant(
                 name,
-                self.desugar_constant(self.constants.get(name).ok_or(InferenceError)?)?,
+                self.desugar_constant(
+                    self.constants
+                        .get(name)
+                        .ok_or(InferenceError::VariableNotFound)?,
+                )?,
             )
         })
     }
@@ -80,7 +84,9 @@ impl<'a> Context<'a> {
     }
 
     fn desugar_constant(&self, term: &RefCell<Term<'a>>) -> Result<core::Term<'a>> {
-        let mut term = term.try_borrow_mut().map_err(|_| InferenceError)?;
+        let mut term = term
+            .try_borrow_mut()
+            .map_err(|_| InferenceError::TopLevelCircularDependency)?;
 
         let typed_term = match &mut *term {
             Term::Core(term) => term.clone(),
