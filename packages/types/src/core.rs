@@ -397,13 +397,15 @@ impl<'src> Term<'src> {
     }
 
     async fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
+        x.evaluate_known().await?;
+        y.evaluate_known().await?;
         let mut reducible = Vec::new();
         Self::unify_upto_eval(x, y, &mut reducible)?;
 
         while !reducible.is_empty() {
             for (mut x, mut y) in mem::take(&mut reducible) {
-                x.evaluatex().await?;
-                y.evaluatex().await?;
+                x.evaluate_known().await?;
+                y.evaluate_known().await?;
                 Self::unify_upto_eval(&mut x, &mut y, &mut reducible)?;
             }
         }
@@ -411,7 +413,11 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    async fn evaluatex(&mut self) -> Result<()> {
+    async fn evaluate_known(&mut self) -> Result<()> {
+        if self.is_unknown() {
+            return Ok(());
+        }
+
         // TODO: await unknowns
 
         if self.is_reducible() {
@@ -593,7 +599,11 @@ impl<'src> Term<'src> {
     }
 
     fn is_known(&self) -> bool {
-        !matches!(&*self.clone().value(), TermEnum::Unknown { .. })
+        !self.is_unknown()
+    }
+
+    fn is_unknown(&self) -> bool {
+        matches!(&*self.clone().value(), TermEnum::Unknown { .. })
     }
 
     fn typ(&self) -> Self {
