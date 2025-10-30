@@ -32,7 +32,13 @@ impl<'a> Context<'a> {
             self.desugar_constant(value)?;
         }
 
-        self.constraints.solve()
+        self.constraints.solve()?;
+
+        for value in self.constants.values() {
+            self.desugar_constant(value)?.check_scope()?;
+        }
+
+        Ok(())
     }
 
     pub fn constants(&self) -> impl Iterator<Item = (&'a str, Result<core::Term<'a>>)> {

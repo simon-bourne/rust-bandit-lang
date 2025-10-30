@@ -63,6 +63,7 @@ pub enum InferenceError {
     InfiniteTerm,
     VariableNotFound,
     TopLevelCircularDependency,
+    OutOfScope,
 }
 
 impl fmt::Display for InferenceError {
@@ -75,6 +76,7 @@ impl fmt::Display for InferenceError {
             InferenceError::InfiniteTerm => "InfiniteTerm",
             InferenceError::VariableNotFound => "VariableNotFound",
             InferenceError::TopLevelCircularDependency => "TopLevelCircularDependency",
+            InferenceError::OutOfScope => "OutOfScope",
         })
     }
 }

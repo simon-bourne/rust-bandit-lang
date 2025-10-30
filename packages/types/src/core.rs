@@ -41,6 +41,7 @@ impl<'src> Term<'src> {
             name,
             fresh: None,
             typ,
+            scope: VariableScope::Unseen,
         })
     }
 
@@ -236,6 +237,78 @@ impl<'src> Term<'src> {
         Self(SharedMut::new(IndirectTerm::Value { term }))
     }
 
+    pub fn check_scope(&mut self) -> Result<()> {
+        dbg!(&self);
+        self.check_scope_init();
+        self.check_child_scope()
+    }
+
+    fn check_scope_init(&mut self) {
+        // TODO: Factor out recursion schemes
+        match &mut *self.value() {
+            TermEnum::Variable { scope, typ, .. } => {
+                *scope = VariableScope::Unseen;
+                typ.check_scope_init();
+            }
+            TermEnum::Type => (),
+            TermEnum::Apply {
+                function,
+                argument,
+                typ,
+                ..
+            } => {
+                function.check_scope_init();
+                argument.check_scope_init();
+                typ.check_scope_init();
+            }
+            TermEnum::Constant { .. } => (),
+            TermEnum::Unknown { typ } => typ.check_scope_init(),
+            TermEnum::Let { value, binding } => {
+                value.check_scope_init();
+                binding.check_scope_init()
+            }
+            TermEnum::Pi(binding) => binding.check_scope_init(),
+            TermEnum::Lambda(binding) => binding.check_scope_init(),
+        }
+    }
+
+    fn check_child_scope(&mut self) -> Result<()> {
+        use VariableScope as Scope;
+
+        match &mut *self.try_value()? {
+            TermEnum::Variable { scope, typ, .. } => {
+                match scope {
+                    Scope::Unseen => *scope = Scope::Free,
+                    Scope::OutOfScope => Err(InferenceError::OutOfScope)?,
+                    Scope::Free | Scope::Bound => (),
+                }
+
+                typ.check_child_scope()?;
+            }
+            TermEnum::Type => (),
+            TermEnum::Apply {
+                function,
+                argument,
+                typ,
+                ..
+            } => {
+                function.check_child_scope()?;
+                argument.check_child_scope()?;
+                typ.check_child_scope()?;
+            }
+            TermEnum::Constant { .. } => (),
+            TermEnum::Unknown { typ } => typ.check_child_scope()?,
+            TermEnum::Let { value, binding } => {
+                value.check_child_scope()?;
+                binding.check_scope()?
+            }
+            TermEnum::Pi(binding) => binding.check_scope()?,
+            TermEnum::Lambda(binding) => binding.check_scope()?,
+        }
+
+        Ok(())
+    }
+
     fn add_unify_constraint(mut x: Self, mut y: Self, constraints: &Constraints<'src>) {
         constraints.add(async move { Self::unify(&mut x, &mut y).await })
     }
@@ -329,11 +402,21 @@ impl<'src> Term<'src> {
 
         while !reducible.is_empty() {
             for (mut x, mut y) in mem::take(&mut reducible) {
-                // TODO: await unknowns
-                x.evaluate()?;
-                y.evaluate()?;
+                x.evaluatex().await?;
+                y.evaluatex().await?;
                 Self::unify_upto_eval(&mut x, &mut y, &mut reducible)?;
             }
+        }
+
+        Ok(())
+    }
+
+    async fn evaluatex(&mut self) -> Result<()> {
+        // TODO: await unknowns
+
+        if self.is_reducible() {
+            self.check_scope()?;
+            self.evaluate()?;
         }
 
         Ok(())
@@ -547,6 +630,7 @@ enum TermEnum<'src> {
     Variable {
         name: Option<&'src str>,
         fresh: Option<Term<'src>>,
+        scope: VariableScope,
         typ: Term<'src>,
     },
     Constant {
@@ -562,6 +646,13 @@ enum TermEnum<'src> {
     },
     Pi(VariableBinding<Term<'src>>),
     Lambda(VariableBinding<Term<'src>>),
+}
+
+enum VariableScope {
+    Unseen,
+    OutOfScope,
+    Free,
+    Bound,
 }
 
 impl<'src> VariableBinding<Term<'src>> {
@@ -597,7 +688,10 @@ impl<'src> VariableBinding<Term<'src>> {
     }
 
     fn allocate_fresh_variable(&mut self) -> Result<Term<'src>> {
-        let TermEnum::Variable { name, fresh, typ } = &mut *self.variable.value() else {
+        let TermEnum::Variable {
+            name, fresh, typ, ..
+        } = &mut *self.variable.value()
+        else {
             return self.variable.fresh_variables();
         };
 
@@ -637,5 +731,37 @@ impl<'src> VariableBinding<Term<'src>> {
         }
 
         Term::unify_upto_eval(&mut binding0.in_term, &mut binding1.in_term, reducible)
+    }
+
+    fn check_scope(&mut self) -> Result<()> {
+        let mut borrow = self.variable.try_value()?;
+
+        let TermEnum::Variable { scope, typ, .. } = &mut *borrow else {
+            unreachable!("Expected a variable")
+        };
+
+        typ.check_child_scope()?;
+
+        use VariableScope as Scope;
+
+        match scope {
+            Scope::Unseen | Scope::OutOfScope => {
+                *scope = Scope::Bound;
+                drop(borrow);
+                self.in_term.check_child_scope()?;
+
+                if let TermEnum::Variable { scope, .. } = &mut *self.variable.try_value()? {
+                    *scope = Scope::OutOfScope;
+                }
+            }
+            Scope::Free | Scope::Bound => Err(InferenceError::OutOfScope)?,
+        }
+
+        Ok(())
+    }
+
+    fn check_scope_init(&mut self) {
+        self.variable.check_scope_init();
+        self.in_term.check_scope_init();
     }
 }
