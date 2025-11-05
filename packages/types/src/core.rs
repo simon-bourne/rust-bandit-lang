@@ -240,12 +240,10 @@ impl<'src> Term<'src> {
         Self(SharedMut::new(IndirectTerm::Value { term }))
     }
 
-    fn for_each(&mut self, f: &mut impl FnMut(&mut TermEnum)) -> Result<()> {
-        let value = &mut *self.try_value()?;
+    fn for_each(&mut self, f: &mut impl FnMut(&mut Self) -> Result<()>) -> Result<()> {
+        f(self)?;
 
-        f(value);
-
-        match value {
+        match &mut *self.try_value()? {
             TermEnum::Variable { typ, .. } => typ.for_each(f)?,
             TermEnum::Type => (),
             TermEnum::Apply {
@@ -278,9 +276,11 @@ impl<'src> Term<'src> {
 
     fn check_scope_init(&mut self) -> Result<()> {
         self.for_each(&mut |t| {
-            if let TermEnum::Variable { scope, .. } = t {
+            if let TermEnum::Variable { scope, .. } = &mut *t.try_value()? {
                 *scope = VariableScope::Unseen
             }
+
+            Ok(())
         })
     }
 
@@ -784,7 +784,7 @@ impl<'src> VariableBinding<Term<'src>> {
         Ok(())
     }
 
-    fn for_each(&mut self, f: &mut impl FnMut(&mut TermEnum)) -> Result<()> {
+    fn for_each(&mut self, f: &mut impl FnMut(&mut Term<'src>) -> Result<()>) -> Result<()> {
         self.variable.for_each(f)?;
         self.in_term.for_each(f)
     }
