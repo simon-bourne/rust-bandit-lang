@@ -693,7 +693,6 @@ enum TermEnum<'src> {
     },
     Constant {
         name: &'src str,
-        // TODO: Should we just store `typ` here?
         // TODO: `typ` needs to be checked for scope
         typ: Term<'src>,
     },
