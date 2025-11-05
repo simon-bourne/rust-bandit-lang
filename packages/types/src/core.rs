@@ -237,19 +237,18 @@ impl<'src> Term<'src> {
         Self(SharedMut::new(IndirectTerm::Value { term }))
     }
 
-    pub fn check_scope(&mut self) -> Result<()> {
-        dbg!(&self);
-        self.check_scope_init();
-        self.check_child_scope()
-    }
+    fn for_each(
+        &mut self,
+        f: &mut impl FnMut(&mut TermEnum) -> ControlFlow<()>,
+    ) -> Result<()> {
+        let value = &mut *self.try_value()?;
 
-    fn check_scope_init(&mut self) {
-        // TODO: Factor out recursion schemes
-        match &mut *self.value() {
-            TermEnum::Variable { scope, typ, .. } => {
-                *scope = VariableScope::Unseen;
-                typ.check_scope_init();
-            }
+        if f(value).is_break() {
+            return Ok(());
+        }
+
+        match value {
+            TermEnum::Variable { typ, .. } => typ.for_each(f)?,
             TermEnum::Type => (),
             TermEnum::Apply {
                 function,
@@ -257,19 +256,40 @@ impl<'src> Term<'src> {
                 typ,
                 ..
             } => {
-                function.check_scope_init();
-                argument.check_scope_init();
-                typ.check_scope_init();
+                function.for_each(f)?;
+                argument.for_each(f)?;
+                typ.for_each(f)?;
             }
-            TermEnum::Constant { .. } => (),
-            TermEnum::Unknown { typ } => typ.check_scope_init(),
+            TermEnum::Constant { value, .. } => value.for_each(f)?,
+            TermEnum::Unknown { typ } => typ.for_each(f)?,
             TermEnum::Let { value, binding } => {
-                value.check_scope_init();
-                binding.check_scope_init()
+                value.for_each(f)?;
+                binding.for_each(f)?;
             }
-            TermEnum::Pi(binding) => binding.check_scope_init(),
-            TermEnum::Lambda(binding) => binding.check_scope_init(),
+            TermEnum::Pi(binding) => binding.for_each(f)?,
+            TermEnum::Lambda(binding) => binding.for_each(f)?,
         }
+
+        Ok(())
+    }
+
+    pub fn check_scope(&mut self) -> Result<()> {
+        self.check_scope_init()?;
+        self.check_child_scope()
+    }
+
+    fn check_scope_init(&mut self) -> Result<()> {
+        self.for_each(&mut |t| {
+            if let TermEnum::Variable { scope, .. } = t {
+                *scope = VariableScope::Unseen
+            }
+
+            if matches!(t, TermEnum::Constant { .. }) {
+                ControlFlow::Break(())
+            } else {
+                ControlFlow::Continue(())
+            }
+        })
     }
 
     fn check_child_scope(&mut self) -> Result<()> {
@@ -770,8 +790,11 @@ impl<'src> VariableBinding<Term<'src>> {
         Ok(())
     }
 
-    fn check_scope_init(&mut self) {
-        self.variable.check_scope_init();
-        self.in_term.check_scope_init();
+    fn for_each(
+        &mut self,
+        f: &mut impl FnMut(&mut TermEnum) -> ControlFlow<()>,
+    ) -> Result<()> {
+        self.variable.for_each(f)?;
+        self.in_term.for_each(f)
     }
 }
