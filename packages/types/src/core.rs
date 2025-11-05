@@ -46,7 +46,10 @@ impl<'src> Term<'src> {
     }
 
     pub fn constant(name: &'src str, value: Self) -> Self {
-        Self::new(TermEnum::Constant { name, value })
+        Self::new(TermEnum::Constant {
+            name,
+            typ: value.typ(),
+        })
     }
 
     #[cfg_attr(doc, katexit)]
@@ -200,9 +203,9 @@ impl<'src> Term<'src> {
                 drop(value);
                 return Ok(self.clone());
             }
-            TermEnum::Constant { name, value } => TermEnum::Constant {
+            TermEnum::Constant { name, typ } => TermEnum::Constant {
                 name,
-                value: value.fresh_variables()?,
+                typ: typ.fresh_variables()?,
             },
             TermEnum::Let { value, binding } => TermEnum::Let {
                 value: value.fresh_variables()?,
@@ -237,10 +240,7 @@ impl<'src> Term<'src> {
         Self(SharedMut::new(IndirectTerm::Value { term }))
     }
 
-    fn for_each(
-        &mut self,
-        f: &mut impl FnMut(&mut TermEnum) -> ControlFlow<()>,
-    ) -> Result<()> {
+    fn for_each(&mut self, f: &mut impl FnMut(&mut TermEnum) -> ControlFlow<()>) -> Result<()> {
         let value = &mut *self.try_value()?;
 
         if f(value).is_break() {
@@ -260,7 +260,7 @@ impl<'src> Term<'src> {
                 argument.for_each(f)?;
                 typ.for_each(f)?;
             }
-            TermEnum::Constant { value, .. } => value.for_each(f)?,
+            TermEnum::Constant { typ, .. } => typ.for_each(f)?,
             TermEnum::Unknown { typ } => typ.for_each(f)?,
             TermEnum::Let { value, binding } => {
                 value.for_each(f)?;
@@ -501,12 +501,12 @@ impl<'src> Term<'src> {
         match (&mut *x_ref, &mut *y_ref) {
             (TermEnum::Type, TermEnum::Type) => {}
             (
-                TermEnum::Constant { name, value },
+                TermEnum::Constant { name, typ },
                 TermEnum::Constant {
                     name: name1,
-                    value: value1,
+                    typ: typ1,
                 },
-            ) if name == name1 => Self::unify_upto_eval(value, value1, reducible)?,
+            ) if name == name1 => Self::unify_upto_eval(typ, typ1, reducible)?,
             (
                 TermEnum::Apply {
                     function,
@@ -631,8 +631,8 @@ impl<'src> Term<'src> {
             TermEnum::Type | TermEnum::Pi(_) => Term::type_of_type(),
             TermEnum::Apply { typ, .. }
             | TermEnum::Unknown { typ }
-            | TermEnum::Variable { typ, .. } => typ.clone(),
-            TermEnum::Constant { value, .. } => value.typ(),
+            | TermEnum::Variable { typ, .. }
+            | TermEnum::Constant { typ, .. } => typ.clone(),
             TermEnum::Let { binding, .. } => binding.in_term.typ(),
             TermEnum::Lambda(binding) => Term::pi_type(
                 binding.variable.clone(),
@@ -665,7 +665,9 @@ enum TermEnum<'src> {
     },
     Constant {
         name: &'src str,
-        value: Term<'src>,
+        // TODO: Should we just store `typ` here?
+        // TODO: `typ` needs to be checked for scope
+        typ: Term<'src>,
     },
     Unknown {
         typ: Term<'src>,
@@ -790,10 +792,7 @@ impl<'src> VariableBinding<Term<'src>> {
         Ok(())
     }
 
-    fn for_each(
-        &mut self,
-        f: &mut impl FnMut(&mut TermEnum) -> ControlFlow<()>,
-    ) -> Result<()> {
+    fn for_each(&mut self, f: &mut impl FnMut(&mut TermEnum) -> ControlFlow<()>) -> Result<()> {
         self.variable.for_each(f)?;
         self.in_term.for_each(f)
     }
