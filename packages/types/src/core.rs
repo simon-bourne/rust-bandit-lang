@@ -430,9 +430,8 @@ impl<'src> Term<'src> {
             return Ok(());
         }
 
-        // TODO: await unknowns
-
         if self.is_reducible() {
+            Self::await_unknowns(&mut vec![self.clone()]).await?;
             self.check_scope()?;
             self.evaluate()?;
         }
@@ -483,6 +482,24 @@ impl<'src> Term<'src> {
             TermEnum::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
             TermEnum::Pi(_) | TermEnum::Type => Err(InferenceError::UnexpectedTypeDuringEval)?,
         }
+    }
+
+    async fn await_unknowns(unknowns: &mut Vec<Self>) -> Result<()> {
+        while let Some(mut term) = unknowns.pop() {
+            // TODO: Await the unknown
+
+            assert!(term.is_known());
+
+            term.for_each(&mut |t| {
+                if matches!(&*t.try_value()?, TermEnum::Unknown { .. }) {
+                    unknowns.push(t.clone());
+                }
+
+                Ok(())
+            })?;
+        }
+
+        Ok(())
     }
 
     fn unify_known(x: &mut Self, y: &mut Self, reducible: &mut Vec<(Self, Self)>) -> Result<()> {
