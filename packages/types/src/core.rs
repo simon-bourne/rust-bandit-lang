@@ -3,6 +3,7 @@ use std::{cell::RefMut, fmt, mem, ops::ControlFlow};
 use clonelet::clone;
 #[cfg(doc)]
 use katexit::katexit;
+use tokio::sync::watch;
 
 use crate::{
     Evaluation, InferenceError, Pretty, Result, SharedMut, VariableBinding,
@@ -25,7 +26,12 @@ impl<'src> Term<'src> {
     }
 
     pub fn unknown(typ: Self) -> Self {
-        Self::new(TermEnum::Unknown { typ })
+        let (sender, receiver) = watch::channel(Known::No);
+        Self::new(TermEnum::Unknown {
+            typ,
+            sender,
+            receiver,
+        })
     }
 
     pub fn unknown_value() -> Self {
@@ -196,7 +202,7 @@ impl<'src> Term<'src> {
                 drop(value);
                 return Ok(self.clone());
             }
-            TermEnum::Unknown { typ } => {
+            TermEnum::Unknown { typ, .. } => {
                 // We create a fresh type so we can substitute variables
                 let fresh_type = &typ.fresh_variables()?;
                 typ.replace_with(fresh_type);
@@ -257,7 +263,7 @@ impl<'src> Term<'src> {
                 typ.for_each(f)?;
             }
             TermEnum::Constant { typ, .. } => typ.for_each(f)?,
-            TermEnum::Unknown { typ } => typ.for_each(f)?,
+            TermEnum::Unknown { typ, .. } => typ.for_each(f)?,
             TermEnum::Let { value, binding } => {
                 value.for_each(f)?;
                 binding.for_each(f)?;
@@ -309,7 +315,7 @@ impl<'src> Term<'src> {
                 typ.check_child_scope()?;
             }
             TermEnum::Constant { .. } => (),
-            TermEnum::Unknown { typ } => typ.check_child_scope()?,
+            TermEnum::Unknown { typ, .. } => typ.check_child_scope()?,
             TermEnum::Let { value, binding } => {
                 value.check_child_scope()?;
                 binding.check_scope()?
@@ -345,13 +351,14 @@ impl<'src> Term<'src> {
         other: &mut Self,
         reducible: &mut Vec<(Self, Self)>,
     ) -> Result<ControlFlow<()>> {
-        let mut typ = if let TermEnum::Unknown { typ } = &mut *self.value() {
-            typ.clone()
+        let (mut typ, sender) = if let TermEnum::Unknown { typ, sender, .. } = &mut *self.value() {
+            (typ.clone(), sender.clone())
         } else {
             return Ok(ControlFlow::Continue(()));
         };
 
         self.replace_with(other);
+        sender.send(Known::Yes).ok();
         Self::unify_upto_eval(&mut typ, &mut other.typ(), reducible)?;
         Ok(ControlFlow::Break(()))
     }
@@ -486,7 +493,19 @@ impl<'src> Term<'src> {
 
     async fn await_unknowns(unknowns: &mut Vec<Self>) -> Result<()> {
         while let Some(mut term) = unknowns.pop() {
-            // TODO: Await the unknown
+            // TODO: We need a test for this
+            let receiver = if let TermEnum::Unknown { receiver, .. } = &*term.try_value()? {
+                Some(receiver.clone())
+            } else {
+                None
+            };
+
+            if let Some(mut receiver) = receiver {
+                receiver
+                    .wait_for(|v| matches!(v, Known::Yes))
+                    .await
+                    .expect("Expect receiver to be open");
+            }
 
             assert!(term.is_known());
 
@@ -639,7 +658,7 @@ impl<'src> Term<'src> {
         match &*self.clone().value() {
             TermEnum::Type | TermEnum::Pi(_) => Term::type_of_type(),
             TermEnum::Apply { typ, .. }
-            | TermEnum::Unknown { typ }
+            | TermEnum::Unknown { typ, .. }
             | TermEnum::Variable { typ, .. }
             | TermEnum::Constant { typ, .. } => typ.clone(),
             TermEnum::Let { binding, .. } => binding.in_term.typ(),
@@ -680,6 +699,8 @@ enum TermEnum<'src> {
     },
     Unknown {
         typ: Term<'src>,
+        sender: watch::Sender<Known>,
+        receiver: watch::Receiver<Known>,
     },
     Let {
         value: Term<'src>,
@@ -687,6 +708,11 @@ enum TermEnum<'src> {
     },
     Pi(VariableBinding<Term<'src>>),
     Lambda(VariableBinding<Term<'src>>),
+}
+
+enum Known {
+    Yes,
+    No,
 }
 
 enum VariableScope {

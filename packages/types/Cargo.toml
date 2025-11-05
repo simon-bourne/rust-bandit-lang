@@ -14,3 +14,4 @@ derive_more = { workspace = true, features = ["constructor"] }
 futures.workspace = true
 katexit.workspace = true
 pretty.workspace = true
+tokio = { workspace = true, features = ["sync"] }
