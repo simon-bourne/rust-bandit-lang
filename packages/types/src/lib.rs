@@ -10,6 +10,7 @@ pub mod ast;
 mod constraints;
 pub mod core;
 mod pretty;
+mod sync;
 
 pub use pretty::Pretty;
 

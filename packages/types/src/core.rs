@@ -3,11 +3,10 @@ use std::{cell::RefMut, fmt, mem, ops::ControlFlow};
 use clonelet::clone;
 #[cfg(doc)]
 use katexit::katexit;
-use tokio::sync::watch;
 
 use crate::{
     Evaluation, InferenceError, Pretty, Result, SharedMut, VariableBinding,
-    constraints::Constraints,
+    constraints::Constraints, sync::Latch,
 };
 
 mod pretty;
@@ -26,11 +25,9 @@ impl<'src> Term<'src> {
     }
 
     pub fn unknown(typ: Self) -> Self {
-        let (sender, receiver) = watch::channel(Known::No);
         Self::new(TermEnum::Unknown {
             typ,
-            sender,
-            receiver,
+            inferred: Latch::closed(),
         })
     }
 
@@ -351,14 +348,19 @@ impl<'src> Term<'src> {
         other: &mut Self,
         reducible: &mut Vec<(Self, Self)>,
     ) -> Result<ControlFlow<()>> {
-        let (mut typ, sender) = if let TermEnum::Unknown { typ, sender, .. } = &mut *self.value() {
-            (typ.clone(), sender.clone())
+        let (mut typ, infered) = if let TermEnum::Unknown {
+            typ,
+            inferred: infered,
+            ..
+        } = &mut *self.value()
+        {
+            (typ.clone(), infered.clone())
         } else {
             return Ok(ControlFlow::Continue(()));
         };
 
         self.replace_with(other);
-        sender.send(Known::Yes).ok();
+        infered.open();
         Self::unify_upto_eval(&mut typ, &mut other.typ(), reducible)?;
         Ok(ControlFlow::Break(()))
     }
@@ -494,17 +496,14 @@ impl<'src> Term<'src> {
     async fn await_unknowns(unknowns: &mut Vec<Self>) -> Result<()> {
         while let Some(mut term) = unknowns.pop() {
             // TODO: We need a test for this
-            let receiver = if let TermEnum::Unknown { receiver, .. } = &*term.try_value()? {
-                Some(receiver.clone())
+            let inferred = if let TermEnum::Unknown { inferred, .. } = &*term.try_value()? {
+                Some(inferred.clone())
             } else {
                 None
             };
 
-            if let Some(mut receiver) = receiver {
-                receiver
-                    .wait_for(|v| matches!(v, Known::Yes))
-                    .await
-                    .expect("Expect receiver to be open");
+            if let Some(inferred) = inferred {
+                inferred.wait().await;
             }
 
             assert!(term.is_known());
@@ -698,8 +697,7 @@ enum TermEnum<'src> {
     },
     Unknown {
         typ: Term<'src>,
-        sender: watch::Sender<Known>,
-        receiver: watch::Receiver<Known>,
+        inferred: Latch,
     },
     Let {
         value: Term<'src>,
@@ -707,11 +705,6 @@ enum TermEnum<'src> {
     },
     Pi(VariableBinding<Term<'src>>),
     Lambda(VariableBinding<Term<'src>>),
-}
-
-enum Known {
-    Yes,
-    No,
 }
 
 enum VariableScope {
