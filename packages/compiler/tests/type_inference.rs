@@ -1,7 +1,7 @@
 use bandit_expression::{
     InferenceError, Pretty,
     ast::{Context, Term},
-    core,
+    typed,
 };
 use bandit_parser::{
     lex::{SrcToken, Token},
@@ -44,7 +44,7 @@ impl Test for &str {
     }
 }
 
-fn infer_types(input: &str) -> Result<core::Term<'_>, InferenceError> {
+fn infer_types(input: &str) -> Result<typed::Term<'_>, InferenceError> {
     let ctx = &mut context(
         ["Bool", "Int", "Float"],
         [

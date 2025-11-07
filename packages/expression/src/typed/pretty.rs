@@ -3,8 +3,8 @@ use derive_more::Constructor;
 use super::Term;
 use crate::{
     Pretty,
-    core::TermEnum,
     pretty::{BinaryOperator, Document, Layout, Operator, Side, TypeAnnotated, pretty_let},
+    typed::TermEnum,
 };
 
 impl<'src> Pretty for Term<'src> {

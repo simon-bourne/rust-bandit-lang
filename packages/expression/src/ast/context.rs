@@ -1,14 +1,14 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{InferenceError, Result, ast, constraints::Constraints, core};
+use crate::{InferenceError, Result, ast, constraints::Constraints, typed};
 
 enum Term<'a> {
-    Core(core::Term<'a>),
+    Core(typed::Term<'a>),
     Ast(ast::Term<'a>),
 }
 
 pub struct Context<'a> {
-    variables: HashMap<&'a str, Vec<core::Term<'a>>>,
+    variables: HashMap<&'a str, Vec<typed::Term<'a>>>,
     constants: Rc<HashMap<&'a str, RefCell<Term<'a>>>>,
     constraints: Constraints<'a>,
 }
@@ -41,7 +41,7 @@ impl<'a> Context<'a> {
         Ok(())
     }
 
-    pub fn constants(&self) -> impl Iterator<Item = (&'a str, Result<core::Term<'a>>)> {
+    pub fn constants(&self) -> impl Iterator<Item = (&'a str, Result<typed::Term<'a>>)> {
         self.constants
             .iter()
             .map(|(name, value)| (*name, self.desugar_constant(value)))
@@ -53,7 +53,7 @@ impl<'a> Context<'a> {
 
     pub(crate) fn in_scope<Output>(
         &mut self,
-        mut variable: core::Term<'a>,
+        mut variable: typed::Term<'a>,
         f: impl FnOnce(&mut Self) -> Output,
     ) -> Output {
         let Some(name) = variable.variable_name() else {
@@ -70,11 +70,11 @@ impl<'a> Context<'a> {
         output
     }
 
-    pub(crate) fn lookup(&mut self, name: &'a str) -> Result<core::Term<'a>> {
+    pub(crate) fn lookup(&mut self, name: &'a str) -> Result<typed::Term<'a>> {
         Ok(if let Some(local) = self.lookup_local(name) {
             local
         } else {
-            core::Term::constant(
+            typed::Term::constant(
                 name,
                 self.desugar_constant(
                     self.constants
@@ -85,11 +85,11 @@ impl<'a> Context<'a> {
         })
     }
 
-    fn lookup_local(&self, name: &'a str) -> Option<core::Term<'a>> {
+    fn lookup_local(&self, name: &'a str) -> Option<typed::Term<'a>> {
         Some(self.variables.get(name)?.last()?.clone())
     }
 
-    fn desugar_constant(&self, term: &RefCell<Term<'a>>) -> Result<core::Term<'a>> {
+    fn desugar_constant(&self, term: &RefCell<Term<'a>>) -> Result<typed::Term<'a>> {
         let mut term = term
             .try_borrow_mut()
             .map_err(|_| InferenceError::TopLevelCircularDependency)?;

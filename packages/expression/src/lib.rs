@@ -8,9 +8,9 @@ use std::{
 
 pub mod ast;
 mod constraints;
-pub mod core;
 mod pretty;
 mod sync;
+pub mod typed;
 
 pub use pretty::Pretty;
 

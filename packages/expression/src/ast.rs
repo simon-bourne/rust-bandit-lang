@@ -1,6 +1,6 @@
 use derive_more::Constructor;
 
-use crate::{Evaluation, InferenceError, Result, VariableBinding, core};
+use crate::{Evaluation, InferenceError, Result, VariableBinding, typed};
 
 mod context;
 mod pretty;
@@ -94,8 +94,8 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::Variable(name))
     }
 
-    pub fn desugar(&self, ctx: &mut Context<'src>) -> Result<core::Term<'src>> {
-        use core::Term as Core;
+    pub fn desugar(&self, ctx: &mut Context<'src>) -> Result<typed::Term<'src>> {
+        use typed::Term as Core;
 
         Ok(match self.0.as_ref() {
             TermEnum::Type => Core::type_of_type(),
@@ -137,15 +137,15 @@ impl<'src> Term<'src> {
         Self(Box::new(term))
     }
 
-    fn desugar_variable(&self, ctx: &mut Context<'src>) -> Result<core::Term<'src>> {
+    fn desugar_variable(&self, ctx: &mut Context<'src>) -> Result<typed::Term<'src>> {
         Ok(match self.0.as_ref() {
             TermEnum::HasType { term, typ } => Ok(term
                 .desugar_variable(ctx)?
                 .has_type(typ.desugar(ctx)?, ctx.constraints()))?,
             TermEnum::Variable(name) => {
-                core::Term::variable(Some(name), core::Term::unknown_type())
+                typed::Term::variable(Some(name), typed::Term::unknown_type())
             }
-            TermEnum::Unknown => core::Term::variable(None, core::Term::unknown_type()),
+            TermEnum::Unknown => typed::Term::variable(None, typed::Term::unknown_type()),
             _ => Err(InferenceError::InvalidVariable)?,
         })
     }
@@ -176,7 +176,7 @@ enum TermEnum<'src> {
 }
 
 impl<'src> Binding<'src> {
-    fn desugar(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<core::Term<'src>>> {
+    fn desugar(&self, ctx: &mut Context<'src>) -> Result<VariableBinding<typed::Term<'src>>> {
         let variable = self.variable.desugar_variable(ctx)?;
         let in_term = ctx.in_scope(variable.clone(), |ctx| self.in_term.desugar(ctx))?;
 
