@@ -1,4 +1,4 @@
-use bandit_types::ast::Term;
+use bandit_expression::ast::Term;
 pub use grammar::{definitions, term};
 use winnow::{Result, error::ContextError, token::one_of};
 

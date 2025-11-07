@@ -2,7 +2,7 @@
 // TODO: Newline to separate let binding and expression.
 // TODO: Static and dynamic type construction `T → U`, `T ⇒ U`, `∀x : T → U`,
 // and `∀x : T ⇒ U`
-use bandit_types::{Evaluation, ast::Constant};
+use bandit_expression::{Evaluation, ast::Constant};
 use winnow::{
     Parser as _, Result,
     combinator::{

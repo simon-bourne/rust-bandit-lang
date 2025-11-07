@@ -1,5 +1,5 @@
 [package]
-name = "bandit-types"
+name = "bandit-expression"
 version.workspace = true
 edition.workspace = true
 publish = false

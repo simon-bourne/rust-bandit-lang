@@ -1,8 +1,8 @@
+use bandit_expression::Pretty;
 use bandit_parser::{
     lex::{SrcToken, Token},
     parse::term,
 };
-use bandit_types::Pretty;
 use winnow::Parser;
 
 #[test]

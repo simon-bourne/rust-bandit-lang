@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bandit_types::{
+use bandit_expression::{
     Pretty,
     ast::{Context, Term},
 };
