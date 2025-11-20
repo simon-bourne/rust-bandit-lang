@@ -1,5 +1,7 @@
 # Bandit
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/simon-bourne/rust-bandit-lang)
+
 A Rust-like experimental programming language for me to play around with:
 
 - Parameterized modules/associated traits
