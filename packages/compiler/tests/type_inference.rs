@@ -1,6 +1,6 @@
 use bandit_expression::{
     InferenceError, Pretty,
-    ast::{Context, Term},
+    ast::{Context, Term, Value},
     typed,
 };
 use bandit_parser::{
@@ -18,10 +18,18 @@ fn context<'src>(
     types: impl IntoIterator<Item = &'src str>,
     items: impl IntoIterator<Item = (&'src str, &'src str)>,
 ) -> Context<'src> {
-    let types = types.into_iter().map(|name| (name, Term::type_of_type()));
-    let items = items
+    let types = types
         .into_iter()
-        .map(|(name, typ)| (name, Term::unknown().has_type(parse(typ))));
+        .map(|name| (name, Value::new(Term::type_of_type())));
+    let items = items.into_iter().map(|(name, typ)| {
+        (
+            name,
+            Value {
+                value: Term::unknown(),
+                typ: parse(typ),
+            },
+        )
+    });
     Context::new(types.chain(items))
 }
 

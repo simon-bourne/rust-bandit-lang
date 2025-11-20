@@ -7,20 +7,45 @@ enum Term<'a> {
     Ast(ast::Term<'a>),
 }
 
+type MutableValue<'a> = Value<RefCell<Term<'a>>>;
+
+pub struct Value<T> {
+    pub value: T,
+    pub typ: T,
+}
+
+impl<'src> Value<ast::Term<'src>> {
+    pub fn new(value: ast::Term<'src>) -> Self {
+        Self {
+            value,
+            typ: ast::Term::unknown(),
+        }
+    }
+}
+
+impl<'src> From<Value<ast::Term<'src>>> for MutableValue<'src> {
+    fn from(value: Value<ast::Term<'src>>) -> Self {
+        Value {
+            value: RefCell::new(Term::Ast(value.value)),
+            typ: RefCell::new(Term::Ast(value.typ)),
+        }
+    }
+}
+
 pub struct Context<'a> {
     variables: HashMap<&'a str, Vec<typed::Term<'a>>>,
-    constants: Rc<HashMap<&'a str, RefCell<Term<'a>>>>,
+    constants: Rc<HashMap<&'a str, MutableValue<'a>>>,
     constraints: Constraints<'a>,
 }
 
 impl<'a> Context<'a> {
-    pub fn new(constants: impl IntoIterator<Item = (&'a str, ast::Term<'a>)>) -> Self {
+    pub fn new(constants: impl IntoIterator<Item = (&'a str, Value<ast::Term<'a>>)>) -> Self {
         Self {
             variables: HashMap::new(),
             constants: Rc::new(
                 constants
                     .into_iter()
-                    .map(|(name, value)| (name, RefCell::new(Term::Ast(value))))
+                    .map(|(name, value)| (name, value.into()))
                     .collect(),
             ),
             constraints: Constraints::empty(),
@@ -28,14 +53,15 @@ impl<'a> Context<'a> {
     }
 
     pub fn infer_types(&self) -> Result<()> {
-        for value in self.constants.values() {
-            self.desugar_constant(value)?;
+        for Value { value, typ } in self.constants.values() {
+            self.desugar_term(value)?
+                .has_type(self.desugar_term(typ)?, &self.constraints);
         }
 
         self.constraints.solve()?;
 
-        for value in self.constants.values() {
-            self.desugar_constant(value)?.check_scope()?;
+        for Value { value, .. } in self.constants.values() {
+            self.desugar_term(value)?.check_scope()?;
         }
 
         Ok(())
@@ -44,7 +70,7 @@ impl<'a> Context<'a> {
     pub fn constants(&self) -> impl Iterator<Item = (&'a str, Result<typed::Term<'a>>)> {
         self.constants
             .iter()
-            .map(|(name, value)| (*name, self.desugar_constant(value)))
+            .map(|(name, Value { value, .. })| (*name, self.desugar_term(value)))
     }
 
     pub fn constraints(&self) -> &Constraints<'a> {
@@ -76,10 +102,12 @@ impl<'a> Context<'a> {
         } else {
             typed::Term::constant(
                 name,
-                self.desugar_constant(
-                    self.constants
+                self.desugar_term(
+                    &self
+                        .constants
                         .get(name)
-                        .ok_or(InferenceError::VariableNotFound)?,
+                        .ok_or(InferenceError::VariableNotFound)?
+                        .typ,
                 )?,
             )
         })
@@ -89,7 +117,7 @@ impl<'a> Context<'a> {
         Some(self.variables.get(name)?.last()?.clone())
     }
 
-    fn desugar_constant(&self, term: &RefCell<Term<'a>>) -> Result<typed::Term<'a>> {
+    fn desugar_term(&self, term: &RefCell<Term<'a>>) -> Result<typed::Term<'a>> {
         let mut term = term
             .try_borrow_mut()
             .map_err(|_| InferenceError::TopLevelCircularDependency)?;

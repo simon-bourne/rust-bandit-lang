@@ -48,11 +48,8 @@ impl<'src> Term<'src> {
         })
     }
 
-    pub fn constant(name: &'src str, value: Self) -> Self {
-        Self::new(TermEnum::Constant {
-            name,
-            typ: value.typ(),
-        })
+    pub fn constant(name: &'src str, typ: Self) -> Self {
+        Self::new(TermEnum::Constant { name, typ })
     }
 
     #[cfg_attr(doc, katexit)]

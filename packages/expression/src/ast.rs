@@ -5,7 +5,7 @@ use crate::{Evaluation, InferenceError, Result, VariableBinding, typed};
 mod context;
 mod pretty;
 
-pub use context::Context;
+pub use context::{Context, Value};
 
 #[derive(Constructor)]
 pub struct Constant<'src> {
@@ -17,13 +17,9 @@ pub struct Constant<'src> {
 impl<'src> Constant<'src> {
     pub fn context(definitions: impl IntoIterator<Item = Self>) -> Context<'src> {
         Context::new(definitions.into_iter().map(|Self { name, typ, value }| {
-            let value = if let Some(typ) = typ {
-                value.has_type(typ)
-            } else {
-                value
-            };
+            let typ = typ.unwrap_or_else(Term::unknown);
 
-            (name, value)
+            (name, Value { value, typ })
         }))
     }
 }

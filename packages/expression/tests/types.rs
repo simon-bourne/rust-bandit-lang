@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use bandit_expression::{
     Pretty,
-    ast::{Context, Term},
+    ast::{Context, Term, Value},
 };
 
 #[test]
@@ -32,9 +32,9 @@ fn let_error() {
     let let_binding = Term::let_binding(x(), one, x().has_type(float_type));
 
     let mut global_types = HashMap::new();
-    global_types.insert("one", int_type());
-    global_types.insert("Int", Term::type_of_type());
-    global_types.insert("Float", Term::type_of_type());
+    global_types.insert("one", Value::new(int_type()));
+    global_types.insert("Int", Value::new(Term::type_of_type()));
+    global_types.insert("Float", Value::new(Term::type_of_type()));
     let ctx = &mut Context::new(global_types);
     let_binding.desugar(ctx).unwrap();
 
