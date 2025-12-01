@@ -70,10 +70,11 @@ impl<'src> Term<'src> {
     pub fn apply(
         function: Self,
         argument: Self,
-        mut typ: Self,
         evaluation: Evaluation,
         constraints: &Constraints<'src>,
     ) -> Self {
+        let typ = Self::unknown_type();
+
         constraints.add({
             clone!(function, argument, mut typ);
 
@@ -92,8 +93,6 @@ impl<'src> Term<'src> {
                 Ok(())
             }
         });
-
-        typ.unify_type(constraints);
 
         Self::new(TermEnum::Apply {
             function,

@@ -102,7 +102,6 @@ impl<'src> Term<'src> {
             } => Core::apply(
                 function.desugar(ctx)?,
                 argument.desugar(ctx)?,
-                Core::unknown_type(),
                 *evaluation,
                 ctx.constraints(),
             ),
