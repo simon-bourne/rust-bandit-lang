@@ -9,7 +9,7 @@ authors = ["Simon Bourne <simonbourne@gmail.com>"]
 
 [workspace.dependencies]
 bandit-parser = { path = "packages/parser" }
-bandit-expression = { path = "packages/expression" }
+bandit-term = { path = "packages/term" }
 
 criterion = "0.5.1"
 indoc = "2.0.4"

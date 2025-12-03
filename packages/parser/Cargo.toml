@@ -5,7 +5,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-bandit-expression.workspace = true
+bandit-term.workspace = true
 logos.workspace = true
 itertools.workspace = true
 winnow.workspace= true

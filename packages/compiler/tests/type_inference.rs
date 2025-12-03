@@ -1,11 +1,11 @@
-use bandit_expression::{
-    InferenceError, Pretty,
-    ast::{Context, Term, Value},
-    typed,
-};
 use bandit_parser::{
     lex::{SrcToken, Token},
     parse::term,
+};
+use bandit_term::{
+    InferenceError, Pretty,
+    ast::{Context, Term, Value},
+    typed,
 };
 use winnow::Parser;
 

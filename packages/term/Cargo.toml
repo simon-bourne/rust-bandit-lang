@@ -1,5 +1,5 @@
 [package]
-name = "bandit-expression"
+name = "bandit-term"
 version.workspace = true
 edition.workspace = true
 publish = false

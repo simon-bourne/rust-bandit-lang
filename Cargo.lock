@@ -104,14 +104,26 @@ name = "bandit-compiler"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bandit-expression",
  "bandit-parser",
+ "bandit-term",
  "clap",
  "winnow",
 ]
 
 [[package]]
-name = "bandit-expression"
+name = "bandit-parser"
+version = "0.1.0"
+dependencies = [
+ "bandit-term",
+ "criterion",
+ "indoc",
+ "itertools 0.12.1",
+ "logos",
+ "winnow",
+]
+
+[[package]]
+name = "bandit-term"
 version = "0.1.0"
 dependencies = [
  "clonelet",
@@ -119,18 +131,6 @@ dependencies = [
  "futures",
  "katexit",
  "pretty",
-]
-
-[[package]]
-name = "bandit-parser"
-version = "0.1.0"
-dependencies = [
- "bandit-expression",
- "criterion",
- "indoc",
- "itertools 0.12.1",
- "logos",
- "winnow",
 ]
 
 [[package]]

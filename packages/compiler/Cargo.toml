@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 bandit-parser.workspace = true
-bandit-expression.workspace = true
+bandit-term.workspace = true
 winnow.workspace = true
 clap = { workspace = true, features = ["derive"] }
 anyhow.workspace = true
