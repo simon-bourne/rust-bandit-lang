@@ -1,4 +1,4 @@
-use std::{cell::RefMut, fmt, mem, ops::ControlFlow};
+use std::{cell::RefMut, collections::HashMap, fmt, mem, ops::ControlFlow};
 
 use clonelet::clone;
 #[cfg(doc)]
@@ -50,6 +50,14 @@ impl<'src> Term<'src> {
 
     pub fn constant(name: &'src str, typ: Self) -> Self {
         Self::new(TermEnum::Constant { name, typ })
+    }
+
+    pub fn data(name: &'src str, constructors: HashMap<&'src str, Self>, typ: Self) -> Self {
+        Self::new(TermEnum::Data {
+            name,
+            constructors: Box::new(constructors),
+            typ,
+        })
     }
 
     #[cfg_attr(doc, katexit)]
@@ -206,6 +214,23 @@ impl<'src> Term<'src> {
                 name,
                 typ: typ.fresh_variables()?,
             },
+            TermEnum::Data {
+                name,
+                constructors,
+                typ,
+            } => {
+                let mut fresh_constructors = HashMap::with_capacity(constructors.len());
+
+                for (name, typ) in constructors.iter_mut() {
+                    fresh_constructors.insert(*name, typ.fresh_variables()?);
+                }
+
+                TermEnum::Data {
+                    name,
+                    constructors: Box::new(fresh_constructors),
+                    typ: typ.fresh_variables()?,
+                }
+            }
             TermEnum::Let { value, binding } => TermEnum::Let {
                 value: value.fresh_variables()?,
                 binding: binding.fresh_variables()?,
@@ -256,6 +281,15 @@ impl<'src> Term<'src> {
                 typ.for_each(f)?;
             }
             TermEnum::Constant { typ, .. } => typ.for_each(f)?,
+            TermEnum::Data {
+                constructors, typ, ..
+            } => {
+                for typ in constructors.values_mut() {
+                    typ.for_each(f)?;
+                }
+
+                typ.for_each(f)?
+            }
             TermEnum::Unknown { typ, .. } => typ.for_each(f)?,
             TermEnum::Let { value, binding } => {
                 value.for_each(f)?;
@@ -307,7 +341,7 @@ impl<'src> Term<'src> {
                 argument.check_child_scope()?;
                 typ.check_child_scope()?;
             }
-            TermEnum::Constant { .. } => (),
+            TermEnum::Constant { .. } | TermEnum::Data { .. } => (),
             TermEnum::Unknown { typ, .. } => typ.check_child_scope()?,
             TermEnum::Let { value, binding } => {
                 value.check_child_scope()?;
@@ -480,7 +514,8 @@ impl<'src> Term<'src> {
             TermEnum::Apply { .. }
             | TermEnum::Let { .. }
             | TermEnum::Variable { .. }
-            | TermEnum::Constant { .. } => {
+            | TermEnum::Constant { .. }
+            | TermEnum::Data { .. } => {
                 drop(value);
                 Ok(self.clone())
             }
@@ -571,6 +606,7 @@ impl<'src> Term<'src> {
             | (TermEnum::Apply { .. }, _rhs)
             | (TermEnum::Variable { .. }, _rhs)
             | (TermEnum::Constant { .. }, _rhs)
+            | (TermEnum::Data { .. }, _rhs)
             | (TermEnum::Unknown { .. }, _rhs)
             | (TermEnum::Let { .. }, _rhs)
             | (TermEnum::Pi(_), _rhs)
@@ -655,7 +691,8 @@ impl<'src> Term<'src> {
             TermEnum::Apply { typ, .. }
             | TermEnum::Unknown { typ, .. }
             | TermEnum::Variable { typ, .. }
-            | TermEnum::Constant { typ, .. } => typ.clone(),
+            | TermEnum::Constant { typ, .. }
+            | TermEnum::Data { typ, .. } => typ.clone(),
             TermEnum::Let { binding, .. } => binding.in_term.typ(),
             TermEnum::Lambda(binding) => Term::pi_type(
                 binding.variable.clone(),
@@ -689,6 +726,12 @@ enum TermEnum<'src> {
     Constant {
         name: &'src str,
         // TODO: `typ` needs to be checked for scope
+        typ: Term<'src>,
+    },
+    Data {
+        name: &'src str,
+        #[allow(clippy::box_collection)]
+        constructors: Box<HashMap<&'src str, Term<'src>>>,
         typ: Term<'src>,
     },
     Unknown {
