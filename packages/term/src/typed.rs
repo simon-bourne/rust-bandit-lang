@@ -1,4 +1,4 @@
-use std::{cell::RefMut, collections::HashMap, fmt, mem, ops::ControlFlow};
+use std::{cell::RefMut, collections::HashMap, fmt, mem, ops::ControlFlow, rc};
 
 use clonelet::clone;
 #[cfg(doc)]
@@ -52,12 +52,42 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::Constant { name, typ })
     }
 
-    pub fn data(name: &'src str, constructors: HashMap<&'src str, Self>, typ: Self) -> Self {
-        Self::new(TermEnum::Data {
+    pub fn data(
+        name: &'src str,
+        constructors: rc::Weak<HashMap<&'src str, Self>>,
+        typ: Self,
+        constraints: &Constraints<'src>,
+    ) -> Self {
+        // TODO: Check constructors scope
+        // TODO: `constructors` should be a weak ref, with the strong ref stored in
+        // context, as the head of the codomain should be self.
+
+        constraints.add({
+            clone!(mut typ);
+
+            async move { Self::unify(&mut typ.codomain().await?, &mut Self::type_of_type()).await }
+        });
+
+        let data = Self::new(TermEnum::Data {
             name,
-            constructors: Box::new(constructors),
+            constructors: constructors.clone(),
             typ,
-        })
+        });
+
+        constraints.add({
+            clone!(mut data, constructors);
+
+            async move {
+                for constructor in constructors.upgrade().unwrap().values() {
+                    let head = &mut constructor.clone().codomain().await?.head().await?;
+                    Self::unify(head, &mut data).await?;
+                }
+
+                Ok(())
+            }
+        });
+
+        data
     }
 
     #[cfg_attr(doc, katexit)]
@@ -218,19 +248,11 @@ impl<'src> Term<'src> {
                 name,
                 constructors,
                 typ,
-            } => {
-                let mut fresh_constructors = HashMap::with_capacity(constructors.len());
-
-                for (name, typ) in constructors.iter_mut() {
-                    fresh_constructors.insert(*name, typ.fresh_variables()?);
-                }
-
-                TermEnum::Data {
-                    name,
-                    constructors: Box::new(fresh_constructors),
-                    typ: typ.fresh_variables()?,
-                }
-            }
+            } => TermEnum::Data {
+                name,
+                constructors: constructors.clone(),
+                typ: typ.fresh_variables()?,
+            },
             TermEnum::Let { value, binding } => TermEnum::Let {
                 value: value.fresh_variables()?,
                 binding: binding.fresh_variables()?,
@@ -281,13 +303,8 @@ impl<'src> Term<'src> {
                 typ.for_each(f)?;
             }
             TermEnum::Constant { typ, .. } => typ.for_each(f)?,
-            TermEnum::Data {
-                constructors, typ, ..
-            } => {
-                for typ in constructors.values_mut() {
-                    typ.for_each(f)?;
-                }
-
+            TermEnum::Data { typ, .. } => {
+                // TODO: Do we need to recurse constructors?
                 typ.for_each(f)?
             }
             TermEnum::Unknown { typ, .. } => typ.for_each(f)?,
@@ -524,6 +541,32 @@ impl<'src> Term<'src> {
         }
     }
 
+    async fn head(&mut self) -> Result<Self> {
+        self.await_unknown().await?;
+        let mut function = {
+            let TermEnum::Apply { function, .. } = &mut *self.try_value()? else {
+                return Ok(self.clone());
+            };
+
+            function.clone()
+        };
+
+        Box::pin(function.head()).await
+    }
+
+    async fn codomain(&mut self) -> Result<Self> {
+        self.await_unknown().await?;
+        let mut in_term = {
+            let TermEnum::Pi(binding) = &mut *self.try_value()? else {
+                return Ok(self.clone());
+            };
+
+            binding.in_term.clone()
+        };
+
+        Box::pin(in_term.codomain()).await
+    }
+
     async fn await_unknown(&mut self) -> Result<()> {
         // TODO: We need a test for this
         let inferred = if let TermEnum::Unknown { inferred, .. } = &*self.try_value()? {
@@ -736,7 +779,7 @@ enum TermEnum<'src> {
     Data {
         name: &'src str,
         #[allow(clippy::box_collection)]
-        constructors: Box<HashMap<&'src str, Term<'src>>>,
+        constructors: rc::Weak<HashMap<&'src str, Term<'src>>>,
         typ: Term<'src>,
     },
     Unknown {
