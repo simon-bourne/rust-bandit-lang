@@ -470,7 +470,7 @@ impl<'src> Term<'src> {
         }
 
         if self.is_reducible() {
-            Self::await_unknowns(&mut vec![self.clone()]).await?;
+            Self::await_all_unknowns(&mut vec![self.clone()]).await?;
             self.check_scope()?;
             self.evaluate()?;
         }
@@ -524,20 +524,25 @@ impl<'src> Term<'src> {
         }
     }
 
-    async fn await_unknowns(unknowns: &mut Vec<Self>) -> Result<()> {
+    async fn await_unknown(&mut self) -> Result<()> {
+        // TODO: We need a test for this
+        let inferred = if let TermEnum::Unknown { inferred, .. } = &*self.try_value()? {
+            Some(inferred.clone())
+        } else {
+            None
+        };
+
+        if let Some(inferred) = inferred {
+            inferred.wait().await;
+        }
+
+        assert!(self.is_known());
+        Ok(())
+    }
+
+    async fn await_all_unknowns(unknowns: &mut Vec<Self>) -> Result<()> {
         while let Some(mut term) = unknowns.pop() {
-            // TODO: We need a test for this
-            let inferred = if let TermEnum::Unknown { inferred, .. } = &*term.try_value()? {
-                Some(inferred.clone())
-            } else {
-                None
-            };
-
-            if let Some(inferred) = inferred {
-                inferred.wait().await;
-            }
-
-            assert!(term.is_known());
+            term.await_unknown().await?;
 
             term.for_each(&mut |t| {
                 if matches!(&*t.try_value()?, TermEnum::Unknown { .. }) {
