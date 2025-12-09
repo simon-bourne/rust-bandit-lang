@@ -24,7 +24,7 @@ impl<'src> Pretty for Term<'src> {
             TermEnum::Variable { name, typ, .. } => {
                 has_type(WithId::new(self, name), typ).to_document(parent, layout)
             }
-            TermEnum::Constant { name, typ } | TermEnum::Data { name, typ, .. } => {
+            TermEnum::Constant { name, typ } => {
                 has_type(WithId::new(self, name), typ).to_document(parent, layout)
             }
             TermEnum::Unknown { typ, .. } => {

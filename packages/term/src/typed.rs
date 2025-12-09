@@ -1,4 +1,4 @@
-use std::{cell::RefMut, collections::HashMap, fmt, mem, ops::ControlFlow, rc};
+use std::{cell::RefMut, fmt, mem, ops::ControlFlow};
 
 use clonelet::clone;
 #[cfg(doc)]
@@ -52,42 +52,35 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::Constant { name, typ })
     }
 
+    /// Apply typing rules between type and value constructors.
+    /// 
+    /// `self` is the type constructor
     pub fn data(
-        name: &'src str,
-        constructors: rc::Weak<HashMap<&'src str, Self>>,
-        typ: Self,
+        mut self,
+        value_constructors: impl IntoIterator<Item = Self>,
         constraints: &Constraints<'src>,
-    ) -> Self {
-        // TODO: Check constructors scope
-        // TODO: `constructors` should be a weak ref, with the strong ref stored in
-        // context, as the head of the codomain should be self.
+    ) {
+        self.unify_type(constraints);
 
         constraints.add({
-            clone!(mut typ);
+            let mut typ = self.typ();
 
             async move { Self::unify(&mut typ.codomain().await?, &mut Self::type_of_type()).await }
         });
 
-        let data = Self::new(TermEnum::Data {
-            name,
-            constructors: constructors.clone(),
-            typ,
-        });
-
         constraints.add({
-            clone!(mut data, constructors);
+            let mut type_constructor = self.clone();
+            let value_constructors = Vec::from_iter(value_constructors);
 
             async move {
-                for constructor in constructors.upgrade().unwrap().values() {
-                    let head = &mut constructor.clone().codomain().await?.head().await?;
-                    Self::unify(head, &mut data).await?;
+                for mut value_constructor in value_constructors {
+                    let head = &mut value_constructor.codomain().await?.head().await?;
+                    Self::unify(head, &mut type_constructor).await?;
                 }
 
                 Ok(())
             }
         });
-
-        data
     }
 
     #[cfg_attr(doc, katexit)]
@@ -244,15 +237,6 @@ impl<'src> Term<'src> {
                 name,
                 typ: typ.fresh_variables()?,
             },
-            TermEnum::Data {
-                name,
-                constructors,
-                typ,
-            } => TermEnum::Data {
-                name,
-                constructors: constructors.clone(),
-                typ: typ.fresh_variables()?,
-            },
             TermEnum::Let { value, binding } => TermEnum::Let {
                 value: value.fresh_variables()?,
                 binding: binding.fresh_variables()?,
@@ -303,10 +287,6 @@ impl<'src> Term<'src> {
                 typ.for_each(f)?;
             }
             TermEnum::Constant { typ, .. } => typ.for_each(f)?,
-            TermEnum::Data { typ, .. } => {
-                // TODO: Do we need to recurse constructors?
-                typ.for_each(f)?
-            }
             TermEnum::Unknown { typ, .. } => typ.for_each(f)?,
             TermEnum::Let { value, binding } => {
                 value.for_each(f)?;
@@ -358,7 +338,7 @@ impl<'src> Term<'src> {
                 argument.check_child_scope()?;
                 typ.check_child_scope()?;
             }
-            TermEnum::Constant { .. } | TermEnum::Data { .. } => (),
+            TermEnum::Constant { .. } => (),
             TermEnum::Unknown { typ, .. } => typ.check_child_scope()?,
             TermEnum::Let { value, binding } => {
                 value.check_child_scope()?;
@@ -531,8 +511,7 @@ impl<'src> Term<'src> {
             TermEnum::Apply { .. }
             | TermEnum::Let { .. }
             | TermEnum::Variable { .. }
-            | TermEnum::Constant { .. }
-            | TermEnum::Data { .. } => {
+            | TermEnum::Constant { .. } => {
                 drop(value);
                 Ok(self.clone())
             }
@@ -654,7 +633,6 @@ impl<'src> Term<'src> {
             | (TermEnum::Apply { .. }, _rhs)
             | (TermEnum::Variable { .. }, _rhs)
             | (TermEnum::Constant { .. }, _rhs)
-            | (TermEnum::Data { .. }, _rhs)
             | (TermEnum::Unknown { .. }, _rhs)
             | (TermEnum::Let { .. }, _rhs)
             | (TermEnum::Pi(_), _rhs)
@@ -739,8 +717,7 @@ impl<'src> Term<'src> {
             TermEnum::Apply { typ, .. }
             | TermEnum::Unknown { typ, .. }
             | TermEnum::Variable { typ, .. }
-            | TermEnum::Constant { typ, .. }
-            | TermEnum::Data { typ, .. } => typ.clone(),
+            | TermEnum::Constant { typ, .. } => typ.clone(),
             TermEnum::Let { binding, .. } => binding.in_term.typ(),
             TermEnum::Lambda(binding) => Term::pi_type(
                 binding.variable.clone(),
@@ -774,12 +751,6 @@ enum TermEnum<'src> {
     Constant {
         name: &'src str,
         // TODO: `typ` needs to be checked for scope
-        typ: Term<'src>,
-    },
-    Data {
-        name: &'src str,
-        #[allow(clippy::box_collection)]
-        constructors: rc::Weak<HashMap<&'src str, Term<'src>>>,
         typ: Term<'src>,
     },
     Unknown {
