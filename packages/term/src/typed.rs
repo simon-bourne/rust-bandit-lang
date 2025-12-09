@@ -53,7 +53,7 @@ impl<'src> Term<'src> {
     }
 
     /// Apply typing rules between type and value constructors.
-    /// 
+    ///
     /// `self` is the type constructor
     pub fn data(
         mut self,
