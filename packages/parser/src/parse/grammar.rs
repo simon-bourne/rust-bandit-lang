@@ -2,7 +2,7 @@
 // TODO: Newline to separate let binding and expression.
 // TODO: Static and dynamic type construction `T → U`, `T ⇒ U`, `∀x : T → U`,
 // and `∀x : T ⇒ U`
-use bandit_term::{Evaluation, ast::Constant};
+use bandit_term::{Evaluation, ast::Definition};
 use winnow::{
     Parser as _, Result,
     combinator::{
@@ -15,9 +15,9 @@ use winnow::{
 use super::{Parser, Term, TokenList};
 use crate::lex::{Grouping, Keyword, Operator, SrcToken, Token};
 
-pub fn definitions<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Vec<Constant<'src>>> {
+pub fn definitions<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Vec<Definition<'src>>> {
     terminated(
-        separated(0.., constant_definition(), Token::LineEnd),
+        separated(0.., function_definition(), Token::LineEnd),
         opt(Token::LineEnd),
     )
 }
@@ -26,13 +26,13 @@ pub fn term<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> Result<Term<
     type_annotations().parse_next(input)
 }
 
-fn constant_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Constant<'src>> {
+fn function_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Definition<'src>> {
     (
         identifier(),
         opt(preceded(Operator::HasType, term)),
         preceded(Operator::Assign, term),
     )
-        .map(|(name, typ, value)| Constant::new(name, typ, value))
+        .map(|(name, typ, value)| Definition::function(name, typ, value))
 }
 
 fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {

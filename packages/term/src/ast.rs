@@ -1,5 +1,3 @@
-use derive_more::Constructor;
-
 use crate::{Evaluation, InferenceError, Result, VariableBinding, typed};
 
 mod context;
@@ -7,20 +5,35 @@ mod pretty;
 
 pub use context::{Context, Value};
 
-#[derive(Constructor)]
-pub struct Constant<'src> {
-    name: &'src str,
-    typ: Option<Term<'src>>,
-    value: Term<'src>,
+pub enum Definition<'src> {
+    Function {
+        name: &'src str,
+        typ: Option<Term<'src>>,
+        value: Term<'src>,
+    },
+    Data {
+        name: &'src str,
+    },
 }
 
-impl<'src> Constant<'src> {
-    pub fn context(definitions: impl IntoIterator<Item = Self>) -> Context<'src> {
-        Context::new(definitions.into_iter().map(|Self { name, typ, value }| {
-            let typ = typ.unwrap_or_else(Term::unknown);
+impl<'src> Definition<'src> {
+    pub fn function(name: &'src str, typ: Option<Term<'src>>, value: Term<'src>) -> Self {
+        Self::Function { name, typ, value }
+    }
 
-            (name, Value { value, typ })
-        }))
+    pub fn context(definitions: impl IntoIterator<Item = Self>) -> Context<'src> {
+        Context::new(
+            definitions
+                .into_iter()
+                .filter_map(|definition| match definition {
+                    Definition::Function { name, typ, value } => {
+                        let typ = typ.unwrap_or_else(Term::unknown);
+
+                        Some((name, Value { value, typ }))
+                    }
+                    Definition::Data { .. } => None,
+                }),
+        )
     }
 }
 

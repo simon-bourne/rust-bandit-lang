@@ -1,6 +1,6 @@
 use crate::{
     Evaluation, Pretty,
-    ast::{Constant, Term, TermEnum},
+    ast::{Definition, Term, TermEnum},
     pretty::{Document, Layout, Operator, Side, TypeAnnotated, pretty_let},
 };
 
@@ -29,10 +29,19 @@ impl Pretty for Term<'_> {
     }
 }
 
-impl Pretty for Constant<'_> {
+impl Pretty for Definition<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        let name = TypeAnnotated::new(self.name, self.typ.as_ref());
+        match self {
+            Definition::Function { name, typ, value } => {
+                let name = TypeAnnotated::new(name, typ.as_ref());
 
-        Operator::Equals.to_document(parent, &name, &self.value, layout, layout.without_types())
+                Operator::Equals.to_document(parent, &name, value, layout, layout.without_types())
+            }
+            Definition::Data { name } => Document::concat([
+                Document::text("data"),
+                Document::text(" "),
+                Document::as_string(name),
+            ]),
+        }
     }
 }

@@ -3,7 +3,7 @@ use bandit_parser::{
     lex::{SrcToken, Token},
     parse::definitions,
 };
-use bandit_term::{Pretty, ast::Constant};
+use bandit_term::{Pretty, ast::Definition};
 use winnow::Parser;
 
 pub fn compile(source: &str) -> Result<()> {
@@ -19,7 +19,7 @@ pub fn compile(source: &str) -> Result<()> {
         println!("{}", constant.to_pretty_string(80));
     }
 
-    let ctx = Constant::context(constant);
+    let ctx = Definition::context(constant);
     ctx.infer_types()?;
 
     println!();
