@@ -53,9 +53,7 @@ impl<'src> Term<'src> {
     }
 
     /// Apply typing rules between type and value constructors.
-    ///
-    /// `self` is the type constructor
-    pub fn data(
+    pub fn type_constructor(
         mut self,
         value_constructors: impl IntoIterator<Item = Self>,
         constraints: &Constraints<'src>,
