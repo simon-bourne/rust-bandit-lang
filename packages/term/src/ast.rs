@@ -4,21 +4,29 @@ mod context;
 mod pretty;
 
 pub use context::{Context, Value};
+use derive_more::Constructor;
 
 pub enum Definition<'src> {
-    Function {
-        name: &'src str,
-        typ: Option<Term<'src>>,
-        value: Term<'src>,
-    },
-    Data {
-        name: &'src str,
-    },
+    Function(Function<'src>),
+    Data(Data<'src>),
+}
+
+#[derive(Constructor)]
+pub struct Function<'src> {
+    name: &'src str,
+    typ: Option<Term<'src>>,
+    value: Term<'src>,
+}
+
+#[derive(Constructor)]
+pub struct Data<'src> {
+    name: &'src str,
+    typ: Option<Term<'src>>,
 }
 
 impl<'src> Definition<'src> {
     pub fn function(name: &'src str, typ: Option<Term<'src>>, value: Term<'src>) -> Self {
-        Self::Function { name, typ, value }
+        Self::Function(Function { name, typ, value })
     }
 
     pub fn context(definitions: impl IntoIterator<Item = Self>) -> Context<'src> {
@@ -26,10 +34,16 @@ impl<'src> Definition<'src> {
             definitions
                 .into_iter()
                 .filter_map(|definition| match definition {
-                    Definition::Function { name, typ, value } => {
-                        let typ = typ.unwrap_or_else(Term::unknown);
+                    Definition::Function(f) => {
+                        let typ = f.typ.unwrap_or_else(Term::unknown);
 
-                        Some((name, Value { value, typ }))
+                        Some((
+                            f.name,
+                            Value {
+                                value: f.value,
+                                typ,
+                            },
+                        ))
                     }
                     Definition::Data { .. } => None,
                 }),
