@@ -97,20 +97,15 @@ impl<'a> Context<'a> {
     }
 
     pub(crate) fn lookup(&mut self, name: &'a str) -> Result<typed::Term<'a>> {
-        Ok(if let Some(local) = self.lookup_local(name) {
+        let term = if let Some(local) = self.lookup_local(name) {
             local
+        } else if let Some(constant) = self.constants.get(name) {
+            typed::Term::constant(name, self.desugar_term(&constant.typ)?)
         } else {
-            typed::Term::constant(
-                name,
-                self.desugar_term(
-                    &self
-                        .constants
-                        .get(name)
-                        .ok_or(InferenceError::VariableNotFound)?
-                        .typ,
-                )?,
-            )
-        })
+            return Err(InferenceError::VariableNotFound)?;
+        };
+
+        Ok(term)
     }
 
     fn lookup_local(&self, name: &'a str) -> Option<typed::Term<'a>> {
