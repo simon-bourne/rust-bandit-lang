@@ -34,14 +34,24 @@ impl<'src> From<Value<ast::Term<'src>>> for MutableValue<'src> {
 
 pub struct Context<'a> {
     variables: HashMap<&'a str, Vec<typed::Term<'a>>>,
+    types: Rc<HashMap<&'a str, RefCell<Term<'a>>>>,
     constants: Rc<HashMap<&'a str, MutableValue<'a>>>,
     constraints: Constraints<'a>,
 }
 
 impl<'a> Context<'a> {
-    pub fn new(constants: impl IntoIterator<Item = (&'a str, Value<ast::Term<'a>>)>) -> Self {
+    pub fn new(
+        types: impl IntoIterator<Item = (&'a str, ast::Term<'a>)>,
+        constants: impl IntoIterator<Item = (&'a str, Value<ast::Term<'a>>)>,
+    ) -> Self {
         Self {
             variables: HashMap::new(),
+            types: Rc::new(
+                types
+                    .into_iter()
+                    .map(|(name, typ)| (name, RefCell::new(Term::Ast(typ))))
+                    .collect(),
+            ),
             constants: Rc::new(
                 constants
                     .into_iter()
@@ -101,6 +111,8 @@ impl<'a> Context<'a> {
             local
         } else if let Some(constant) = self.constants.get(name) {
             typed::Term::constant(name, self.desugar_term(&constant.typ)?)
+        } else if let Some(type_constructor) = self.types.get(name) {
+            typed::Term::constant(name, self.desugar_term(type_constructor)?)
         } else {
             return Err(InferenceError::VariableNotFound)?;
         };
@@ -122,6 +134,7 @@ impl<'a> Context<'a> {
             Term::Ast(term) => {
                 let mut global_ctx = Context {
                     variables: HashMap::new(),
+                    types: self.types.clone(),
                     constants: self.constants.clone(),
                     constraints: self.constraints.clone(),
                 };

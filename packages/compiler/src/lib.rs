@@ -9,17 +9,17 @@ use winnow::Parser;
 pub fn compile(source: &str) -> Result<()> {
     let tokens: Vec<SrcToken> = Token::layout(source).collect();
     // TODO: Ergonomic parse errors: <https://docs.rs/winnow/latest/winnow/_tutorial/chapter_7/index.html#error-adaptation-and-rendering>
-    let constant = definitions()
+    let constants = definitions()
         .parse(&tokens)
         .map_err(|_| anyhow!("A parse error occurred"))?;
 
     println!("Before type inference:");
 
-    for constant in &constant {
+    for constant in &constants {
         println!("{}", constant.to_pretty_string(80));
     }
 
-    let ctx = Definition::context(constant);
+    let ctx = Definition::context(constants);
     ctx.infer_types()?;
 
     println!();

@@ -30,24 +30,27 @@ impl<'src> Definition<'src> {
     }
 
     pub fn context(definitions: impl IntoIterator<Item = Self>) -> Context<'src> {
-        Context::new(
-            definitions
-                .into_iter()
-                .filter_map(|definition| match definition {
-                    Definition::Function(f) => {
-                        let typ = f.typ.unwrap_or_else(Term::unknown);
+        let mut functions = Vec::new();
+        let mut types = Vec::new();
 
-                        Some((
-                            f.name,
-                            Value {
-                                value: f.value,
-                                typ,
-                            },
-                        ))
-                    }
-                    Definition::Data { .. } => None,
-                }),
-        )
+        for definition in definitions {
+            match definition {
+                Definition::Function(f) => {
+                    let typ = f.typ.unwrap_or_else(Term::unknown);
+                    let value = Value {
+                        value: f.value,
+                        typ,
+                    };
+                    functions.push((f.name, value));
+                }
+                Definition::Data(data) => {
+                    let typ = data.typ.unwrap_or_else(Term::unknown);
+                    types.push((data.name, typ))
+                }
+            }
+        }
+
+        Context::new(types, functions)
     }
 }
 

@@ -30,7 +30,7 @@ fn context<'src>(
             },
         )
     });
-    Context::new(types.chain(items))
+    Context::new([], types.chain(items))
 }
 
 trait Test {
