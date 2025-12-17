@@ -7,7 +7,6 @@ publish = false
 [dependencies]
 bandit-term.workspace = true
 logos.workspace = true
-itertools.workspace = true
 winnow.workspace= true
 
 [dev-dependencies]
