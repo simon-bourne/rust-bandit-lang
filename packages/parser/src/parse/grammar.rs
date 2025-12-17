@@ -4,7 +4,7 @@
 // and `∀x : T ⇒ U`
 use bandit_term::{
     Evaluation,
-    ast::{Data, Definition, Function},
+    ast::{Data, Definition, Function, ValueConstructor},
 };
 use winnow::{
     Parser as _, Result,
@@ -16,17 +16,19 @@ use winnow::{
 };
 
 use super::{Parser, Term, TokenList};
-use crate::lex::{Grouping, Keyword, Operator, SrcToken, Token};
+use crate::{
+    lex::{Grouping, Keyword, Operator, SrcToken, Token},
+    parse::{close_block, open_block},
+};
 
 pub fn definitions<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Vec<Definition<'src>>> {
     terminated(
-        separated(
-            0..,
+        repeat(
+            ..,
             alt((
                 function_definition().map(Definition::Function),
                 data_definition().map(Definition::Data),
             )),
-            Token::LineEnd,
         ),
         opt(Token::LineEnd),
     )
@@ -35,8 +37,8 @@ pub fn definitions<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Vec<Definition
 fn function_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Function<'src>> {
     (
         identifier(),
-        opt(preceded(Operator::HasType, term)),
-        preceded(Operator::Assign, term),
+        opt(has_type()),
+        delimited(Operator::Assign, term, Token::LineEnd),
     )
         .map(|(name, typ, value)| Function::new(name, typ, value))
 }
@@ -44,9 +46,26 @@ fn function_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Function<'
 fn data_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Data<'src>> {
     preceded(
         Keyword::Data,
-        (identifier(), opt(preceded(Operator::HasType, term))),
+        (
+            identifier(),
+            opt(has_type()),
+            alt((
+                delimited(open_block(), value_constructors(), close_block()),
+                Token::LineEnd.default_value(),
+            )),
+        ),
     )
-    .map(|(name, typ)| Data::new(name, typ))
+    .map(|(name, typ, value_constructors)| Data::new(name, typ, value_constructors))
+}
+
+fn value_constructors<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Vec<ValueConstructor<'src>>> {
+    let constructor =
+        (identifier(), opt(has_type())).map(|(name, typ)| ValueConstructor::new(name, typ));
+    separated(1.., constructor, Token::LineEnd)
+}
+
+fn has_type<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
+    preceded(Operator::HasType, term)
 }
 
 pub fn term<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> Result<Term<'src>> {

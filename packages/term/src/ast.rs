@@ -22,6 +22,13 @@ pub struct Function<'src> {
 pub struct Data<'src> {
     name: &'src str,
     typ: Option<Term<'src>>,
+    _constructors: Vec<ValueConstructor<'src>>,
+}
+
+#[derive(Constructor)]
+pub struct ValueConstructor<'src> {
+    _name: &'src str,
+    _typ: Option<Term<'src>>,
 }
 
 impl<'src> Definition<'src> {

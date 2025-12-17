@@ -1,7 +1,6 @@
 data Bool : Type
 data Int : Type
 data Float : Type
-
 one : Int = _
 pi : Float = _
 true : Bool = _
@@ -13,3 +12,7 @@ polymorphic : ∀a ⇒ a = _
 scoped : ∀a ⇒ (∀s ⇒ s → a) → a = _
 
 f = one
+
+data MyType
+    constructor1 : Int → MyType
+    constructor2 : Float → MyType
