@@ -44,7 +44,7 @@ term do term term do
     });
     group.bench_function("layout", |b| {
         b.iter(|| {
-            let lexer = Token::layout(&input);
+            let lexer = Token::iter(&input);
 
             for token in lexer {
                 assert!(!matches!(token.0, Token::Error(_)));

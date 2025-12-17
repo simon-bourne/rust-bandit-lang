@@ -21,7 +21,7 @@ fn type_annotation() {
 }
 
 fn parse(input: &str, expected: &str) {
-    let tokens: Vec<SrcToken> = Token::layout(input).collect();
+    let tokens: Vec<SrcToken> = Token::iter(input).collect();
     let term = term.parse(&tokens).unwrap();
     assert_eq!(term.to_pretty_string(80), expected);
 }

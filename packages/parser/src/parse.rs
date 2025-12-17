@@ -41,9 +41,9 @@ impl<'tok, 'src: 'tok> winnow::Parser<TokenList<'tok, 'src>, Keyword, ContextErr
 }
 
 fn open_block<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, ()> {
-    Token::Open(Grouping::Block).void()
+    Token::Open(Grouping::Braces).void()
 }
 
 fn close_block<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, ()> {
-    Token::Close(Grouping::Block).void()
+    Token::Close(Grouping::Braces).void()
 }

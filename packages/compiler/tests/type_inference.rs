@@ -10,7 +10,7 @@ use bandit_term::{
 use winnow::Parser;
 
 fn parse(input: &str) -> Term<'_> {
-    let tokens: Vec<SrcToken> = Token::layout(input).collect();
+    let tokens: Vec<SrcToken> = Token::iter(input).collect();
     term.parse(&tokens).unwrap()
 }
 
