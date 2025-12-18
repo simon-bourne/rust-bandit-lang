@@ -9,8 +9,8 @@ use bandit_term::{
 use winnow::{
     Parser as _, Result,
     combinator::{
-        alt, delimited, opt, preceded, repeat, separated_foldl1, separated_foldr1, separated_pair,
-        terminated,
+        alt, delimited, opt, preceded, repeat, separated, separated_foldl1, separated_foldr1,
+        separated_pair, terminated,
     },
     token::any,
 };
@@ -40,16 +40,13 @@ fn function_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Function<'
 fn data_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Data<'src>> {
     preceded(
         Keyword::Data,
-        (identifier(), opt(has_type()), block(value_constructors())),
+        (identifier(), opt(has_type()), block(value_constructor())),
     )
     .map(|(name, typ, value_constructors)| Data::new(name, typ, value_constructors))
 }
 
-fn value_constructors<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Vec<ValueConstructor<'src>>> {
-    repeat(
-        ..,
-        line((identifier(), opt(has_type()))).map(|(name, typ)| ValueConstructor::new(name, typ)),
-    )
+fn value_constructor<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, ValueConstructor<'src>> {
+    (identifier(), opt(has_type())).map(|(name, typ)| ValueConstructor::new(name, typ))
 }
 
 fn has_type<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
@@ -57,9 +54,15 @@ fn has_type<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 }
 
 fn block<'tok, 'src: 'tok, T>(
-    parse: impl Parser<'tok, 'src, Vec<T>>,
+    parse: impl Parser<'tok, 'src, T>,
 ) -> impl Parser<'tok, 'src, Vec<T>> {
-    terminated(parse, Keyword::End)
+    alt((
+        Keyword::End.default_value(),
+        terminated(
+            separated(1.., parse, Token::LineEnd),
+            (opt(Token::LineEnd), Keyword::End),
+        ),
+    ))
 }
 
 fn line<'tok, 'src: 'tok, T>(parse: impl Parser<'tok, 'src, T>) -> impl Parser<'tok, 'src, T> {
