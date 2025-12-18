@@ -1,7 +1,4 @@
-use bandit_parser::{
-    lex::{SrcToken, Token},
-    parse::term,
-};
+use bandit_parser::{lex::Token, parse::term};
 use bandit_term::{
     InferenceError, Pretty,
     ast::{Context, Term, Value},
@@ -10,7 +7,7 @@ use bandit_term::{
 use winnow::Parser;
 
 fn parse(input: &str) -> Term<'_> {
-    let tokens: Vec<SrcToken> = Token::iter(input).collect();
+    let tokens = Token::layout(input);
     term.parse(&tokens).unwrap()
 }
 

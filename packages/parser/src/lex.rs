@@ -1,7 +1,7 @@
 use logos::{Logos, Span};
 
 #[derive(Logos, Debug, PartialEq, Eq, Copy, Clone)]
-#[logos(skip r"[ \t\r\n\f]+")]
+#[logos(skip r"[ \t\r\f]+")]
 #[logos(subpattern ident = r"(\p{XID_Start}\p{XID_Continue}*)|(_\p{XID_Continue}+)")]
 pub enum Token<'src> {
     #[token("(", |_| Grouping::Parentheses)]
@@ -15,9 +15,7 @@ pub enum Token<'src> {
     Close(Grouping),
 
     #[token(",")]
-    Comma,
-
-    #[token(";")]
+    #[regex(r"[ \t\r\f\n]*\n[ \t]*")]
     LineEnd,
 
     #[token("break", |_| Keyword::Break)]
@@ -43,7 +41,7 @@ pub enum Token<'src> {
     #[token("use", |_| Keyword::Use)]
     #[token("where", |_| Keyword::Where)]
     #[token("while", |_| Keyword::While)]
-    #[token(";;", |_| Keyword::End)]
+    #[token(";", |_| Keyword::End)]
     Keyword(Keyword),
 
     /// We don't allow `λ` as an alternative because it's allowed in
@@ -93,11 +91,48 @@ pub enum Token<'src> {
 }
 
 impl<'src> Token<'src> {
-    pub fn iter(source: &'src str) -> impl Iterator<Item = SrcToken<'src>> + 'src {
-        Self::lexer(source).spanned().map(|(tok, span)| match tok {
+    pub fn layout(source: &'src str) -> Vec<SrcToken<'src>> {
+        let tokens = Self::lexer(source).spanned().map(|(tok, span)| match tok {
             Ok(tok) => (tok, Span::from(span)),
             Err(()) => (Self::Error(Error::UnknownToken), span),
-        })
+        });
+
+        let mut layout_tokens = Vec::new();
+        let mut current_indent = Indent::default();
+
+        for token in tokens {
+            if let Some(indent) = Indent::new(source, &token)
+                && indent != current_indent
+            {
+                current_indent = indent;
+            } else {
+                layout_tokens.push(token);
+            }
+        }
+
+        while let Some((Token::LineEnd, _)) = layout_tokens.last() {
+            layout_tokens.pop();
+        }
+
+        layout_tokens
+    }
+}
+
+#[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Debug, Default)]
+struct Indent(usize);
+
+impl Indent {
+    fn new(source: &str, token: &SrcToken) -> Option<Self> {
+        if matches!(token.0, Token::LineEnd) {
+            Some(Self(
+                source[token.1.clone()]
+                    .rsplit_once('\n')
+                    .map(|(_head, tail)| tail.len())
+                    .unwrap_or(0),
+            ))
+        } else {
+            None
+        }
     }
 }
 
@@ -183,7 +218,7 @@ impl Keyword {
             KW::Use => "use",
             KW::Where => "where",
             KW::While => "while",
-            KW::End => ";;",
+            KW::End => ";",
         }
     }
 }

@@ -1,7 +1,4 @@
-use bandit_parser::{
-    lex::{SrcToken, Token},
-    parse::term,
-};
+use bandit_parser::{lex::Token, parse::term};
 use bandit_term::Pretty;
 use winnow::Parser;
 
@@ -21,7 +18,7 @@ fn type_annotation() {
 }
 
 fn parse(input: &str, expected: &str) {
-    let tokens: Vec<SrcToken> = Token::iter(input).collect();
+    let tokens = Token::layout(input);
     let term = term.parse(&tokens).unwrap();
     assert_eq!(term.to_pretty_string(80), expected);
 }

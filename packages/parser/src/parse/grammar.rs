@@ -19,12 +19,13 @@ use super::{Parser, Term, TokenList};
 use crate::lex::{Grouping, Keyword, Operator, SrcToken, Token};
 
 pub fn definitions<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Vec<Definition<'src>>> {
-    repeat(
+    separated(
         ..,
         alt((
             function_definition().map(Definition::Function),
             data_definition().map(Definition::Data),
         )),
+        Token::LineEnd,
     )
 }
 
@@ -32,7 +33,7 @@ fn function_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Function<'
     (
         identifier(),
         opt(has_type()),
-        line(preceded(Operator::Assign, term)),
+        preceded(Operator::Assign, term),
     )
         .map(|(name, typ, value)| Function::new(name, typ, value))
 }
@@ -56,17 +57,7 @@ fn has_type<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn block<'tok, 'src: 'tok, T>(
     parse: impl Parser<'tok, 'src, T>,
 ) -> impl Parser<'tok, 'src, Vec<T>> {
-    alt((
-        Keyword::End.default_value(),
-        terminated(
-            separated(1.., parse, Token::LineEnd),
-            (opt(Token::LineEnd), Keyword::End),
-        ),
-    ))
-}
-
-fn line<'tok, 'src: 'tok, T>(parse: impl Parser<'tok, 'src, T>) -> impl Parser<'tok, 'src, T> {
-    terminated(parse, Token::LineEnd)
+    terminated(separated(.., parse, Token::LineEnd), Keyword::End)
 }
 
 pub fn term<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> Result<Term<'src>> {

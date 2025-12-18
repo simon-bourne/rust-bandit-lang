@@ -1,13 +1,10 @@
 use anyhow::{Result, anyhow};
-use bandit_parser::{
-    lex::{SrcToken, Token},
-    parse::definitions,
-};
+use bandit_parser::{lex::Token, parse::definitions};
 use bandit_term::{Pretty, ast::Definition};
 use winnow::Parser;
 
 pub fn compile(source: &str) -> Result<()> {
-    let tokens: Vec<SrcToken> = Token::iter(source).collect();
+    let tokens = Token::layout(source);
     // TODO: Ergonomic parse errors: <https://docs.rs/winnow/latest/winnow/_tutorial/chapter_7/index.html#error-adaptation-and-rendering>
     let constants = definitions()
         .parse(&tokens)
