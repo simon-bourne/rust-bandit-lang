@@ -18,6 +18,9 @@ pub enum Token<'src> {
     #[regex(r"[ \t\r\f\n]*\n[ \t]*")]
     LineEnd,
 
+    #[token(";")]
+    BlockEnd,
+
     #[token("break", |_| Keyword::Break)]
     #[token("case", |_| Keyword::Case)]
     #[token("continue", |_| Keyword::Continue)]
@@ -41,7 +44,6 @@ pub enum Token<'src> {
     #[token("use", |_| Keyword::Use)]
     #[token("where", |_| Keyword::Where)]
     #[token("while", |_| Keyword::While)]
-    #[token(";", |_| Keyword::End)]
     Keyword(Keyword),
 
     /// We don't allow `λ` as an alternative because it's allowed in
@@ -101,7 +103,7 @@ impl<'src> Token<'src> {
         let mut current_indent = Indent::default();
 
         for token in tokens {
-            if matches!(token.0, Token::Keyword(Keyword::End)) {
+            if matches!(token.0, Token::BlockEnd) {
                 remove_trailing_line_ends(&mut layout_tokens);
             }
 
@@ -196,7 +198,6 @@ pub enum Keyword {
     Use,
     Where,
     While,
-    End,
 }
 
 impl Keyword {
@@ -226,7 +227,6 @@ impl Keyword {
             KW::Use => "use",
             KW::Where => "where",
             KW::While => "while",
-            KW::End => ";",
         }
     }
 }
