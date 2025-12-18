@@ -1,6 +1,7 @@
 data Bool : Type;
 data Int : Type;
-data Float : Type;
+data Float : Type
+;
 
 data MyType
     constructor1 : Int → MyType

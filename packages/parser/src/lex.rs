@@ -101,6 +101,10 @@ impl<'src> Token<'src> {
         let mut current_indent = Indent::default();
 
         for token in tokens {
+            if matches!(token.0, Token::Keyword(Keyword::End)) {
+                remove_trailing_line_ends(&mut layout_tokens);
+            }
+
             if let Some(indent) = Indent::new(source, &token)
                 && indent != current_indent
             {
@@ -110,11 +114,15 @@ impl<'src> Token<'src> {
             }
         }
 
-        while let Some((Token::LineEnd, _)) = layout_tokens.last() {
-            layout_tokens.pop();
-        }
+        remove_trailing_line_ends(&mut layout_tokens);
 
         layout_tokens
+    }
+}
+
+fn remove_trailing_line_ends(layout_tokens: &mut Vec<(Token<'_>, std::ops::Range<usize>)>) {
+    while let Some((Token::LineEnd, _)) = layout_tokens.last() {
+        layout_tokens.pop();
     }
 }
 
