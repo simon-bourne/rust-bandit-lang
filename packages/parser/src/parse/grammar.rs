@@ -19,15 +19,12 @@ use super::{Parser, Term, TokenList};
 use crate::lex::{Grouping, Keyword, Operator, SrcToken, Token};
 
 pub fn definitions<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Vec<Definition<'src>>> {
-    terminated(
-        repeat(
-            ..,
-            alt((
-                function_definition().map(Definition::Function),
-                data_definition().map(Definition::Data),
-            )),
-        ),
-        opt(Token::LineEnd),
+    repeat(
+        ..,
+        alt((
+            function_definition().map(Definition::Function),
+            data_definition().map(Definition::Data),
+        )),
     )
 }
 
@@ -35,7 +32,7 @@ fn function_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Function<'
     (
         identifier(),
         opt(has_type()),
-        delimited(Operator::Assign, term, Token::LineEnd),
+        line(preceded(Operator::Assign, term)),
     )
         .map(|(name, typ, value)| Function::new(name, typ, value))
 }
@@ -49,9 +46,10 @@ fn data_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Data<'src>> {
 }
 
 fn value_constructors<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Vec<ValueConstructor<'src>>> {
-    let constructor = terminated((identifier(), opt(has_type())), Token::LineEnd)
-        .map(|(name, typ)| ValueConstructor::new(name, typ));
-    repeat(.., constructor)
+    repeat(
+        ..,
+        line((identifier(), opt(has_type()))).map(|(name, typ)| ValueConstructor::new(name, typ)),
+    )
 }
 
 fn has_type<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
@@ -62,6 +60,10 @@ fn block<'tok, 'src: 'tok, T>(
     parse: impl Parser<'tok, 'src, Vec<T>>,
 ) -> impl Parser<'tok, 'src, Vec<T>> {
     terminated(parse, Keyword::End)
+}
+
+fn line<'tok, 'src: 'tok, T>(parse: impl Parser<'tok, 'src, T>) -> impl Parser<'tok, 'src, T> {
+    terminated(parse, Token::LineEnd)
 }
 
 pub fn term<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> Result<Term<'src>> {
