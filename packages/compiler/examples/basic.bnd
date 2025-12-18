@@ -1,11 +1,11 @@
-data Bool : Type;
-data Int : Type;
-data Float : Type;
+data Bool : Type;;
+data Int : Type;;
+data Float : Type;;
 
-data MyType {
-    constructor1 : Int → MyType
-    constructor2 : Float → MyType
-}
+data MyType
+    constructor1 : Int → MyType;
+    constructor2 : Float → MyType;
+;;
 
 one : Int = _;
 pi : Float = _;

@@ -1,8 +1,8 @@
 use bandit_term::ast::Term;
 pub use grammar::{definitions, term};
-use winnow::{Parser as _, Result, error::ContextError, token::one_of};
+use winnow::{Result, error::ContextError, token::one_of};
 
-use crate::lex::{Grouping, Keyword, Operator, SrcToken, Token};
+use crate::lex::{Keyword, Operator, SrcToken, Token};
 
 mod grammar;
 
@@ -38,12 +38,4 @@ impl<'tok, 'src: 'tok> winnow::Parser<TokenList<'tok, 'src>, Keyword, ContextErr
     fn parse_next(&mut self, input: &mut TokenList<'tok, 'src>) -> Result<Keyword> {
         Token::Keyword(*self).value(*self).parse_next(input)
     }
-}
-
-fn open_block<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, ()> {
-    Token::Open(Grouping::Braces).void()
-}
-
-fn close_block<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, ()> {
-    Token::Close(Grouping::Braces).void()
 }

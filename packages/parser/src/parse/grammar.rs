@@ -9,17 +9,14 @@ use bandit_term::{
 use winnow::{
     Parser as _, Result,
     combinator::{
-        alt, delimited, opt, preceded, repeat, separated, separated_foldl1, separated_foldr1,
-        separated_pair, terminated,
+        alt, delimited, opt, preceded, repeat, separated_foldl1, separated_foldr1, separated_pair,
+        terminated,
     },
     token::any,
 };
 
 use super::{Parser, Term, TokenList};
-use crate::{
-    lex::{Grouping, Keyword, Operator, SrcToken, Token},
-    parse::{close_block, open_block},
-};
+use crate::lex::{Grouping, Keyword, Operator, SrcToken, Token};
 
 pub fn definitions<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Vec<Definition<'src>>> {
     terminated(
@@ -46,26 +43,25 @@ fn function_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Function<'
 fn data_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Data<'src>> {
     preceded(
         Keyword::Data,
-        (
-            identifier(),
-            opt(has_type()),
-            alt((
-                delimited(open_block(), value_constructors(), close_block()),
-                Token::LineEnd.default_value(),
-            )),
-        ),
+        (identifier(), opt(has_type()), block(value_constructors())),
     )
     .map(|(name, typ, value_constructors)| Data::new(name, typ, value_constructors))
 }
 
 fn value_constructors<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Vec<ValueConstructor<'src>>> {
-    let constructor =
-        (identifier(), opt(has_type())).map(|(name, typ)| ValueConstructor::new(name, typ));
-    separated(1.., constructor, Token::LineEnd)
+    let constructor = terminated((identifier(), opt(has_type())), Token::LineEnd)
+        .map(|(name, typ)| ValueConstructor::new(name, typ));
+    repeat(.., constructor)
 }
 
 fn has_type<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(Operator::HasType, term)
+}
+
+fn block<'tok, 'src: 'tok, T>(
+    parse: impl Parser<'tok, 'src, Vec<T>>,
+) -> impl Parser<'tok, 'src, Vec<T>> {
+    terminated(parse, Keyword::End)
 }
 
 pub fn term<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> Result<Term<'src>> {

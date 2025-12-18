@@ -43,6 +43,7 @@ pub enum Token<'src> {
     #[token("use", |_| Keyword::Use)]
     #[token("where", |_| Keyword::Where)]
     #[token("while", |_| Keyword::While)]
+    #[token(";;", |_| Keyword::End)]
     Keyword(Keyword),
 
     /// We don't allow `λ` as an alternative because it's allowed in
@@ -152,6 +153,7 @@ pub enum Keyword {
     Use,
     Where,
     While,
+    End,
 }
 
 impl Keyword {
@@ -181,6 +183,7 @@ impl Keyword {
             KW::Use => "use",
             KW::Where => "where",
             KW::While => "while",
+            KW::End => ";;",
         }
     }
 }
