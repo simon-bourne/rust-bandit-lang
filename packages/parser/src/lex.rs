@@ -100,20 +100,16 @@ impl<'src> Token<'src> {
         });
 
         let mut layout_tokens = Vec::new();
-        let mut current_indent = Indent::default();
 
         for token in tokens {
-            if matches!(token.0, Token::BlockEnd) {
-                remove_trailing_line_ends(&mut layout_tokens);
+            match token.0 {
+                Token::Operator(_) | Token::NamedOperator(_) | Token::BlockEnd => {
+                    remove_trailing_line_ends(&mut layout_tokens)
+                }
+                _ => (),
             }
 
-            if let Some(indent) = Indent::new(source, &token)
-                && indent != current_indent
-            {
-                current_indent = indent;
-            } else {
-                layout_tokens.push(token);
-            }
+            layout_tokens.push(token);
         }
 
         remove_trailing_line_ends(&mut layout_tokens);
@@ -125,24 +121,6 @@ impl<'src> Token<'src> {
 fn remove_trailing_line_ends(layout_tokens: &mut Vec<(Token<'_>, std::ops::Range<usize>)>) {
     while let Some((Token::LineEnd, _)) = layout_tokens.last() {
         layout_tokens.pop();
-    }
-}
-
-#[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Debug, Default)]
-struct Indent(usize);
-
-impl Indent {
-    fn new(source: &str, token: &SrcToken) -> Option<Self> {
-        if matches!(token.0, Token::LineEnd) {
-            Some(Self(
-                source[token.1.clone()]
-                    .rsplit_once('\n')
-                    .map(|(_head, tail)| tail.len())
-                    .unwrap_or(0),
-            ))
-        } else {
-            None
-        }
     }
 }
 

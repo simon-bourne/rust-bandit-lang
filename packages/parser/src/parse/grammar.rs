@@ -57,7 +57,7 @@ fn has_type<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn block<'tok, 'src: 'tok, T>(
     parse: impl Parser<'tok, 'src, T>,
 ) -> impl Parser<'tok, 'src, Vec<T>> {
-    terminated(separated(.., parse, Token::LineEnd), Token::BlockEnd)
+    terminated(repeat(.., preceded(Token::LineEnd, parse)), Token::BlockEnd)
 }
 
 pub fn term<'tok, 'src: 'tok>(input: &mut TokenList<'tok, 'src>) -> Result<Term<'src>> {
