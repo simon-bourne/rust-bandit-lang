@@ -58,6 +58,7 @@ impl<'src> Term<'src> {
         value_constructors: impl IntoIterator<Item = Self>,
         constraints: &Constraints<'src>,
     ) {
+        assert!(matches!(&*self.value(), TermEnum::Constant { .. }));
         self.unify_type(constraints);
 
         constraints.add({
