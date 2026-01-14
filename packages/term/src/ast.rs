@@ -44,10 +44,7 @@ impl<'src> Definition<'src> {
             match definition {
                 Definition::Function(f) => {
                     let typ = f.typ.unwrap_or_else(Term::unknown);
-                    let value = Value {
-                        value: f.value,
-                        typ,
-                    };
+                    let value = Value::with_type(f.value, typ);
                     functions.push((f.name, value));
                 }
                 Definition::Data(data) => {

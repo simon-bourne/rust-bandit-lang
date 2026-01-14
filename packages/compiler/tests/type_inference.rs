@@ -18,15 +18,9 @@ fn context<'src>(
     let types = types
         .into_iter()
         .map(|name| (name, Value::new(Term::type_of_type())));
-    let items = items.into_iter().map(|(name, typ)| {
-        (
-            name,
-            Value {
-                value: Term::unknown(),
-                typ: parse(typ),
-            },
-        )
-    });
+    let items = items
+        .into_iter()
+        .map(|(name, typ)| (name, Value::with_type(Term::unknown(), parse(typ))));
     Context::new([], types.chain(items))
 }
 

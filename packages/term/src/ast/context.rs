@@ -10,8 +10,8 @@ enum Term<'a> {
 type MutableValue<'a> = Value<RefCell<Term<'a>>>;
 
 pub struct Value<T> {
-    pub value: T,
-    pub typ: T,
+    value: T,
+    typ: T,
 }
 
 impl<'src> Value<ast::Term<'src>> {
@@ -20,6 +20,10 @@ impl<'src> Value<ast::Term<'src>> {
             value,
             typ: ast::Term::unknown(),
         }
+    }
+
+    pub fn with_type(value: ast::Term<'src>, typ: ast::Term<'src>) -> Self {
+        Self { value, typ }
     }
 }
 
