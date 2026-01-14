@@ -48,7 +48,10 @@ impl Pretty for Function<'_> {
 
 impl Pretty for Data<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        let name = TypeAnnotated::new(self.name, self.typ.as_ref());
+        let name = TypeAnnotated::new(
+            self.type_constructor.name,
+            self.type_constructor.typ.as_ref(),
+        );
 
         Document::concat([
             Document::text("data"),

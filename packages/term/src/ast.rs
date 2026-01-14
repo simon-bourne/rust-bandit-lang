@@ -18,17 +18,28 @@ pub struct Function<'src> {
     value: Term<'src>,
 }
 
-#[derive(Constructor)]
 pub struct Data<'src> {
-    name: &'src str,
-    typ: Option<Term<'src>>,
-    _constructors: Vec<ValueConstructor<'src>>,
+    type_constructor: Constant<'src>,
+    value_constructors: Vec<Constant<'src>>,
+}
+
+impl<'src> Data<'src> {
+    pub fn new(
+        name: &'src str,
+        typ: Option<Term<'src>>,
+        value_constructors: Vec<Constant<'src>>,
+    ) -> Self {
+        Self {
+            type_constructor: Constant { name, typ },
+            value_constructors,
+        }
+    }
 }
 
 #[derive(Constructor)]
-pub struct ValueConstructor<'src> {
-    _name: &'src str,
-    _typ: Option<Term<'src>>,
+pub struct Constant<'src> {
+    name: &'src str,
+    typ: Option<Term<'src>>,
 }
 
 impl<'src> Definition<'src> {
@@ -48,8 +59,7 @@ impl<'src> Definition<'src> {
                     functions.push((f.name, value));
                 }
                 Definition::Data(data) => {
-                    let typ = data.typ.unwrap_or_else(Term::unknown);
-                    types.push((data.name, typ))
+                    types.push(data);
                 }
             }
         }

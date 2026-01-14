@@ -72,8 +72,8 @@ impl<'src> Term<'src> {
             let value_constructors = Vec::from_iter(value_constructors);
 
             async move {
-                for mut value_constructor in value_constructors {
-                    let head = &mut value_constructor.codomain().await?.head().await?;
+                for value_constructor in value_constructors {
+                    let head = &mut value_constructor.typ().codomain().await?.head().await?;
                     Self::unify(head, &mut type_constructor).await?;
                 }
 

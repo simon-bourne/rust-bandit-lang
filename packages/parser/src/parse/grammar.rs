@@ -4,7 +4,7 @@
 // and `∀x : T ⇒ U`
 use bandit_term::{
     Evaluation,
-    ast::{Data, Definition, Function, ValueConstructor},
+    ast::{Constant, Data, Definition, Function},
 };
 use winnow::{
     Parser as _, Result,
@@ -46,8 +46,8 @@ fn data_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Data<'src>> {
     .map(|(name, typ, value_constructors)| Data::new(name, typ, value_constructors))
 }
 
-fn value_constructor<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, ValueConstructor<'src>> {
-    (identifier(), opt(has_type())).map(|(name, typ)| ValueConstructor::new(name, typ))
+fn value_constructor<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Constant<'src>> {
+    (identifier(), opt(has_type())).map(|(name, typ)| Constant::new(name, typ))
 }
 
 fn has_type<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {

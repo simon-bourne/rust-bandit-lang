@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use crate::{InferenceError, Result, ast, constraints::Constraints, typed};
 
 enum Term<'a> {
-    Core(typed::Term<'a>),
+    Typed(typed::Term<'a>),
     Ast(ast::Term<'a>),
 }
 
@@ -27,6 +27,40 @@ impl<'src> Value<ast::Term<'src>> {
     }
 }
 
+pub struct Data<'src> {
+    type_constructor: MutableConstant<'src>,
+    value_constructors: Vec<(&'src str, MutableConstant<'src>)>,
+}
+
+impl<'src> Data<'src> {
+    pub fn new(data: ast::Data<'src>) -> Self {
+        let value_constructors = data
+            .value_constructors
+            .into_iter()
+            .map(|constant| (constant.name, Constant::new(constant)))
+            .collect();
+
+        Self {
+            type_constructor: Constant::new(data.type_constructor),
+            value_constructors,
+        }
+    }
+}
+
+enum Constant<'src> {
+    Ast(ast::Constant<'src>),
+    Typed(typed::Term<'src>),
+}
+
+// TODO: We need a better prefix than `Mutable`. `Compilable`?
+type MutableConstant<'src> = RefCell<Constant<'src>>;
+
+impl<'src> Constant<'src> {
+    fn new(value: ast::Constant<'src>) -> MutableConstant<'src> {
+        RefCell::new(Self::Ast(value))
+    }
+}
+
 impl<'src> From<Value<ast::Term<'src>>> for MutableValue<'src> {
     fn from(value: Value<ast::Term<'src>>) -> Self {
         Value {
@@ -38,14 +72,14 @@ impl<'src> From<Value<ast::Term<'src>>> for MutableValue<'src> {
 
 pub struct Context<'a> {
     variables: HashMap<&'a str, Vec<typed::Term<'a>>>,
-    types: Rc<HashMap<&'a str, RefCell<Term<'a>>>>,
+    types: Rc<HashMap<&'a str, Data<'a>>>,
     constants: Rc<HashMap<&'a str, MutableValue<'a>>>,
     constraints: Constraints<'a>,
 }
 
 impl<'a> Context<'a> {
     pub fn new(
-        types: impl IntoIterator<Item = (&'a str, ast::Term<'a>)>,
+        types: impl IntoIterator<Item = ast::Data<'a>>,
         constants: impl IntoIterator<Item = (&'a str, Value<ast::Term<'a>>)>,
     ) -> Self {
         Self {
@@ -53,7 +87,7 @@ impl<'a> Context<'a> {
             types: Rc::new(
                 types
                     .into_iter()
-                    .map(|(name, typ)| (name, RefCell::new(Term::Ast(typ))))
+                    .map(|data| (data.type_constructor.name, Data::new(data)))
                     .collect(),
             ),
             constants: Rc::new(
@@ -72,13 +106,21 @@ impl<'a> Context<'a> {
                 .has_type(self.desugar_term(typ)?, &self.constraints);
         }
 
-        self.constraints.solve()?;
-
         for Value { value, .. } in self.constants.values() {
             self.desugar_term(value)?.check_scope()?;
         }
 
-        Ok(())
+        for data in self.types.values() {
+            let value_constructors: Result<Vec<_>> = data
+                .value_constructors
+                .iter()
+                .map(|(_, term)| self.desugar_constant(term))
+                .collect();
+            self.desugar_constant(&data.type_constructor)?
+                .type_constructor(value_constructors?, &self.constraints);
+        }
+
+        self.constraints.solve()
     }
 
     pub fn constants(&self) -> impl Iterator<Item = (&'a str, Result<typed::Term<'a>>)> {
@@ -115,8 +157,8 @@ impl<'a> Context<'a> {
             local
         } else if let Some(constant) = self.constants.get(name) {
             typed::Term::constant(name, self.desugar_term(&constant.typ)?)
-        } else if let Some(type_constructor) = self.types.get(name) {
-            typed::Term::constant(name, self.desugar_term(type_constructor)?)
+        } else if let Some(data) = self.types.get(name) {
+            self.desugar_constant(&data.type_constructor)?
         } else {
             return Err(InferenceError::VariableNotFound)?;
         };
@@ -134,21 +176,43 @@ impl<'a> Context<'a> {
             .map_err(|_| InferenceError::TopLevelCircularDependency)?;
 
         let typed_term = match &mut *term {
-            Term::Core(term) => term.clone(),
-            Term::Ast(term) => {
-                let mut global_ctx = Context {
-                    variables: HashMap::new(),
-                    types: self.types.clone(),
-                    constants: self.constants.clone(),
-                    constraints: self.constraints.clone(),
-                };
-
-                term.desugar(&mut global_ctx)?
-            }
+            Term::Typed(term) => term.clone(),
+            Term::Ast(term) => term.desugar(&mut self.global())?,
         };
 
-        *term = Term::Core(typed_term.clone());
+        *term = Term::Typed(typed_term.clone());
 
         Ok(typed_term)
+    }
+
+    fn desugar_constant(&self, constant: &MutableConstant<'a>) -> Result<typed::Term<'a>> {
+        let mut constant = constant
+            .try_borrow_mut()
+            .map_err(|_| InferenceError::TopLevelCircularDependency)?;
+
+        let typed_constant = match &mut *constant {
+            Constant::Typed(constant) => constant.clone(),
+            Constant::Ast(constant) => typed::Term::constant(
+                constant.name,
+                constant
+                    .typ
+                    .take()
+                    .unwrap_or_else(ast::Term::unknown)
+                    .desugar(&mut self.global())?,
+            ),
+        };
+
+        *constant = Constant::Typed(typed_constant.clone());
+
+        Ok(typed_constant)
+    }
+
+    fn global(&self) -> Self {
+        Self {
+            variables: HashMap::new(),
+            types: self.types.clone(),
+            constants: self.constants.clone(),
+            constraints: self.constraints.clone(),
+        }
     }
 }
