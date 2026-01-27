@@ -111,10 +111,13 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn infer_types(&self, constraints: &mut Constraints<'a>) -> Result<()> {
+    pub fn infer_types(&'a self, constraints: &mut Constraints<'a>) -> Result<()> {
         for Value { value, typ } in self.constants.values() {
-            self.desugar_term(value, constraints)?
-                .has_type(self.desugar_term(typ, constraints)?, constraints);
+            self.desugar_term(value, constraints)?.has_type(
+                self.desugar_term(typ, constraints)?,
+                constraints,
+                self,
+            );
         }
 
         for Value { value, .. } in self.constants.values() {
@@ -128,14 +131,14 @@ impl<'a> Context<'a> {
                 .map(|(_, term)| self.desugar_constant(term, constraints))
                 .collect();
             self.desugar_constant(&data.type_constructor, constraints)?
-                .type_constructor(value_constructors?, constraints);
+                .type_constructor(value_constructors?, constraints, self);
         }
 
         constraints.solve()
     }
 
     pub fn constants(
-        &self,
+        &'a self,
         constraints: &mut Constraints<'a>,
     ) -> impl Iterator<Item = (&'a str, Result<typed::Term<'a>>)> {
         self.constants
@@ -161,7 +164,7 @@ impl<'a> Context<'a> {
     }
 
     pub(crate) fn lookup(
-        &self,
+        &'a self,
         name: &'a str,
         variables: &mut LocalVariables<'a>,
         constraints: &mut Constraints<'a>,
@@ -180,7 +183,7 @@ impl<'a> Context<'a> {
     }
 
     fn desugar_term(
-        &self,
+        &'a self,
         term: &RefCell<Term<'a>>,
         constraints: &mut Constraints<'a>,
     ) -> Result<typed::Term<'a>> {
@@ -199,7 +202,7 @@ impl<'a> Context<'a> {
     }
 
     fn desugar_constant(
-        &self,
+        &'a self,
         constant: &MutableConstant<'a>,
         constraints: &mut Constraints<'a>,
     ) -> Result<typed::Term<'a>> {

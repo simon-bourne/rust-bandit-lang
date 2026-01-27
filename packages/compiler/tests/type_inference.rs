@@ -12,10 +12,20 @@ fn parse(input: &str) -> Term<'_> {
     term.parse(&tokens).unwrap()
 }
 
-fn context<'src>(
-    types: impl IntoIterator<Item = &'src str>,
-    items: impl IntoIterator<Item = (&'src str, &'src str)>,
-) -> Context<'src> {
+fn context<'src>() -> Context<'src> {
+    let types = ["Bool", "Int", "Float"];
+    let items = [
+        ("one", "Int"),
+        ("pi", "Float"),
+        ("true", "Bool"),
+        ("abs", "Int → Int"),
+        ("add", "Int → Int → Int"),
+        ("id", "∀a ⇒ a → a"),
+        ("float_to_int", "Float → Int"),
+        ("polymorphic", "∀a ⇒ a"),
+        ("scoped", "∀a ⇒ (∀s ⇒ s → a) → a"),
+    ];
+
     let types = types
         .into_iter()
         .map(|name| (name, Value::new(Term::type_of_type())));
@@ -33,33 +43,22 @@ trait Test {
 
 impl Test for &str {
     fn infers(self, expected: &str) {
-        let term = infer_types(self).unwrap();
+        let ctx = context();
+        let term = infer_types(&ctx, self).unwrap();
         assert_eq!(term.to_pretty_string(80), expected);
     }
 
     fn fails(self) {
-        if let Ok(term) = infer_types(self) {
+        if let Ok(term) = infer_types(&context(), self) {
             panic!("Expected error, got '{}'", term.to_pretty_string(80))
         }
     }
 }
 
-fn infer_types(input: &str) -> Result<typed::Term<'_>, InferenceError> {
-    let ctx = &mut context(
-        ["Bool", "Int", "Float"],
-        [
-            ("one", "Int"),
-            ("pi", "Float"),
-            ("true", "Bool"),
-            ("abs", "Int → Int"),
-            ("add", "Int → Int → Int"),
-            ("id", "∀a ⇒ a → a"),
-            ("float_to_int", "Float → Int"),
-            ("polymorphic", "∀a ⇒ a"),
-            ("scoped", "∀a ⇒ (∀s ⇒ s → a) → a"),
-        ],
-    );
-
+fn infer_types<'src>(
+    ctx: &'src Context<'src>,
+    input: &'src str,
+) -> Result<typed::Term<'src>, InferenceError> {
     let constraints = &mut Constraints::empty();
     let mut term = parse(input).desugar(ctx, constraints)?;
     ctx.infer_types(constraints)?;

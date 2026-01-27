@@ -5,7 +5,7 @@ use clonelet::clone;
 use katexit::katexit;
 
 use crate::{
-    Evaluation, InferenceError, Pretty, Result, SharedMut, VariableBinding,
+    Evaluation, InferenceError, Pretty, Result, SharedMut, VariableBinding, ast::Context,
     constraints::Constraints, sync::Latch,
 };
 
@@ -57,14 +57,15 @@ impl<'src> Term<'src> {
         mut self,
         value_constructors: impl IntoIterator<Item = Self>,
         constraints: &mut Constraints<'src>,
+        ctx: &'src Context<'src>,
     ) {
         assert!(matches!(&*self.value(), TermEnum::Constant { .. }));
-        self.unify_type(constraints);
+        self.unify_type(constraints, ctx);
 
         constraints.add({
             let mut typ = self.typ();
 
-            async move { Self::unify(&mut typ.codomain().await?, &mut Self::type_of_type()).await }
+            async move { Self::unify(&mut typ.codomain().await?, &mut Self::type_of_type(), ctx).await }
         });
 
         constraints.add({
@@ -74,7 +75,7 @@ impl<'src> Term<'src> {
             async move {
                 for value_constructor in value_constructors {
                     let head = &mut value_constructor.typ().codomain().await?.head().await?;
-                    Self::unify(head, &mut type_constructor).await?;
+                    Self::unify(head, &mut type_constructor, ctx).await?;
                 }
 
                 Ok(())
@@ -102,6 +103,7 @@ impl<'src> Term<'src> {
         argument: Self,
         evaluation: Evaluation,
         constraints: &mut Constraints<'src>,
+        ctx: &'src Context<'src>,
     ) -> Self {
         let typ = Self::unknown_type();
 
@@ -111,7 +113,7 @@ impl<'src> Term<'src> {
             async move {
                 let variable = Self::variable(None, argument.typ());
                 let mut function_type = Self::pi_type(variable, Self::unknown_type(), evaluation);
-                Self::unify(&mut function_type, &mut function.typ()).await?;
+                Self::unify(&mut function_type, &mut function.typ(), ctx).await?;
 
                 let mut result_type = if let TermEnum::Pi(binding) = &mut *function_type.value() {
                     binding.apply(&argument)?
@@ -119,7 +121,7 @@ impl<'src> Term<'src> {
                     panic!("Expected a PI type")
                 };
 
-                Self::unify(&mut typ, &mut result_type).await?;
+                Self::unify(&mut typ, &mut result_type, ctx).await?;
                 Ok(())
             }
         });
@@ -132,9 +134,14 @@ impl<'src> Term<'src> {
         })
     }
 
-    pub fn has_type(self, mut typ: Self, constraints: &mut Constraints<'src>) -> Self {
-        typ.unify_type(constraints);
-        Self::add_unify_constraint(self.typ(), typ, constraints);
+    pub fn has_type(
+        self,
+        mut typ: Self,
+        constraints: &mut Constraints<'src>,
+        ctx: &'src Context<'src>,
+    ) -> Self {
+        typ.unify_type(constraints, ctx);
+        Self::add_unify_constraint(self.typ(), typ, constraints, ctx);
         self
     }
 
@@ -152,8 +159,9 @@ impl<'src> Term<'src> {
         value: Self,
         binding: VariableBinding<Self>,
         constraints: &mut Constraints<'src>,
+        ctx: &'src Context<'src>,
     ) -> Self {
-        Self::add_unify_constraint(value.typ(), binding.variable.typ(), constraints);
+        Self::add_unify_constraint(value.typ(), binding.variable.typ(), constraints, ctx);
         Self::new(TermEnum::Let { value, binding })
     }
 
@@ -176,8 +184,9 @@ impl<'src> Term<'src> {
     pub(crate) fn pi(
         mut binding: VariableBinding<Self>,
         constraints: &mut Constraints<'src>,
+        ctx: &'src Context<'src>,
     ) -> Self {
-        binding.in_term.unify_type(constraints);
+        binding.in_term.unify_type(constraints, ctx);
         Self::new(TermEnum::Pi(binding))
     }
 
@@ -353,8 +362,13 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    fn add_unify_constraint(mut x: Self, mut y: Self, constraints: &mut Constraints<'src>) {
-        constraints.add(async move { Self::unify(&mut x, &mut y).await })
+    fn add_unify_constraint(
+        mut x: Self,
+        mut y: Self,
+        constraints: &mut Constraints<'src>,
+        ctx: &'src Context<'src>,
+    ) {
+        constraints.add(async move { Self::unify(&mut x, &mut y, ctx).await })
     }
 
     fn is_reducible(&mut self) -> bool {
@@ -366,10 +380,10 @@ impl<'src> Term<'src> {
         }
     }
 
-    fn unify_type(&mut self, constraints: &mut Constraints<'src>) {
+    fn unify_type(&mut self, constraints: &mut Constraints<'src>, ctx: &'src Context<'src>) {
         let mut typ = self.typ();
 
-        constraints.add(async move { Self::unify(&mut typ, &mut Self::type_of_type()).await })
+        constraints.add(async move { Self::unify(&mut typ, &mut Self::type_of_type(), ctx).await })
     }
 
     fn unify_unknown(
@@ -446,16 +460,16 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    async fn unify(x: &mut Self, y: &mut Self) -> Result<()> {
-        x.evaluate_known().await?;
-        y.evaluate_known().await?;
+    async fn unify(x: &mut Self, y: &mut Self, ctx: &'src Context<'src>) -> Result<()> {
+        x.evaluate_known(ctx).await?;
+        y.evaluate_known(ctx).await?;
         let mut reducible = Vec::new();
         Self::unify_upto_eval(x, y, &mut reducible)?;
 
         while !reducible.is_empty() {
             for (mut x, mut y) in mem::take(&mut reducible) {
-                x.evaluate_known().await?;
-                y.evaluate_known().await?;
+                x.evaluate_known(ctx).await?;
+                y.evaluate_known(ctx).await?;
                 Self::unify_upto_eval(&mut x, &mut y, &mut reducible)?;
             }
         }
@@ -463,7 +477,7 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    async fn evaluate_known(&mut self) -> Result<()> {
+    async fn evaluate_known(&mut self, ctx: &'src Context<'src>) -> Result<()> {
         if self.is_unknown() {
             return Ok(());
         }
@@ -471,13 +485,13 @@ impl<'src> Term<'src> {
         if self.is_reducible() {
             Self::await_all_unknowns(&mut vec![self.clone()]).await?;
             self.check_scope()?;
-            self.evaluate()?;
+            self.evaluate(ctx)?;
         }
 
         Ok(())
     }
 
-    fn evaluate(&mut self) -> Result<()> {
+    fn evaluate(&mut self, ctx: &'src Context<'src>) -> Result<()> {
         // TODO: This does evaluation by substitution, which is very inefficient. We
         // should use a stack and De Bruijn Indices.
         let mut borrow = self.value();
@@ -486,14 +500,14 @@ impl<'src> Term<'src> {
             TermEnum::Apply {
                 function, argument, ..
             } => {
-                let reduced = function.evaluate_apply(argument)?;
+                let reduced = function.evaluate_apply(argument, ctx)?;
                 drop(borrow);
                 self.replace_with(&reduced);
             }
             TermEnum::Let { value, binding } => {
-                value.evaluate()?;
+                value.evaluate(ctx)?;
                 let mut reduced = binding.apply(value)?;
-                reduced.evaluate()?;
+                reduced.evaluate(ctx)?;
                 drop(borrow);
                 self.replace_with(&reduced);
             }
@@ -503,9 +517,9 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    fn evaluate_apply(&mut self, argument: &mut Self) -> Result<Self> {
-        self.evaluate()?;
-        argument.evaluate()?;
+    fn evaluate_apply(&mut self, argument: &mut Self, ctx: &'src Context<'src>) -> Result<Self> {
+        self.evaluate(ctx)?;
+        argument.evaluate(ctx)?;
         let mut value = self.value();
 
         match &mut *value {
