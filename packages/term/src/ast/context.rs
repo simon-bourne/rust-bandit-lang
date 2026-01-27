@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap};
 
 use crate::{InferenceError, Result, ast, constraints::Constraints, typed};
 
@@ -90,8 +90,8 @@ impl<'a> LocalVariables<'a> {
 }
 
 pub struct Context<'a> {
-    types: Rc<HashMap<&'a str, Data<'a>>>,
-    constants: Rc<HashMap<&'a str, MutableValue<'a>>>,
+    types: HashMap<&'a str, Data<'a>>,
+    constants: HashMap<&'a str, MutableValue<'a>>,
     constraints: Constraints<'a>,
 }
 
@@ -101,18 +101,14 @@ impl<'a> Context<'a> {
         constants: impl IntoIterator<Item = (&'a str, Value<ast::Term<'a>>)>,
     ) -> Self {
         Self {
-            types: Rc::new(
-                types
-                    .into_iter()
-                    .map(|data| (data.type_constructor.name, Data::new(data)))
-                    .collect(),
-            ),
-            constants: Rc::new(
-                constants
-                    .into_iter()
-                    .map(|(name, value)| (name, value.into()))
-                    .collect(),
-            ),
+            types: types
+                .into_iter()
+                .map(|data| (data.type_constructor.name, Data::new(data)))
+                .collect(),
+            constants: constants
+                .into_iter()
+                .map(|(name, value)| (name, value.into()))
+                .collect(),
             constraints: Constraints::empty(),
         }
     }
