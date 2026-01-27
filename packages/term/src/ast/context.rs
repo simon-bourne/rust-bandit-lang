@@ -70,8 +70,27 @@ impl<'src> From<Value<ast::Term<'src>>> for MutableValue<'src> {
     }
 }
 
+#[derive(Default)]
+pub struct LocalVariables<'a>(HashMap<&'a str, Vec<typed::Term<'a>>>);
+
+impl<'a> LocalVariables<'a> {
+    fn lookup(&self, name: &'a str) -> Option<typed::Term<'a>> {
+        Some(self.0.get(name)?.last()?.clone())
+    }
+
+    fn push(&mut self, name: &'a str, variable: typed::Term<'a>) {
+        self.0.entry(name).or_default().push(variable);
+    }
+
+    fn pop(&mut self, name: &'a str) {
+        if self.0.get_mut(name).unwrap().pop().is_none() {
+            self.0.remove(name);
+        }
+    }
+}
+
 pub struct Context<'a> {
-    variables: HashMap<&'a str, Vec<typed::Term<'a>>>,
+    variables: LocalVariables<'a>,
     types: Rc<HashMap<&'a str, Data<'a>>>,
     constants: Rc<HashMap<&'a str, MutableValue<'a>>>,
     constraints: Constraints<'a>,
@@ -83,7 +102,7 @@ impl<'a> Context<'a> {
         constants: impl IntoIterator<Item = (&'a str, Value<ast::Term<'a>>)>,
     ) -> Self {
         Self {
-            variables: HashMap::new(),
+            variables: LocalVariables::default(),
             types: Rc::new(
                 types
                     .into_iter()
@@ -142,18 +161,15 @@ impl<'a> Context<'a> {
             return f(self);
         };
 
-        self.variables.entry(name).or_default().push(variable);
+        self.variables.push(name, variable);
         let output = f(self);
-
-        if self.variables.get_mut(name).unwrap().pop().is_none() {
-            self.variables.remove(name);
-        }
+        self.variables.pop(name);
 
         output
     }
 
     pub(crate) fn lookup(&mut self, name: &'a str) -> Result<typed::Term<'a>> {
-        let term = if let Some(local) = self.lookup_local(name) {
+        let term = if let Some(local) = self.variables.lookup(name) {
             local
         } else if let Some(constant) = self.constants.get(name) {
             typed::Term::constant(name, self.desugar_term(&constant.typ)?)
@@ -164,10 +180,6 @@ impl<'a> Context<'a> {
         };
 
         Ok(term)
-    }
-
-    fn lookup_local(&self, name: &'a str) -> Option<typed::Term<'a>> {
-        Some(self.variables.get(name)?.last()?.clone())
     }
 
     fn desugar_term(&self, term: &RefCell<Term<'a>>) -> Result<typed::Term<'a>> {
@@ -209,7 +221,7 @@ impl<'a> Context<'a> {
 
     fn global(&self) -> Self {
         Self {
-            variables: HashMap::new(),
+            variables: LocalVariables::default(),
             types: self.types.clone(),
             constants: self.constants.clone(),
             constraints: self.constraints.clone(),
