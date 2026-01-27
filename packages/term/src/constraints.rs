@@ -1,25 +1,27 @@
-use std::task::{self, Waker};
+use std::{
+    mem,
+    task::{self, Waker},
+};
 
 use futures::future::{FutureExt, LocalBoxFuture};
 
-use crate::{InferenceError, Result, SharedMut};
+use crate::{InferenceError, Result};
 
-#[derive(Clone)]
-pub struct Constraints<'a>(SharedMut<Vec<LocalBoxFuture<'a, Result<()>>>>);
+pub struct Constraints<'a>(Vec<LocalBoxFuture<'a, Result<()>>>);
 
 impl<'a> Constraints<'a> {
     pub fn empty() -> Self {
-        Self(SharedMut::new(Vec::new()))
+        Self(Vec::new())
     }
 
-    pub fn add(&self, constraint: impl Future<Output = Result<()>> + 'a) {
-        self.0.borrow_mut().push(constraint.boxed_local())
+    pub fn add(&mut self, constraint: impl Future<Output = Result<()>> + 'a) {
+        self.0.push(constraint.boxed_local())
     }
 
     // TODO: Tidy
-    pub fn solve(&self) -> Result<()> {
+    pub fn solve(&mut self) -> Result<()> {
         loop {
-            let current = self.0.replace_with(Vec::new());
+            let current = mem::take(&mut self.0);
 
             if current.is_empty() {
                 return Ok(());
@@ -39,7 +41,7 @@ impl<'a> Constraints<'a> {
                 }
             }
 
-            if self.0.borrow().is_empty() && pending.is_empty() {
+            if self.0.is_empty() && pending.is_empty() {
                 // We didn't solve any constraints, so we're stuck
                 if !any_solved {
                     return Err(InferenceError::CouldntInferAllTypes);
@@ -48,7 +50,7 @@ impl<'a> Constraints<'a> {
                 }
             }
 
-            self.0.borrow_mut().extend(pending);
+            self.0.extend(pending);
         }
     }
 }

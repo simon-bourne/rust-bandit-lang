@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use bandit_term::{
     Pretty,
     ast::{Context, Term, Value},
+    constraints::Constraints,
 };
 
 #[test]
@@ -11,10 +12,11 @@ fn infer_kinds() {
     let m = || Term::variable("m");
     let a = || Term::variable("a");
     let ctx = &mut Context::new([], []);
+    let constraints = &mut Constraints::empty();
     let constructor_type = Term::lambda(m(), Term::lambda(a(), Term::apply(m(), a())))
-        .desugar(ctx)
+        .desugar(ctx, constraints)
         .unwrap();
-    ctx.infer_types().unwrap();
+    ctx.infer_types(constraints).unwrap();
 
     assert_eq!(
         constructor_type.to_pretty_string(80),
@@ -36,7 +38,8 @@ fn let_error() {
     global_types.insert("Int", Value::new(Term::type_of_type()));
     global_types.insert("Float", Value::new(Term::type_of_type()));
     let ctx = &mut Context::new([], global_types);
-    let_binding.desugar(ctx).unwrap();
+    let constraints = &mut Constraints::empty();
+    let_binding.desugar(ctx, constraints).unwrap();
 
-    assert!(ctx.infer_types().is_err());
+    assert!(ctx.infer_types(constraints).is_err());
 }

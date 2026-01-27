@@ -1,4 +1,4 @@
-use crate::{Evaluation, InferenceError, Result, VariableBinding, typed};
+use crate::{Evaluation, InferenceError, Result, VariableBinding, constraints::Constraints, typed};
 
 mod context;
 mod pretty;
@@ -134,14 +134,19 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::Variable(name))
     }
 
-    pub fn desugar(&self, ctx: &Context<'src>) -> Result<typed::Term<'src>> {
-        self.desugar_local(ctx, &mut LocalVariables::default())
+    pub fn desugar(
+        &self,
+        ctx: &Context<'src>,
+        constraints: &mut Constraints<'src>,
+    ) -> Result<typed::Term<'src>> {
+        self.desugar_local(ctx, &mut LocalVariables::default(), constraints)
     }
 
     fn desugar_local(
         &self,
         ctx: &Context<'src>,
         variables: &mut LocalVariables<'src>,
+        constraints: &mut Constraints<'src>,
     ) -> Result<typed::Term<'src>> {
         use typed::Term as Core;
 
@@ -152,31 +157,38 @@ impl<'src> Term<'src> {
                 argument,
                 evaluation,
             } => Core::apply(
-                function.desugar_local(ctx, variables)?,
-                argument.desugar_local(ctx, variables)?,
+                function.desugar_local(ctx, variables, constraints)?,
+                argument.desugar_local(ctx, variables, constraints)?,
                 *evaluation,
-                ctx.constraints(),
+                constraints,
             ),
-            TermEnum::Variable(name) => ctx.lookup(name, variables)?,
+            TermEnum::Variable(name) => ctx.lookup(name, variables, constraints)?,
             TermEnum::Unknown => Core::unknown_value(),
             TermEnum::Let { value, binding } => Core::let_binding(
-                value.desugar_local(ctx, variables)?,
-                binding.desugar(ctx, variables)?,
-                ctx.constraints(),
+                value.desugar_local(ctx, variables, constraints)?,
+                binding.desugar(ctx, variables, constraints)?,
+                constraints,
             ),
-            TermEnum::Pi(binding) => Core::pi(binding.desugar(ctx, variables)?, ctx.constraints()),
+            TermEnum::Pi(binding) => {
+                Core::pi(binding.desugar(ctx, variables, constraints)?, constraints)
+            }
             TermEnum::FunctionType(left, right) => Core::pi(
                 VariableBinding {
-                    variable: Core::variable(None, left.desugar_local(ctx, variables)?),
-                    in_term: right.desugar_local(ctx, variables)?,
+                    variable: Core::variable(
+                        None,
+                        left.desugar_local(ctx, variables, constraints)?,
+                    ),
+                    in_term: right.desugar_local(ctx, variables, constraints)?,
                     evaluation: Evaluation::Dynamic,
                 },
-                ctx.constraints(),
+                constraints,
             ),
-            TermEnum::Lambda(binding) => Core::lambda(binding.desugar(ctx, variables)?),
+            TermEnum::Lambda(binding) => {
+                Core::lambda(binding.desugar(ctx, variables, constraints)?)
+            }
             TermEnum::HasType { term, typ } => term
-                .desugar_local(ctx, variables)?
-                .has_type(typ.desugar_local(ctx, variables)?, ctx.constraints()),
+                .desugar_local(ctx, variables, constraints)?
+                .has_type(typ.desugar_local(ctx, variables, constraints)?, constraints),
         })
     }
 
@@ -188,11 +200,12 @@ impl<'src> Term<'src> {
         &self,
         ctx: &Context<'src>,
         variables: &mut LocalVariables<'src>,
+        constraints: &mut Constraints<'src>,
     ) -> Result<typed::Term<'src>> {
         Ok(match self.0.as_ref() {
             TermEnum::HasType { term, typ } => Ok(term
-                .desugar_variable(ctx, variables)?
-                .has_type(typ.desugar_local(ctx, variables)?, ctx.constraints()))?,
+                .desugar_variable(ctx, variables, constraints)?
+                .has_type(typ.desugar_local(ctx, variables, constraints)?, constraints))?,
             TermEnum::Variable(name) => {
                 typed::Term::variable(Some(name), typed::Term::unknown_type())
             }
@@ -231,10 +244,13 @@ impl<'src> Binding<'src> {
         &self,
         ctx: &Context<'src>,
         variables: &mut LocalVariables<'src>,
+        constraints: &mut Constraints<'src>,
     ) -> Result<VariableBinding<typed::Term<'src>>> {
-        let variable = self.variable.desugar_variable(ctx, variables)?;
+        let variable = self
+            .variable
+            .desugar_variable(ctx, variables, constraints)?;
         let in_term = ctx.in_scope(variables, variable.clone(), |ctx, variables| {
-            self.in_term.desugar_local(ctx, variables)
+            self.in_term.desugar_local(ctx, variables, constraints)
         })?;
 
         Ok(VariableBinding {

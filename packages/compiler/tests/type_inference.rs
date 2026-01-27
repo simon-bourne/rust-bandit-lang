@@ -2,6 +2,7 @@ use bandit_parser::{lex::Token, parse::term};
 use bandit_term::{
     InferenceError, Pretty,
     ast::{Context, Term, Value},
+    constraints::Constraints,
     typed,
 };
 use winnow::Parser;
@@ -59,8 +60,9 @@ fn infer_types(input: &str) -> Result<typed::Term<'_>, InferenceError> {
         ],
     );
 
-    let mut term = parse(input).desugar(ctx)?;
-    ctx.infer_types()?;
+    let constraints = &mut Constraints::empty();
+    let mut term = parse(input).desugar(ctx, constraints)?;
+    ctx.infer_types(constraints)?;
     term.check_scope()?;
     Ok(term)
 }

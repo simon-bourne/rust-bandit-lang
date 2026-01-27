@@ -56,7 +56,7 @@ impl<'src> Term<'src> {
     pub fn type_constructor(
         mut self,
         value_constructors: impl IntoIterator<Item = Self>,
-        constraints: &Constraints<'src>,
+        constraints: &mut Constraints<'src>,
     ) {
         assert!(matches!(&*self.value(), TermEnum::Constant { .. }));
         self.unify_type(constraints);
@@ -101,7 +101,7 @@ impl<'src> Term<'src> {
         function: Self,
         argument: Self,
         evaluation: Evaluation,
-        constraints: &Constraints<'src>,
+        constraints: &mut Constraints<'src>,
     ) -> Self {
         let typ = Self::unknown_type();
 
@@ -132,7 +132,7 @@ impl<'src> Term<'src> {
         })
     }
 
-    pub fn has_type(self, mut typ: Self, constraints: &Constraints<'src>) -> Self {
+    pub fn has_type(self, mut typ: Self, constraints: &mut Constraints<'src>) -> Self {
         typ.unify_type(constraints);
         Self::add_unify_constraint(self.typ(), typ, constraints);
         self
@@ -151,7 +151,7 @@ impl<'src> Term<'src> {
     pub(crate) fn let_binding(
         value: Self,
         binding: VariableBinding<Self>,
-        constraints: &Constraints<'src>,
+        constraints: &mut Constraints<'src>,
     ) -> Self {
         Self::add_unify_constraint(value.typ(), binding.variable.typ(), constraints);
         Self::new(TermEnum::Let { value, binding })
@@ -173,7 +173,10 @@ impl<'src> Term<'src> {
     ///
     /// We don't use indexed type universes, as this isn't a theorem proving
     /// language.
-    pub(crate) fn pi(mut binding: VariableBinding<Self>, constraints: &Constraints<'src>) -> Self {
+    pub(crate) fn pi(
+        mut binding: VariableBinding<Self>,
+        constraints: &mut Constraints<'src>,
+    ) -> Self {
         binding.in_term.unify_type(constraints);
         Self::new(TermEnum::Pi(binding))
     }
@@ -350,7 +353,7 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    fn add_unify_constraint(mut x: Self, mut y: Self, constraints: &Constraints<'src>) {
+    fn add_unify_constraint(mut x: Self, mut y: Self, constraints: &mut Constraints<'src>) {
         constraints.add(async move { Self::unify(&mut x, &mut y).await })
     }
 
@@ -363,7 +366,7 @@ impl<'src> Term<'src> {
         }
     }
 
-    fn unify_type(&mut self, constraints: &Constraints<'src>) {
+    fn unify_type(&mut self, constraints: &mut Constraints<'src>) {
         let mut typ = self.typ();
 
         constraints.add(async move { Self::unify(&mut typ, &mut Self::type_of_type()).await })

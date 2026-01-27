@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow};
 use bandit_parser::{lex::Token, parse::definitions};
-use bandit_term::{Pretty, ast::Definition};
+use bandit_term::{Pretty, ast::Definition, constraints::Constraints};
 use winnow::Parser;
 
 pub fn compile(source: &str) -> Result<()> {
@@ -17,12 +17,13 @@ pub fn compile(source: &str) -> Result<()> {
     }
 
     let ctx = Definition::context(constants);
-    ctx.infer_types()?;
+    let constraints = &mut Constraints::empty();
+    ctx.infer_types(constraints)?;
 
     println!();
     println!("After type inference:");
 
-    for (name, value) in ctx.constants() {
+    for (name, value) in ctx.constants(constraints) {
         let value = value?.to_pretty_string(80);
         println!("{name} = {value}",)
     }
