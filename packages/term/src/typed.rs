@@ -55,17 +55,17 @@ impl<'src> Term<'src> {
     /// Apply typing rules between type and value constructors.
     pub fn type_constructor(
         mut self,
+        ctx: &'src Context<'src>,
         value_constructors: impl IntoIterator<Item = Self>,
         constraints: &mut Constraints<'src>,
-        ctx: &'src Context<'src>,
     ) {
         assert!(matches!(&*self.value(), TermEnum::Constant { .. }));
-        self.unify_type(constraints, ctx);
+        self.unify_type(ctx, constraints);
 
         constraints.add({
             let mut typ = self.typ();
 
-            async move { Self::unify(&mut typ.codomain().await?, &mut Self::type_of_type(), ctx).await }
+            async move { Self::unify(ctx, &mut typ.codomain().await?, &mut Self::type_of_type()).await }
         });
 
         constraints.add({
@@ -75,7 +75,7 @@ impl<'src> Term<'src> {
             async move {
                 for value_constructor in value_constructors {
                     let head = &mut value_constructor.typ().codomain().await?.head().await?;
-                    Self::unify(head, &mut type_constructor, ctx).await?;
+                    Self::unify(ctx, head, &mut type_constructor).await?;
                 }
 
                 Ok(())
@@ -99,11 +99,11 @@ impl<'src> Term<'src> {
     /// The term $B[a/x]$ means replace $x$ with $a$ in $B$ (which is necessary
     /// as $B$ depends on $x$ in the premise).
     pub fn apply(
+        ctx: &'src Context<'src>,
         function: Self,
         argument: Self,
         evaluation: Evaluation,
         constraints: &mut Constraints<'src>,
-        ctx: &'src Context<'src>,
     ) -> Self {
         let typ = Self::unknown_type();
 
@@ -113,7 +113,7 @@ impl<'src> Term<'src> {
             async move {
                 let variable = Self::variable(None, argument.typ());
                 let mut function_type = Self::pi_type(variable, Self::unknown_type(), evaluation);
-                Self::unify(&mut function_type, &mut function.typ(), ctx).await?;
+                Self::unify(ctx, &mut function_type, &mut function.typ()).await?;
 
                 let mut result_type = if let TermEnum::Pi(binding) = &mut *function_type.value() {
                     binding.apply(&argument)?
@@ -121,7 +121,7 @@ impl<'src> Term<'src> {
                     panic!("Expected a PI type")
                 };
 
-                Self::unify(&mut typ, &mut result_type, ctx).await?;
+                Self::unify(ctx, &mut typ, &mut result_type).await?;
                 Ok(())
             }
         });
@@ -136,12 +136,12 @@ impl<'src> Term<'src> {
 
     pub fn has_type(
         self,
+        ctx: &'src Context<'src>,
         mut typ: Self,
         constraints: &mut Constraints<'src>,
-        ctx: &'src Context<'src>,
     ) -> Self {
-        typ.unify_type(constraints, ctx);
-        Self::add_unify_constraint(self.typ(), typ, constraints, ctx);
+        typ.unify_type(ctx, constraints);
+        Self::add_unify_constraint(ctx, self.typ(), typ, constraints);
         self
     }
 
@@ -156,12 +156,12 @@ impl<'src> Term<'src> {
     /// }
     /// $$
     pub(crate) fn let_binding(
+        ctx: &'src Context<'src>,
         value: Self,
         binding: VariableBinding<Self>,
         constraints: &mut Constraints<'src>,
-        ctx: &'src Context<'src>,
     ) -> Self {
-        Self::add_unify_constraint(value.typ(), binding.variable.typ(), constraints, ctx);
+        Self::add_unify_constraint(ctx, value.typ(), binding.variable.typ(), constraints);
         Self::new(TermEnum::Let { value, binding })
     }
 
@@ -182,11 +182,11 @@ impl<'src> Term<'src> {
     /// We don't use indexed type universes, as this isn't a theorem proving
     /// language.
     pub(crate) fn pi(
+        ctx: &'src Context<'src>,
         mut binding: VariableBinding<Self>,
         constraints: &mut Constraints<'src>,
-        ctx: &'src Context<'src>,
     ) -> Self {
-        binding.in_term.unify_type(constraints, ctx);
+        binding.in_term.unify_type(ctx, constraints);
         Self::new(TermEnum::Pi(binding))
     }
 
@@ -363,12 +363,12 @@ impl<'src> Term<'src> {
     }
 
     fn add_unify_constraint(
+        ctx: &'src Context<'src>,
         mut x: Self,
         mut y: Self,
         constraints: &mut Constraints<'src>,
-        ctx: &'src Context<'src>,
     ) {
-        constraints.add(async move { Self::unify(&mut x, &mut y, ctx).await })
+        constraints.add(async move { Self::unify(ctx, &mut x, &mut y).await })
     }
 
     fn is_reducible(&mut self) -> bool {
@@ -380,10 +380,10 @@ impl<'src> Term<'src> {
         }
     }
 
-    fn unify_type(&mut self, constraints: &mut Constraints<'src>, ctx: &'src Context<'src>) {
+    fn unify_type(&mut self, ctx: &'src Context<'src>, constraints: &mut Constraints<'src>) {
         let mut typ = self.typ();
 
-        constraints.add(async move { Self::unify(&mut typ, &mut Self::type_of_type(), ctx).await })
+        constraints.add(async move { Self::unify(ctx, &mut typ, &mut Self::type_of_type()).await })
     }
 
     fn unify_unknown(
@@ -460,7 +460,7 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    async fn unify(x: &mut Self, y: &mut Self, ctx: &'src Context<'src>) -> Result<()> {
+    async fn unify(ctx: &'src Context<'src>, x: &mut Self, y: &mut Self) -> Result<()> {
         x.evaluate_known(ctx).await?;
         y.evaluate_known(ctx).await?;
         let mut reducible = Vec::new();
@@ -500,7 +500,7 @@ impl<'src> Term<'src> {
             TermEnum::Apply {
                 function, argument, ..
             } => {
-                let reduced = function.evaluate_apply(argument, ctx)?;
+                let reduced = function.evaluate_apply(ctx, argument)?;
                 drop(borrow);
                 self.replace_with(&reduced);
             }
@@ -517,7 +517,7 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    fn evaluate_apply(&mut self, argument: &mut Self, ctx: &'src Context<'src>) -> Result<Self> {
+    fn evaluate_apply(&mut self, ctx: &'src Context<'src>, argument: &mut Self) -> Result<Self> {
         self.evaluate(ctx)?;
         argument.evaluate(ctx)?;
         let mut value = self.value();

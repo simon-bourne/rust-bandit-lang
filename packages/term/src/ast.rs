@@ -157,26 +157,27 @@ impl<'src> Term<'src> {
                 argument,
                 evaluation,
             } => Core::apply(
+                ctx,
                 function.desugar_local(ctx, variables, constraints)?,
                 argument.desugar_local(ctx, variables, constraints)?,
                 *evaluation,
                 constraints,
-                ctx,
             ),
-            TermEnum::Variable(name) => ctx.lookup(name, variables, constraints)?,
+            TermEnum::Variable(name) => ctx.lookup(variables, name, constraints)?,
             TermEnum::Unknown => Core::unknown_value(),
             TermEnum::Let { value, binding } => Core::let_binding(
+                ctx,
                 value.desugar_local(ctx, variables, constraints)?,
                 binding.desugar(ctx, variables, constraints)?,
                 constraints,
-                ctx,
             ),
             TermEnum::Pi(binding) => Core::pi(
+                ctx,
                 binding.desugar(ctx, variables, constraints)?,
                 constraints,
-                ctx,
             ),
             TermEnum::FunctionType(left, right) => Core::pi(
+                ctx,
                 VariableBinding {
                     variable: Core::variable(
                         None,
@@ -186,16 +187,15 @@ impl<'src> Term<'src> {
                     evaluation: Evaluation::Dynamic,
                 },
                 constraints,
-                ctx,
             ),
             TermEnum::Lambda(binding) => {
                 Core::lambda(binding.desugar(ctx, variables, constraints)?)
             }
             TermEnum::HasType { term, typ } => {
                 term.desugar_local(ctx, variables, constraints)?.has_type(
+                    ctx,
                     typ.desugar_local(ctx, variables, constraints)?,
                     constraints,
-                    ctx,
                 )
             }
         })
@@ -215,9 +215,9 @@ impl<'src> Term<'src> {
             TermEnum::HasType { term, typ } => Ok(term
                 .desugar_variable(ctx, variables, constraints)?
                 .has_type(
+                    ctx,
                     typ.desugar_local(ctx, variables, constraints)?,
                     constraints,
-                    ctx,
                 ))?,
             TermEnum::Variable(name) => {
                 typed::Term::variable(Some(name), typed::Term::unknown_type())

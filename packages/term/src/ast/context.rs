@@ -114,9 +114,9 @@ impl<'a> Context<'a> {
     pub fn infer_types(&'a self, constraints: &mut Constraints<'a>) -> Result<()> {
         for Value { value, typ } in self.constants.values() {
             self.desugar_term(value, constraints)?.has_type(
+                self,
                 self.desugar_term(typ, constraints)?,
                 constraints,
-                self,
             );
         }
 
@@ -131,7 +131,7 @@ impl<'a> Context<'a> {
                 .map(|(_, term)| self.desugar_constant(term, constraints))
                 .collect();
             self.desugar_constant(&data.type_constructor, constraints)?
-                .type_constructor(value_constructors?, constraints, self);
+                .type_constructor(self, value_constructors?, constraints);
         }
 
         constraints.solve()
@@ -165,8 +165,8 @@ impl<'a> Context<'a> {
 
     pub(crate) fn lookup(
         &'a self,
-        name: &'a str,
         variables: &mut LocalVariables<'a>,
+        name: &'a str,
         constraints: &mut Constraints<'a>,
     ) -> Result<typed::Term<'a>> {
         let term = if let Some(local) = variables.lookup(name) {
