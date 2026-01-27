@@ -90,7 +90,6 @@ impl<'a> LocalVariables<'a> {
 }
 
 pub struct Context<'a> {
-    variables: LocalVariables<'a>,
     types: Rc<HashMap<&'a str, Data<'a>>>,
     constants: Rc<HashMap<&'a str, MutableValue<'a>>>,
     constraints: Constraints<'a>,
@@ -102,7 +101,6 @@ impl<'a> Context<'a> {
         constants: impl IntoIterator<Item = (&'a str, Value<ast::Term<'a>>)>,
     ) -> Self {
         Self {
-            variables: LocalVariables::default(),
             types: Rc::new(
                 types
                     .into_iter()
@@ -153,23 +151,28 @@ impl<'a> Context<'a> {
     }
 
     pub(crate) fn in_scope<Output>(
-        &mut self,
+        &self,
+        local_variables: &mut LocalVariables<'a>,
         mut variable: typed::Term<'a>,
-        f: impl FnOnce(&mut Self) -> Output,
+        f: impl FnOnce(&Self, &mut LocalVariables<'a>) -> Output,
     ) -> Output {
         let Some(name) = variable.variable_name() else {
-            return f(self);
+            return f(self, local_variables);
         };
 
-        self.variables.push(name, variable);
-        let output = f(self);
-        self.variables.pop(name);
+        local_variables.push(name, variable);
+        let output = f(self, local_variables);
+        local_variables.pop(name);
 
         output
     }
 
-    pub(crate) fn lookup(&mut self, name: &'a str) -> Result<typed::Term<'a>> {
-        let term = if let Some(local) = self.variables.lookup(name) {
+    pub(crate) fn lookup(
+        &self,
+        name: &'a str,
+        variables: &mut LocalVariables<'a>,
+    ) -> Result<typed::Term<'a>> {
+        let term = if let Some(local) = variables.lookup(name) {
             local
         } else if let Some(constant) = self.constants.get(name) {
             typed::Term::constant(name, self.desugar_term(&constant.typ)?)
@@ -189,7 +192,7 @@ impl<'a> Context<'a> {
 
         let typed_term = match &mut *term {
             Term::Typed(term) => term.clone(),
-            Term::Ast(term) => term.desugar(&mut self.global())?,
+            Term::Ast(term) => term.desugar(self)?,
         };
 
         *term = Term::Typed(typed_term.clone());
@@ -210,21 +213,12 @@ impl<'a> Context<'a> {
                     .typ
                     .take()
                     .unwrap_or_else(ast::Term::unknown)
-                    .desugar(&mut self.global())?,
+                    .desugar(self)?,
             ),
         };
 
         *constant = Constant::Typed(typed_constant.clone());
 
         Ok(typed_constant)
-    }
-
-    fn global(&self) -> Self {
-        Self {
-            variables: LocalVariables::default(),
-            types: self.types.clone(),
-            constants: self.constants.clone(),
-            constraints: self.constraints.clone(),
-        }
     }
 }
