@@ -249,7 +249,7 @@ impl<'src> Binding<'src> {
         let variable = self
             .variable
             .desugar_variable(ctx, variables, constraints)?;
-        let in_term = ctx.in_scope(variables, variable.clone(), |ctx, variables| {
+        let in_term = ctx.in_scope(variables, variable.clone(), |variables| {
             self.in_term.desugar_local(ctx, variables, constraints)
         })?;
 

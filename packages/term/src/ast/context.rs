@@ -147,14 +147,14 @@ impl<'a> Context<'a> {
         &self,
         local_variables: &mut LocalVariables<'a>,
         mut variable: typed::Term<'a>,
-        f: impl FnOnce(&Self, &mut LocalVariables<'a>) -> Output,
+        f: impl FnOnce(&mut LocalVariables<'a>) -> Output,
     ) -> Output {
         let Some(name) = variable.variable_name() else {
-            return f(self, local_variables);
+            return f(local_variables);
         };
 
         local_variables.push(name, variable);
-        let output = f(self, local_variables);
+        let output = f(local_variables);
         local_variables.pop(name);
 
         output
