@@ -116,14 +116,14 @@ pub struct ContextData<'a> {
     constraints: RefCell<Constraints<'a>>,
 }
 
-pub struct ContextOwner<'a>(Rc<RefCell<ContextData<'a>>>);
+pub struct ContextOwner<'a>(Rc<ContextData<'a>>);
 
 impl<'a> ContextOwner<'a> {
     pub fn new(
         types: impl IntoIterator<Item = ast::Data<'a>>,
         constants: impl IntoIterator<Item = (&'a str, Value<ast::Term<'a>>)>,
     ) -> Self {
-        Self(Rc::new(RefCell::new(ContextData {
+        Self(Rc::new(ContextData {
             types: types
                 .into_iter()
                 .map(|data| (data.type_constructor.name(), Data::new(data)))
@@ -133,7 +133,7 @@ impl<'a> ContextOwner<'a> {
                 .map(|(name, value)| (name, value.into()))
                 .collect(),
             constraints: RefCell::default(),
-        })))
+        }))
     }
 
     pub fn handle(&self) -> Context<'a> {
@@ -142,26 +142,26 @@ impl<'a> ContextOwner<'a> {
 }
 
 #[derive(Clone)]
-pub struct Context<'a>(Weak<RefCell<ContextData<'a>>>);
+pub struct Context<'a>(Weak<ContextData<'a>>);
 
 impl<'a> Context<'a> {
     pub fn constraint(&self, constraint: impl Future<Output = Result<()>> + 'a) {
-        self.rc().borrow().constraints.borrow_mut().add(constraint)
+        self.rc().constraints.borrow_mut().add(constraint)
     }
 
     pub fn infer_types(&self) -> Result<()> {
         let this = self.rc();
 
-        for Value { value, typ } in this.borrow().constants.values() {
+        for Value { value, typ } in this.constants.values() {
             self.desugar_term(value)?
                 .has_type(self, self.desugar_term(typ)?);
         }
 
-        for Value { value, .. } in this.borrow().constants.values() {
+        for Value { value, .. } in this.constants.values() {
             self.desugar_term(value)?.check_scope()?;
         }
 
-        for data in this.borrow().types.values() {
+        for data in this.types.values() {
             let value_constructors: Result<Vec<_>> = data
                 .value_constructors
                 .iter()
@@ -171,12 +171,11 @@ impl<'a> Context<'a> {
                 .type_constructor(self, value_constructors?);
         }
 
-        this.borrow().constraints.borrow_mut().solve()
+        this.constraints.borrow_mut().solve()
     }
 
     pub fn constants(&self) -> impl Iterator<Item = (&'a str, Result<typed::Term<'a>>)> {
         self.rc()
-            .borrow()
             .constants
             .iter()
             .map(|(name, Value { value, .. })| (*name, self.desugar_term(value)))
@@ -190,7 +189,6 @@ impl<'a> Context<'a> {
         name: &'a str,
     ) -> Result<typed::Term<'a>> {
         let this = self.rc();
-        let this = this.borrow();
 
         let term = if let Some(local) = variables.lookup(name) {
             local
@@ -235,7 +233,7 @@ impl<'a> Context<'a> {
         Ok(typed_constant)
     }
 
-    fn rc(&self) -> Rc<RefCell<ContextData<'a>>> {
+    fn rc(&self) -> Rc<ContextData<'a>> {
         self.0.upgrade().unwrap()
     }
 }
