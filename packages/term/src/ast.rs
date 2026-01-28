@@ -250,7 +250,7 @@ impl<'src> Binding<'src> {
         variables: &mut LocalVariables<'src>,
     ) -> Result<VariableBinding<typed::Term<'src>>> {
         let variable = self.variable.desugar_variable(ctx, variables)?;
-        let in_term = ctx.in_scope(variables, variable.clone(), |variables| {
+        let in_term = variables.in_scope(variable.clone(), |variables| {
             self.in_term.desugar_local(ctx, variables)
         })?;
 

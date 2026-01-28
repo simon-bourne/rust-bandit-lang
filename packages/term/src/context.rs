@@ -79,6 +79,22 @@ impl<'src> From<Value<ast::Term<'src>>> for MutableValue<'src> {
 pub struct LocalVariables<'a>(HashMap<&'a str, Vec<typed::Term<'a>>>);
 
 impl<'a> LocalVariables<'a> {
+    pub(crate) fn in_scope<Output>(
+        &mut self,
+        mut variable: typed::Term<'a>,
+        f: impl FnOnce(&mut LocalVariables<'a>) -> Output,
+    ) -> Output {
+        let Some(name) = variable.variable_name() else {
+            return f(self);
+        };
+
+        self.push(name, variable);
+        let output = f(self);
+        self.pop(name);
+
+        output
+    }
+
     fn lookup(&self, name: &'a str) -> Option<typed::Term<'a>> {
         Some(self.0.get(name)?.last()?.clone())
     }
@@ -166,24 +182,6 @@ impl<'a> Context<'a> {
             .map(|(name, Value { value, .. })| (*name, self.desugar_term(value)))
             .collect::<Vec<_>>()
             .into_iter()
-    }
-
-    pub(crate) fn in_scope<Output>(
-        // TODO: `self` is not used. Move this method to `LocalVariables`
-        &self,
-        local_variables: &mut LocalVariables<'a>,
-        mut variable: typed::Term<'a>,
-        f: impl FnOnce(&mut LocalVariables<'a>) -> Output,
-    ) -> Output {
-        let Some(name) = variable.variable_name() else {
-            return f(local_variables);
-        };
-
-        local_variables.push(name, variable);
-        let output = f(local_variables);
-        local_variables.pop(name);
-
-        output
     }
 
     pub(crate) fn lookup(
