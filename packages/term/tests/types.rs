@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use bandit_term::{
     Pretty,
-    ast::{Context, Term, Value},
+    ast::Term,
     constraints::Constraints,
+    context::{Context, Value},
 };
 
 #[test]

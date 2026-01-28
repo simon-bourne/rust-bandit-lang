@@ -1,8 +1,9 @@
 use bandit_parser::{lex::Token, parse::term};
 use bandit_term::{
     InferenceError, Pretty,
-    ast::{Context, Term, Value},
+    ast::Term,
     constraints::Constraints,
+    context::{Context, Value},
     typed,
 };
 use winnow::Parser;

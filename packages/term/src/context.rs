@@ -27,7 +27,7 @@ impl<'src> Value<ast::Term<'src>> {
     }
 }
 
-pub struct Data<'src> {
+struct Data<'src> {
     type_constructor: MutableConstant<'src>,
     value_constructors: Vec<(&'src str, MutableConstant<'src>)>,
 }
@@ -37,7 +37,7 @@ impl<'src> Data<'src> {
         let value_constructors = data
             .value_constructors
             .into_iter()
-            .map(|constant| (constant.name, Constant::new(constant)))
+            .map(|constant| (constant.name(), Constant::new(constant)))
             .collect();
 
         Self {
@@ -102,7 +102,7 @@ impl<'a> Context<'a> {
         Self {
             types: types
                 .into_iter()
-                .map(|data| (data.type_constructor.name, Data::new(data)))
+                .map(|data| (data.type_constructor.name(), Data::new(data)))
                 .collect(),
             constants: constants
                 .into_iter()
@@ -212,14 +212,7 @@ impl<'a> Context<'a> {
 
         let typed_constant = match &mut *constant {
             Constant::Typed(constant) => constant.clone(),
-            Constant::Ast(constant) => typed::Term::constant(
-                constant.name,
-                constant
-                    .typ
-                    .take()
-                    .unwrap_or_else(ast::Term::unknown)
-                    .desugar(self, constraints)?,
-            ),
+            Constant::Ast(constant) => constant.desugar(self, constraints)?,
         };
 
         *constant = Constant::Typed(typed_constant.clone());

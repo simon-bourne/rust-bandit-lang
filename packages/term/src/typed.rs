@@ -5,8 +5,8 @@ use clonelet::clone;
 use katexit::katexit;
 
 use crate::{
-    Evaluation, InferenceError, Pretty, Result, SharedMut, VariableBinding, ast::Context,
-    constraints::Constraints, sync::Latch,
+    Evaluation, InferenceError, Pretty, Result, SharedMut, VariableBinding,
+    constraints::Constraints, context::Context, sync::Latch,
 };
 
 mod pretty;

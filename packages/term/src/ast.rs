@@ -1,10 +1,10 @@
 use crate::{Evaluation, InferenceError, Result, VariableBinding, constraints::Constraints, typed};
 
-mod context;
 mod pretty;
 
-pub use context::{Context, LocalVariables, Value};
 use derive_more::Constructor;
+
+use crate::context::{Context, LocalVariables, Value};
 
 pub enum Definition<'src> {
     Function(Function<'src>),
@@ -19,8 +19,8 @@ pub struct Function<'src> {
 }
 
 pub struct Data<'src> {
-    type_constructor: Constant<'src>,
-    value_constructors: Vec<Constant<'src>>,
+    pub type_constructor: Constant<'src>,
+    pub value_constructors: Vec<Constant<'src>>,
 }
 
 impl<'src> Data<'src> {
@@ -40,6 +40,27 @@ impl<'src> Data<'src> {
 pub struct Constant<'src> {
     name: &'src str,
     typ: Option<Term<'src>>,
+}
+
+impl<'src> Constant<'src> {
+    pub fn name(&self) -> &'src str {
+        self.name
+    }
+
+    pub fn desugar(
+        &self,
+        ctx: &'src Context<'src>,
+        constraints: &mut Constraints<'src>,
+    ) -> Result<typed::Term<'src>> {
+        Ok(typed::Term::constant(
+            self.name,
+            if let Some(typ) = self.typ.as_ref() {
+                typ.desugar(ctx, constraints)?
+            } else {
+                typed::Term::unknown_type()
+            },
+        ))
+    }
 }
 
 impl<'src> Definition<'src> {
