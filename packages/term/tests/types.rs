@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use bandit_term::{
     Pretty,
     ast::Term,
-    constraints::Constraints,
-    context::{Context, Value},
+    context::{ContextOwner, Value},
 };
 
 #[test]
@@ -12,12 +11,12 @@ fn infer_kinds() {
     // C : (m a)
     let m = || Term::variable("m");
     let a = || Term::variable("a");
-    let ctx = &mut Context::new([], []);
-    let constraints = &mut Constraints::default();
+    let ctx_owner = ContextOwner::new([], []);
+    let ctx = ctx_owner.handle();
     let constructor_type = Term::lambda(m(), Term::lambda(a(), Term::apply(m(), a())))
-        .desugar(ctx, constraints)
+        .desugar(&ctx)
         .unwrap();
-    ctx.infer_types(constraints).unwrap();
+    ctx.infer_types().unwrap();
 
     assert_eq!(
         constructor_type.to_pretty_string(80),
@@ -38,9 +37,9 @@ fn let_error() {
     global_types.insert("one", Value::new(int_type()));
     global_types.insert("Int", Value::new(Term::type_of_type()));
     global_types.insert("Float", Value::new(Term::type_of_type()));
-    let ctx = &mut Context::new([], global_types);
-    let constraints = &mut Constraints::default();
-    let_binding.desugar(ctx, constraints).unwrap();
+    let ctx_owner = ContextOwner::new([], global_types);
+    let ctx = ctx_owner.handle();
+    let_binding.desugar(&ctx).unwrap();
 
-    assert!(ctx.infer_types(constraints).is_err());
+    assert!(ctx.infer_types().is_err());
 }

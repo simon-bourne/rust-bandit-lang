@@ -2,8 +2,7 @@ use bandit_parser::{lex::Token, parse::term};
 use bandit_term::{
     InferenceError, Pretty,
     ast::Term,
-    constraints::Constraints,
-    context::{Context, Value},
+    context::{ContextOwner, Value},
     typed,
 };
 use winnow::Parser;
@@ -13,7 +12,7 @@ fn parse(input: &str) -> Term<'_> {
     term.parse(&tokens).unwrap()
 }
 
-fn context<'src>() -> Context<'src> {
+fn context<'src>() -> ContextOwner<'src> {
     let types = ["Bool", "Int", "Float"];
     let items = [
         ("one", "Int"),
@@ -33,7 +32,7 @@ fn context<'src>() -> Context<'src> {
     let items = items
         .into_iter()
         .map(|(name, typ)| (name, Value::with_type(Term::unknown(), parse(typ))));
-    Context::new([], types.chain(items))
+    ContextOwner::new([], types.chain(items))
 }
 
 trait Test {
@@ -44,25 +43,22 @@ trait Test {
 
 impl Test for &str {
     fn infers(self, expected: &str) {
-        let ctx = context();
-        let term = infer_types(&ctx, self).unwrap();
+        let term = infer_types(self).unwrap();
         assert_eq!(term.to_pretty_string(80), expected);
     }
 
     fn fails(self) {
-        if let Ok(term) = infer_types(&context(), self) {
+        if let Ok(term) = infer_types(self) {
             panic!("Expected error, got '{}'", term.to_pretty_string(80))
         }
     }
 }
 
-fn infer_types<'src>(
-    ctx: &'src Context<'src>,
-    input: &'src str,
-) -> Result<typed::Term<'src>, InferenceError> {
-    let constraints = &mut Constraints::default();
-    let mut term = parse(input).desugar(ctx, constraints)?;
-    ctx.infer_types(constraints)?;
+fn infer_types<'src>(input: &'src str) -> Result<typed::Term<'src>, InferenceError> {
+    let ctx_owner = context();
+    let ctx = ctx_owner.handle();
+    let mut term = parse(input).desugar(&ctx)?;
+    ctx.infer_types()?;
     term.check_scope()?;
     Ok(term)
 }

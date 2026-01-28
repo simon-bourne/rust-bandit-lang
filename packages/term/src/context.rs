@@ -1,4 +1,8 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    rc::{Rc, Weak},
+};
 
 use crate::{InferenceError, Result, ast, constraints::Constraints, typed};
 
@@ -90,17 +94,20 @@ impl<'a> LocalVariables<'a> {
     }
 }
 
-pub struct Context<'a> {
+pub struct ContextData<'a> {
     types: HashMap<&'a str, Data<'a>>,
     constants: HashMap<&'a str, MutableValue<'a>>,
+    constraints: RefCell<Constraints<'a>>,
 }
 
-impl<'a> Context<'a> {
+pub struct ContextOwner<'a>(Rc<RefCell<ContextData<'a>>>);
+
+impl<'a> ContextOwner<'a> {
     pub fn new(
         types: impl IntoIterator<Item = ast::Data<'a>>,
         constants: impl IntoIterator<Item = (&'a str, Value<ast::Term<'a>>)>,
     ) -> Self {
-        Self {
+        Self(Rc::new(RefCell::new(ContextData {
             types: types
                 .into_iter()
                 .map(|data| (data.type_constructor.name(), Data::new(data)))
@@ -109,45 +116,60 @@ impl<'a> Context<'a> {
                 .into_iter()
                 .map(|(name, value)| (name, value.into()))
                 .collect(),
-        }
+            constraints: RefCell::default(),
+        })))
     }
 
-    pub fn infer_types(&'a self, constraints: &mut Constraints<'a>) -> Result<()> {
-        for Value { value, typ } in self.constants.values() {
-            self.desugar_term(value, constraints)?.has_type(
-                self,
-                self.desugar_term(typ, constraints)?,
-                constraints,
-            );
+    pub fn handle(&self) -> Context<'a> {
+        Context(Rc::downgrade(&self.0))
+    }
+}
+
+#[derive(Clone)]
+pub struct Context<'a>(Weak<RefCell<ContextData<'a>>>);
+
+impl<'a> Context<'a> {
+    pub fn constraint(&self, constraint: impl Future<Output = Result<()>> + 'a) {
+        self.rc().borrow().constraints.borrow_mut().add(constraint)
+    }
+
+    pub fn infer_types(&self) -> Result<()> {
+        let this = self.rc();
+
+        for Value { value, typ } in this.borrow().constants.values() {
+            self.desugar_term(value)?
+                .has_type(self, self.desugar_term(typ)?);
         }
 
-        for Value { value, .. } in self.constants.values() {
-            self.desugar_term(value, constraints)?.check_scope()?;
+        for Value { value, .. } in this.borrow().constants.values() {
+            self.desugar_term(value)?.check_scope()?;
         }
 
-        for data in self.types.values() {
+        for data in this.borrow().types.values() {
             let value_constructors: Result<Vec<_>> = data
                 .value_constructors
                 .iter()
-                .map(|(_, term)| self.desugar_constant(term, constraints))
+                .map(|(_, term)| self.desugar_constant(term))
                 .collect();
-            self.desugar_constant(&data.type_constructor, constraints)?
-                .type_constructor(self, value_constructors?, constraints);
+            self.desugar_constant(&data.type_constructor)?
+                .type_constructor(self, value_constructors?);
         }
 
-        constraints.solve()
+        this.borrow().constraints.borrow_mut().solve()
     }
 
-    pub fn constants(
-        &'a self,
-        constraints: &mut Constraints<'a>,
-    ) -> impl Iterator<Item = (&'a str, Result<typed::Term<'a>>)> {
-        self.constants
+    pub fn constants(&self) -> impl Iterator<Item = (&'a str, Result<typed::Term<'a>>)> {
+        self.rc()
+            .borrow()
+            .constants
             .iter()
-            .map(|(name, Value { value, .. })| (*name, self.desugar_term(value, constraints)))
+            .map(|(name, Value { value, .. })| (*name, self.desugar_term(value)))
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 
     pub(crate) fn in_scope<Output>(
+        // TODO: `self` is not used. Move this method to `LocalVariables`
         &self,
         local_variables: &mut LocalVariables<'a>,
         mut variable: typed::Term<'a>,
@@ -165,17 +187,19 @@ impl<'a> Context<'a> {
     }
 
     pub(crate) fn lookup(
-        &'a self,
+        &self,
         variables: &mut LocalVariables<'a>,
         name: &'a str,
-        constraints: &mut Constraints<'a>,
     ) -> Result<typed::Term<'a>> {
+        let this = self.rc();
+        let this = this.borrow();
+
         let term = if let Some(local) = variables.lookup(name) {
             local
-        } else if let Some(constant) = self.constants.get(name) {
-            typed::Term::constant(name, self.desugar_term(&constant.typ, constraints)?)
-        } else if let Some(data) = self.types.get(name) {
-            self.desugar_constant(&data.type_constructor, constraints)?
+        } else if let Some(constant) = this.constants.get(name) {
+            typed::Term::constant(name, self.desugar_term(&constant.typ)?)
+        } else if let Some(data) = this.types.get(name) {
+            self.desugar_constant(&data.type_constructor)?
         } else {
             return Err(InferenceError::VariableNotFound)?;
         };
@@ -183,18 +207,14 @@ impl<'a> Context<'a> {
         Ok(term)
     }
 
-    fn desugar_term(
-        &'a self,
-        term: &RefCell<Term<'a>>,
-        constraints: &mut Constraints<'a>,
-    ) -> Result<typed::Term<'a>> {
+    fn desugar_term(&self, term: &RefCell<Term<'a>>) -> Result<typed::Term<'a>> {
         let mut term = term
             .try_borrow_mut()
             .map_err(|_| InferenceError::TopLevelCircularDependency)?;
 
         let typed_term = match &mut *term {
             Term::Typed(term) => term.clone(),
-            Term::Ast(term) => term.desugar(self, constraints)?,
+            Term::Ast(term) => term.desugar(self)?,
         };
 
         *term = Term::Typed(typed_term.clone());
@@ -202,22 +222,22 @@ impl<'a> Context<'a> {
         Ok(typed_term)
     }
 
-    fn desugar_constant(
-        &'a self,
-        constant: &MutableConstant<'a>,
-        constraints: &mut Constraints<'a>,
-    ) -> Result<typed::Term<'a>> {
+    fn desugar_constant(&self, constant: &MutableConstant<'a>) -> Result<typed::Term<'a>> {
         let mut constant = constant
             .try_borrow_mut()
             .map_err(|_| InferenceError::TopLevelCircularDependency)?;
 
         let typed_constant = match &mut *constant {
             Constant::Typed(constant) => constant.clone(),
-            Constant::Ast(constant) => constant.desugar(self, constraints)?,
+            Constant::Ast(constant) => constant.desugar(self)?,
         };
 
         *constant = Constant::Typed(typed_constant.clone());
 
         Ok(typed_constant)
+    }
+
+    fn rc(&self) -> Rc<RefCell<ContextData<'a>>> {
+        self.0.upgrade().unwrap()
     }
 }
