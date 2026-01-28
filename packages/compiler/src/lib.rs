@@ -17,7 +17,7 @@ pub fn compile(source: &str) -> Result<()> {
     }
 
     let ctx = Definition::context(constants);
-    let constraints = &mut Constraints::empty();
+    let constraints = &mut Constraints::default();
     ctx.infer_types(constraints)?;
 
     println!();

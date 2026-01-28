@@ -15,6 +15,7 @@ pub mod typed;
 
 pub use pretty::Pretty;
 
+#[derive(Default)]
 struct SharedMut<T>(Rc<RefCell<T>>);
 
 impl<T> SharedMut<T> {

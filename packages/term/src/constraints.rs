@@ -7,13 +7,10 @@ use futures::future::{FutureExt, LocalBoxFuture};
 
 use crate::{InferenceError, Result};
 
+#[derive(Default)]
 pub struct Constraints<'a>(Vec<LocalBoxFuture<'a, Result<()>>>);
 
 impl<'a> Constraints<'a> {
-    pub fn empty() -> Self {
-        Self(Vec::new())
-    }
-
     pub fn add(&mut self, constraint: impl Future<Output = Result<()>> + 'a) {
         self.0.push(constraint.boxed_local())
     }

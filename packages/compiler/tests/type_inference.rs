@@ -60,7 +60,7 @@ fn infer_types<'src>(
     ctx: &'src Context<'src>,
     input: &'src str,
 ) -> Result<typed::Term<'src>, InferenceError> {
-    let constraints = &mut Constraints::empty();
+    let constraints = &mut Constraints::default();
     let mut term = parse(input).desugar(ctx, constraints)?;
     ctx.infer_types(constraints)?;
     term.check_scope()?;

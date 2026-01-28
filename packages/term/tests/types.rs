@@ -13,7 +13,7 @@ fn infer_kinds() {
     let m = || Term::variable("m");
     let a = || Term::variable("a");
     let ctx = &mut Context::new([], []);
-    let constraints = &mut Constraints::empty();
+    let constraints = &mut Constraints::default();
     let constructor_type = Term::lambda(m(), Term::lambda(a(), Term::apply(m(), a())))
         .desugar(ctx, constraints)
         .unwrap();
@@ -39,7 +39,7 @@ fn let_error() {
     global_types.insert("Int", Value::new(Term::type_of_type()));
     global_types.insert("Float", Value::new(Term::type_of_type()));
     let ctx = &mut Context::new([], global_types);
-    let constraints = &mut Constraints::empty();
+    let constraints = &mut Constraints::default();
     let_binding.desugar(ctx, constraints).unwrap();
 
     assert!(ctx.infer_types(constraints).is_err());
