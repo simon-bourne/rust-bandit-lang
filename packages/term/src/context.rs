@@ -9,6 +9,7 @@ enum Term<'a> {
 
 type MutableValue<'a> = Value<RefCell<Term<'a>>>;
 
+/// The value of a constant: `constant : <type> = <value>`
 pub struct Value<T> {
     value: T,
     typ: T,
