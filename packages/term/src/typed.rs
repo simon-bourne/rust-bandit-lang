@@ -481,30 +481,25 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    fn evaluate(&mut self, ctx: &Context<'src>) -> Result<()> {
+    fn evaluate(&mut self, ctx: &Context<'src>) -> Result<Self> {
         // TODO: This does evaluation by substitution, which is very inefficient. We
         // should use a stack and De Bruijn Indices.
-        let mut borrow = self.value();
-
-        match &mut *borrow {
+        let reduced = match &mut *self.value() {
             TermEnum::Apply {
                 function, argument, ..
-            } => {
-                let reduced = function.evaluate_apply(ctx, argument)?;
-                drop(borrow);
-                self.replace_with(&reduced);
-            }
+            } => Some(function.evaluate_apply(ctx, argument)?),
             TermEnum::Let { value, binding } => {
-                value.evaluate(ctx)?;
-                let mut reduced = binding.apply(value)?;
-                reduced.evaluate(ctx)?;
-                drop(borrow);
-                self.replace_with(&reduced);
+                Some(binding.apply(&value.evaluate(ctx)?)?.evaluate(ctx)?)
             }
-            _ => (),
+            TermEnum::Constant { name, .. } => Some(ctx.lookup_global(name)?),
+            _ => None,
+        };
+
+        if let Some(reduced) = reduced {
+            self.replace_with(&reduced);
         }
 
-        Ok(())
+        Ok(self.clone())
     }
 
     fn evaluate_apply(&mut self, ctx: &Context<'src>, argument: &mut Self) -> Result<Self> {
