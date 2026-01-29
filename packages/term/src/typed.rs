@@ -491,7 +491,7 @@ impl<'src> Term<'src> {
             TermEnum::Let { value, binding } => {
                 Some(binding.apply(&value.evaluate(ctx)?)?.evaluate(ctx)?)
             }
-            TermEnum::Constant { name, .. } => Some(ctx.lookup_global(name)?),
+            TermEnum::Constant { name, .. } => ctx.constant_value(name)?,
             _ => None,
         };
 
@@ -508,8 +508,10 @@ impl<'src> Term<'src> {
 
         match &mut *self.value() {
             TermEnum::Lambda(binding) => return binding.apply(argument),
-            TermEnum::Apply { .. } | TermEnum::Let { .. } | TermEnum::Variable { .. } => {}
-            TermEnum::Constant { name, .. } => return ctx.lookup_global(name),
+            TermEnum::Apply { .. }
+            | TermEnum::Let { .. }
+            | TermEnum::Variable { .. }
+            | TermEnum::Constant { .. } => {}
             TermEnum::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
             TermEnum::Pi(_) | TermEnum::Type => Err(InferenceError::UnexpectedTypeDuringEval)?,
         }

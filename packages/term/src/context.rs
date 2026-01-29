@@ -188,17 +188,11 @@ impl<'a> Context<'a> {
         variables: &mut LocalVariables<'a>,
         name: &'a str,
     ) -> Result<typed::Term<'a>> {
-        if let Some(local) = variables.lookup(name) {
-            Ok(local)
-        } else {
-            self.lookup_global(name)
-        }
-    }
-
-    pub(crate) fn lookup_global(&self, name: &'a str) -> Result<typed::Term<'a>> {
         let this = self.rc();
 
-        let term = if let Some(constant) = this.constants.get(name) {
+        let term = if let Some(local) = variables.lookup(name) {
+            local
+        } else if let Some(constant) = this.constants.get(name) {
             typed::Term::constant(name, self.desugar_term(&constant.typ)?)
         } else if let Some(data) = this.types.get(name) {
             self.desugar_constant(&data.type_constructor)?
@@ -207,6 +201,14 @@ impl<'a> Context<'a> {
         };
 
         Ok(term)
+    }
+
+    pub(crate) fn constant_value(&self, name: &'a str) -> Result<Option<typed::Term<'a>>> {
+        Ok(if let Some(constant) = self.rc().constants.get(name) {
+            Some(self.desugar_term(&constant.value)?)
+        } else {
+            None
+        })
     }
 
     fn desugar_term(&self, term: &RefCell<Term<'a>>) -> Result<typed::Term<'a>> {
