@@ -505,20 +505,16 @@ impl<'src> Term<'src> {
     fn evaluate_apply(&mut self, ctx: &Context<'src>, argument: &mut Self) -> Result<Self> {
         self.evaluate(ctx)?;
         argument.evaluate(ctx)?;
-        let mut value = self.value();
 
-        match &mut *value {
-            TermEnum::Lambda(binding) => Ok(binding.apply(argument)?),
-            TermEnum::Apply { .. }
-            | TermEnum::Let { .. }
-            | TermEnum::Variable { .. }
-            | TermEnum::Constant { .. } => {
-                drop(value);
-                Ok(self.clone())
-            }
+        match &mut *self.value() {
+            TermEnum::Lambda(binding) => return binding.apply(argument),
+            TermEnum::Apply { .. } | TermEnum::Let { .. } | TermEnum::Variable { .. } => {}
+            TermEnum::Constant { name, .. } => return ctx.lookup_global(name),
             TermEnum::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
             TermEnum::Pi(_) | TermEnum::Type => Err(InferenceError::UnexpectedTypeDuringEval)?,
         }
+
+        Ok(self.clone())
     }
 
     async fn head(&mut self) -> Result<Self> {
