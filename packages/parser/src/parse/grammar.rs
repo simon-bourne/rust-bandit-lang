@@ -113,7 +113,7 @@ fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
         Keyword::Forall,
         separated_pair(term, Operator::Implies, term),
     )
-    .map(|(variable, in_term)| Term::pi_type(variable, in_term, Evaluation::Static))
+    .map(|(variable, in_term)| Term::pi_type(variable, in_term))
 }
 
 fn let_binding<'tok, 'src: 'tok>(

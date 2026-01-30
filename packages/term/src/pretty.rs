@@ -36,6 +36,14 @@ impl<T: Pretty> Pretty for &'_ T {
 }
 
 impl<Term: Pretty> VariableBinding<Term> {
+    pub fn pi_to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
+        assert!(
+            self.evaluation == Evaluation::Static,
+            "Dynamic PI bindings are not supported"
+        );
+        self.binding_to_document("∀", parent, layout)
+    }
+
     pub fn to_document(
         &self,
         dynamic_binder: &str,
@@ -47,6 +55,15 @@ impl<Term: Pretty> VariableBinding<Term> {
             Evaluation::Static => static_binder,
             Evaluation::Dynamic => dynamic_binder,
         };
+        self.binding_to_document(binder, parent, layout)
+    }
+
+    fn binding_to_document(
+        &self,
+        binder: &str,
+        parent: Option<(Operator, Side)>,
+        layout: Layout,
+    ) -> RcDoc<'static> {
         parenthesize_if(
             parent.is_some(),
             [

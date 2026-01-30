@@ -42,8 +42,7 @@ impl<'src> Pretty for Term<'src> {
                         layout,
                     )
                 } else {
-                    // TODO: Differentiate static and dynamic bindings
-                    binding.to_document("∀", "∀", parent, layout)
+                    binding.pi_to_document(parent, layout)
                 }
             }
             TermEnum::Lambda(binding) => binding.to_document(r"\", r"\\", parent, layout),
