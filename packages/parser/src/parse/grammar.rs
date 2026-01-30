@@ -1,7 +1,4 @@
-// TODO: `static x = 3 * 4`
 // TODO: Newline to separate let binding and expression.
-// TODO: Static and dynamic type construction `T → U`, `T ⇒ U`, `∀x : T → U`,
-// and `∀x : T ⇒ U`
 use bandit_term::{
     Evaluation,
     ast::{Constant, Data, Definition, Function},
