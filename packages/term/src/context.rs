@@ -157,10 +157,6 @@ impl<'a> Context<'a> {
                 .has_type(self, self.desugar_term(typ)?);
         }
 
-        for Value { value, .. } in this.constants.values() {
-            self.desugar_term(value)?.check_scope()?;
-        }
-
         for data in this.types.values() {
             let value_constructors: Result<Vec<_>> = data
                 .value_constructors
@@ -171,7 +167,15 @@ impl<'a> Context<'a> {
                 .type_constructor(self, value_constructors?);
         }
 
-        this.constraints.borrow_mut().solve()
+        this.constraints.borrow_mut().solve()?;
+
+        // We need to solve constraints before we `check_scope`, so we don't introduce
+        // any new scope escapes
+        for Value { value, .. } in this.constants.values() {
+            self.desugar_term(value)?.check_scope()?;
+        }
+
+        Ok(())
     }
 
     pub fn constants(&self) -> impl Iterator<Item = (&'a str, Result<typed::Term<'a>>)> {
