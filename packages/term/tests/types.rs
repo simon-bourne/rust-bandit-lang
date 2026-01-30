@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bandit_term::{
-    Pretty,
+    Evaluation, Pretty,
     ast::Term,
     context::{ContextOwner, Value},
 };
@@ -13,7 +13,8 @@ fn infer_kinds() {
     let a = || Term::variable("a");
     let ctx_owner = ContextOwner::new([], []);
     let ctx = ctx_owner.handle();
-    let constructor_type = Term::lambda(m(), Term::lambda(a(), Term::apply(m(), a())))
+    let lambda = |var, body| Term::lambda(var, body, Evaluation::Dynamic);
+    let constructor_type = lambda(m(), lambda(a(), Term::apply(m(), a())))
         .desugar(&ctx)
         .unwrap();
     ctx.infer_types().unwrap();
@@ -31,7 +32,7 @@ fn let_error() {
     let int_type = || Term::variable("Int");
     let float_type = Term::variable("Float");
     let one = Term::variable("one").has_type(int_type());
-    let let_binding = Term::let_binding(x(), one, x().has_type(float_type));
+    let let_binding = Term::let_binding(x(), one, x().has_type(float_type), Evaluation::Dynamic);
 
     let mut global_types = HashMap::new();
     global_types.insert("one", Value::new(int_type()));

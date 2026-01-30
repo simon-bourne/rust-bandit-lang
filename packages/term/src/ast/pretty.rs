@@ -18,10 +18,10 @@ impl Pretty for Term<'_> {
             TermEnum::Variable(name) => Document::as_string(name),
             TermEnum::Unknown => Document::text("_"),
             TermEnum::Let { value, binding } => pretty_let(value, binding, parent, layout),
-            TermEnum::Pi(binding) => binding.to_document("∀", parent, layout),
+            TermEnum::Pi(binding) => binding.to_document("∀", r"∀", parent, layout),
             TermEnum::FunctionType(input_type, output_type) => Operator::Arrow(Evaluation::Dynamic)
                 .to_document(parent, input_type, output_type, layout, layout),
-            TermEnum::Lambda(binding) => binding.to_document("\\", parent, layout),
+            TermEnum::Lambda(binding) => binding.to_document(r"\", r"\\", parent, layout),
             TermEnum::HasType { term, typ } => {
                 Operator::HasType.to_document(parent, term, typ, layout, layout)
             }

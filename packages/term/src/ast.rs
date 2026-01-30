@@ -112,13 +112,13 @@ impl<'src> Term<'src> {
         })
     }
 
-    pub fn let_binding(variable: Self, value: Self, in_term: Self) -> Self {
+    pub fn let_binding(variable: Self, value: Self, in_term: Self, evaluation: Evaluation) -> Self {
         Self::new(TermEnum::Let {
             value,
             binding: VariableBinding {
                 variable,
                 in_term,
-                evaluation: Evaluation::Dynamic,
+                evaluation,
             },
         })
     }
@@ -135,11 +135,11 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::FunctionType(input_type, output_type))
     }
 
-    pub fn lambda(variable: Self, in_term: Self) -> Self {
+    pub fn lambda(variable: Self, in_term: Self, evaluation: Evaluation) -> Self {
         Self::new(TermEnum::Lambda(VariableBinding {
             variable,
             in_term,
-            evaluation: Evaluation::Dynamic,
+            evaluation,
         }))
     }
 

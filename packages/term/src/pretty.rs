@@ -38,10 +38,15 @@ impl<T: Pretty> Pretty for &'_ T {
 impl<Term: Pretty> VariableBinding<Term> {
     pub fn to_document(
         &self,
-        binder: &str,
+        dynamic_binder: &str,
+        static_binder: &str,
         parent: Option<(Operator, Side)>,
         layout: Layout,
     ) -> Document {
+        let binder = match self.evaluation {
+            Evaluation::Static => static_binder,
+            Evaluation::Dynamic => dynamic_binder,
+        };
         parenthesize_if(
             parent.is_some(),
             [

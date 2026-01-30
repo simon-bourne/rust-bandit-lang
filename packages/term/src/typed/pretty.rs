@@ -42,11 +42,11 @@ impl<'src> Pretty for Term<'src> {
                         layout,
                     )
                 } else {
-                    binding.to_document("∀", parent, layout)
+                    // TODO: Differentiate static and dynamic bindings
+                    binding.to_document("∀", "∀", parent, layout)
                 }
             }
-            // TODO: Static (`=>`) and dynamic (`->`) bindings
-            TermEnum::Lambda(binding) => binding.to_document(r"\", parent, layout),
+            TermEnum::Lambda(binding) => binding.to_document(r"\", r"\\", parent, layout),
         }
     }
 }

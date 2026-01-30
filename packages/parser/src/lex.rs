@@ -33,6 +33,7 @@ pub enum Token<'src> {
     #[token("from", |_| Keyword::From)]
     #[token("if", |_| Keyword::If)]
     #[token("let", |_| Keyword::Let)]
+    #[token("static", |_| Keyword::Static)]
     #[token("loop", |_| Keyword::Loop)]
     #[token("of", |_| Keyword::Of)]
     #[token("private", |_| Keyword::Private)]
@@ -50,8 +51,10 @@ pub enum Token<'src> {
     /// identifiers. It doesn't make sense as a keyword, as we'd have to have a
     /// space between it and a variable name. For example, does `λx` mean a
     /// lambda that binds the variable `x`, or an identifier `λx`?
-    #[token("\\")]
+    #[token(r"\")]
     Lambda,
+    #[token(r"\\")]
+    StaticLambda,
 
     #[regex(r"(?&ident)")]
     Identifier(&'src str),
@@ -165,6 +168,7 @@ pub enum Keyword {
     From,
     If,
     Let,
+    Static,
     Loop,
     Of,
     Private,
@@ -194,6 +198,7 @@ impl Keyword {
             KW::From => "from",
             KW::If => "if",
             KW::Let => "let",
+            KW::Static => "static",
             KW::Loop => "loop",
             KW::Of => "of",
             KW::Private => "private",

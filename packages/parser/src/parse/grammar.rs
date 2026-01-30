@@ -96,8 +96,10 @@ fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
         typ(),
         variable(),
         forall(),
-        lambda(),
-        let_binding(),
+        lambda(Token::Lambda, Evaluation::Dynamic),
+        lambda(Token::StaticLambda, Evaluation::Static),
+        let_binding(Keyword::Let, Evaluation::Dynamic),
+        let_binding(Keyword::Static, Evaluation::Static),
         parenthesized(term),
     ))
 }
@@ -114,17 +116,25 @@ fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     .map(|(variable, in_term)| Term::pi_type(variable, in_term, Evaluation::Static))
 }
 
-fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
+fn let_binding<'tok, 'src: 'tok>(
+    keyword: Keyword,
+    evaluation: Evaluation,
+) -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(
-        Keyword::Let,
+        keyword,
         (term, Operator::Assign, term, Operator::Implies, term),
     )
-    .map(|(var, _assign, value, _linend, in_term)| Term::let_binding(var, value, in_term))
+    .map(move |(var, _assign, value, _linend, in_term)| {
+        Term::let_binding(var, value, in_term, evaluation)
+    })
 }
 
-fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    preceded(Token::Lambda, separated_pair(term, Operator::Implies, term))
-        .map(|(variable, in_term)| Term::lambda(variable, in_term))
+fn lambda<'tok, 'src: 'tok>(
+    token: Token<'src>,
+    evaluation: Evaluation,
+) -> impl Parser<'tok, 'src, Term<'src>> {
+    preceded(token, separated_pair(term, Operator::Implies, term))
+        .map(move |(variable, in_term)| Term::lambda(variable, in_term, evaluation))
 }
 
 fn unknown<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
