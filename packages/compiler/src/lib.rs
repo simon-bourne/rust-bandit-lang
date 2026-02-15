@@ -17,7 +17,7 @@ pub fn compile(source: &str) -> Result<()> {
     }
 
     let ctx_owner = Definition::context(constants);
-    let ctx = ctx_owner.handle();
+    let mut ctx = ctx_owner.handle();
     ctx.infer_types()?;
 
     println!();

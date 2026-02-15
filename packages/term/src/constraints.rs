@@ -1,5 +1,5 @@
 use std::{
-    mem,
+    cell::RefCell,
     task::{self, Waker},
 };
 
@@ -8,17 +8,17 @@ use futures::future::{FutureExt, LocalBoxFuture};
 use crate::{InferenceError, Result};
 
 #[derive(Default)]
-pub struct Constraints<'a>(Vec<LocalBoxFuture<'a, Result<()>>>);
+pub struct Constraints<'a>(RefCell<Vec<LocalBoxFuture<'a, Result<()>>>>);
 
 impl<'a> Constraints<'a> {
-    pub fn add(&mut self, constraint: impl Future<Output = Result<()>> + 'a) {
-        self.0.push(constraint.boxed_local())
+    pub fn add(&self, constraint: impl Future<Output = Result<()>> + 'a) {
+        self.0.borrow_mut().push(constraint.boxed_local())
     }
 
     // TODO: Tidy
-    pub fn solve(&mut self) -> Result<()> {
+    pub fn solve(&self) -> Result<()> {
         loop {
-            let current = mem::take(&mut self.0);
+            let current = self.0.take();
 
             if current.is_empty() {
                 return Ok(());
@@ -38,7 +38,7 @@ impl<'a> Constraints<'a> {
                 }
             }
 
-            if self.0.is_empty() && pending.is_empty() {
+            if self.0.borrow().is_empty() && pending.is_empty() {
                 // We didn't solve any constraints, so we're stuck
                 if !any_solved {
                     return Err(InferenceError::CouldntInferAllTypes);
@@ -47,7 +47,7 @@ impl<'a> Constraints<'a> {
                 }
             }
 
-            self.0.extend(pending);
+            self.0.borrow_mut().extend(pending);
         }
     }
 }

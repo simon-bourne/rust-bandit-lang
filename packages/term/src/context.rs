@@ -113,7 +113,7 @@ impl<'a> LocalVariables<'a> {
 pub struct ContextData<'a> {
     types: HashMap<&'a str, Data<'a>>,
     constants: HashMap<&'a str, MutableValue<'a>>,
-    constraints: RefCell<Constraints<'a>>,
+    constraints: Constraints<'a>,
 }
 
 pub struct ContextOwner<'a>(Rc<ContextData<'a>>);
@@ -132,7 +132,7 @@ impl<'a> ContextOwner<'a> {
                 .into_iter()
                 .map(|(name, value)| (name, value.into()))
                 .collect(),
-            constraints: RefCell::default(),
+            constraints: Constraints::default(),
         }))
     }
 
@@ -146,10 +146,10 @@ pub struct Context<'a>(Weak<ContextData<'a>>);
 
 impl<'a> Context<'a> {
     pub fn constraint(&self, constraint: impl Future<Output = Result<()>> + 'a) {
-        self.rc().constraints.borrow_mut().add(constraint)
+        self.rc().constraints.add(constraint)
     }
 
-    pub fn infer_types(&self) -> Result<()> {
+    pub fn infer_types(&mut self) -> Result<()> {
         let this = self.rc();
 
         for Value { value, typ } in this.constants.values() {
@@ -167,7 +167,7 @@ impl<'a> Context<'a> {
                 .type_constructor(self, value_constructors?);
         }
 
-        this.constraints.borrow_mut().solve()?;
+        this.constraints.solve()?;
 
         // We need to solve constraints before we `check_scope`, so we don't introduce
         // any new scope escapes

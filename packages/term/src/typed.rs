@@ -1,4 +1,4 @@
-use std::{cell::RefMut, fmt, mem, ops::ControlFlow};
+use std::{cell::RefMut, fmt, ops::ControlFlow};
 
 use clonelet::clone;
 #[cfg(doc)]
@@ -376,11 +376,7 @@ impl<'src> Term<'src> {
         })
     }
 
-    fn unify_unknown(
-        &mut self,
-        other: &mut Self,
-        reducible: &mut Vec<(Self, Self)>,
-    ) -> Result<ControlFlow<()>> {
+    fn unify_unknown(&mut self, ctx: &Context<'src>, other: &mut Self) -> Result<ControlFlow<()>> {
         let (mut typ, infered) = if let TermEnum::Unknown {
             typ,
             inferred: infered,
@@ -394,14 +390,14 @@ impl<'src> Term<'src> {
 
         self.replace_with(other);
         infered.open();
-        Self::unify_upto_eval(&mut typ, &mut other.typ(), reducible)?;
+        Self::unify_upto_eval(ctx, &mut typ, &mut other.typ())?;
         Ok(ControlFlow::Break(()))
     }
 
     fn unify_implicit_parameter(
         &mut self,
+        ctx: &Context<'src>,
         other: &mut Self,
-        reducible: &mut Vec<(Self, Self)>,
     ) -> Result<ControlFlow<()>> {
         if let TermEnum::Pi(binding) = &*other.value()
             && binding.evaluation == Evaluation::Static
@@ -417,20 +413,16 @@ impl<'src> Term<'src> {
             return Ok(ControlFlow::Continue(()));
         };
 
-        Self::unify_upto_eval(&mut in_term, other, reducible)?;
+        Self::unify_upto_eval(ctx, &mut in_term, other)?;
         Ok(ControlFlow::Break(()))
     }
 
-    fn unify_upto_eval(
-        x: &mut Self,
-        y: &mut Self,
-        reducible: &mut Vec<(Self, Self)>,
-    ) -> Result<()> {
+    fn unify_upto_eval(ctx: &Context<'src>, x: &mut Self, y: &mut Self) -> Result<()> {
         if Self::is_same(x, y)
-            || x.unify_unknown(y, reducible)?.is_break()
-            || y.unify_unknown(x, reducible)?.is_break()
-            || x.unify_implicit_parameter(y, reducible)?.is_break()
-            || y.unify_implicit_parameter(x, reducible)?.is_break()
+            || x.unify_unknown(ctx, y)?.is_break()
+            || y.unify_unknown(ctx, x)?.is_break()
+            || x.unify_implicit_parameter(ctx, y)?.is_break()
+            || y.unify_implicit_parameter(ctx, x)?.is_break()
         {
             return Ok(());
         }
@@ -440,11 +432,19 @@ impl<'src> Term<'src> {
         }
 
         if x.is_reducible() || y.is_reducible() {
-            reducible.push((x.clone(), y.clone()));
+            ctx.constraint({
+                clone!(ctx, mut x, mut y);
+
+                async move {
+                    x.evaluate_known(&ctx).await?;
+                    y.evaluate_known(&ctx).await?;
+                    Self::unify_upto_eval(&ctx, &mut x, &mut y)
+                }
+            });
             return Ok(());
         }
 
-        Self::unify_known(x, y, reducible)?;
+        Self::unify_known(ctx, x, y)?;
         x.replace_with(y);
 
         Ok(())
@@ -453,18 +453,7 @@ impl<'src> Term<'src> {
     async fn unify(ctx: &Context<'src>, x: &mut Self, y: &mut Self) -> Result<()> {
         x.evaluate_known(ctx).await?;
         y.evaluate_known(ctx).await?;
-        let mut reducible = Vec::new();
-        Self::unify_upto_eval(x, y, &mut reducible)?;
-
-        while !reducible.is_empty() {
-            for (mut x, mut y) in mem::take(&mut reducible) {
-                x.evaluate_known(ctx).await?;
-                y.evaluate_known(ctx).await?;
-                Self::unify_upto_eval(&mut x, &mut y, &mut reducible)?;
-            }
-        }
-
-        Ok(())
+        Self::unify_upto_eval(ctx, x, y)
     }
 
     async fn evaluate_known(&mut self, ctx: &Context<'src>) -> Result<()> {
@@ -577,7 +566,7 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    fn unify_known(x: &mut Self, y: &mut Self, reducible: &mut Vec<(Self, Self)>) -> Result<()> {
+    fn unify_known(ctx: &Context<'src>, x: &mut Self, y: &mut Self) -> Result<()> {
         let mut x_ref = x.try_value()?;
         let mut y_ref = y.try_value()?;
 
@@ -590,7 +579,7 @@ impl<'src> Term<'src> {
                     name: name1,
                     typ: typ1,
                 },
-            ) if name == name1 => Self::unify_upto_eval(typ, typ1, reducible)?,
+            ) if name == name1 => Self::unify_upto_eval(ctx, typ, typ1)?,
             (
                 TermEnum::Apply {
                     function,
@@ -605,9 +594,9 @@ impl<'src> Term<'src> {
                     evaluation: evaluation1,
                 },
             ) if evaluation == evaluation1 => {
-                Self::unify_upto_eval(function, function1, reducible)?;
-                Self::unify_upto_eval(argument, argument1, reducible)?;
-                Self::unify_upto_eval(typ, typ1, reducible)?;
+                Self::unify_upto_eval(ctx, function, function1)?;
+                Self::unify_upto_eval(ctx, argument, argument1)?;
+                Self::unify_upto_eval(ctx, typ, typ1)?;
             }
             (
                 TermEnum::Let { value, binding },
@@ -616,16 +605,16 @@ impl<'src> Term<'src> {
                     binding: binding1,
                 },
             ) => {
-                Self::unify_upto_eval(value, value1, reducible)?;
-                VariableBinding::unify(binding, binding1, reducible)?
+                Self::unify_upto_eval(ctx, value, value1)?;
+                VariableBinding::unify(ctx, binding, binding1)?
             }
             (TermEnum::Pi(binding0), TermEnum::Pi(binding1))
                 if binding0.evaluation == binding1.evaluation =>
             {
-                VariableBinding::unify(binding0, binding1, reducible)?
+                VariableBinding::unify(ctx, binding0, binding1)?
             }
             (TermEnum::Lambda(binding0), TermEnum::Lambda(binding1)) => {
-                VariableBinding::unify(binding0, binding1, reducible)?
+                VariableBinding::unify(ctx, binding0, binding1)?
             }
             // It's safer to explicitly ignore each variant
             (TermEnum::Type, _rhs)
@@ -824,19 +813,15 @@ impl<'src> VariableBinding<Term<'src>> {
         }
     }
 
-    fn unify(
-        binding0: &mut Self,
-        binding1: &mut Self,
-        reducible: &mut Vec<(Term<'src>, Term<'src>)>,
-    ) -> Result<()> {
+    fn unify(ctx: &Context<'src>, binding0: &mut Self, binding1: &mut Self) -> Result<()> {
         if binding0.evaluation != binding1.evaluation {
             return Err(InferenceError::CouldntUnify);
         }
 
         Term::unify_upto_eval(
+            ctx,
             &mut binding0.variable.typ(),
             &mut binding1.variable.typ(),
-            reducible,
         )?;
 
         // Keep the name if we can
@@ -846,7 +831,7 @@ impl<'src> VariableBinding<Term<'src>> {
             binding0.variable.replace_with(&binding1.variable);
         }
 
-        Term::unify_upto_eval(&mut binding0.in_term, &mut binding1.in_term, reducible)
+        Term::unify_upto_eval(ctx, &mut binding0.in_term, &mut binding1.in_term)
     }
 
     fn check_scope(&mut self) -> Result<()> {

@@ -12,7 +12,7 @@ fn infer_kinds() {
     let m = || Term::variable("m");
     let a = || Term::variable("a");
     let ctx_owner = ContextOwner::new([], []);
-    let ctx = ctx_owner.handle();
+    let mut ctx = ctx_owner.handle();
     let lambda = |var, body| Term::lambda(var, body, Evaluation::Dynamic);
     let constructor_type = lambda(m(), lambda(a(), Term::apply(m(), a())))
         .desugar(&ctx)
@@ -39,7 +39,7 @@ fn let_error() {
     global_types.insert("Int", Value::new(Term::type_of_type()));
     global_types.insert("Float", Value::new(Term::type_of_type()));
     let ctx_owner = ContextOwner::new([], global_types);
-    let ctx = ctx_owner.handle();
+    let mut ctx = ctx_owner.handle();
     let_binding.desugar(&ctx).unwrap();
 
     assert!(ctx.infer_types().is_err());
