@@ -573,6 +573,7 @@ impl<'src> Term<'src> {
         // TODO: This isn't enough to do an occurs check, as unification can span
         // several constraints. We need to do a separate occurs check, one for
         // each eval, and one at the end. This can use `RefCell` mutable borrowing.
+        // We'll need to use a pool of terms so we don't leak memory.
         match (&mut *x_ref, &mut *y_ref) {
             (TermEnum::Type, TermEnum::Type) => {}
             (
