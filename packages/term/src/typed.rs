@@ -570,7 +570,9 @@ impl<'src> Term<'src> {
         let mut x_ref = x.try_value()?;
         let mut y_ref = y.try_value()?;
 
-        // TODO: Can we use mutable borrowing to do the occurs check for us?
+        // TODO: This isn't enough to do an occurs check, as unification can span
+        // several constraints. We need to do a separate occurs check, one for
+        // each eval, and one at the end. This can use `RefCell` mutable borrowing.
         match (&mut *x_ref, &mut *y_ref) {
             (TermEnum::Type, TermEnum::Type) => {}
             (
