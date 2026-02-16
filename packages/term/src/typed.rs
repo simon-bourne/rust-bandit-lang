@@ -32,9 +32,10 @@ impl<'src> Term<'src> {
 
     pub fn unknown(typ: Self) -> Self {
         Self::new(TermEnum::Unknown {
-            typ,
+            typ: typ.clone(),
             inferred: Latch::closed(),
         })
+        .set_type_to(typ)
     }
 
     pub fn unknown_value() -> Self {
@@ -49,13 +50,18 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::Variable {
             name,
             fresh: None,
-            typ,
+            typ: typ.clone(),
             scope: VariableScope::Unseen,
         })
+        .set_type_to(typ)
     }
 
     pub fn constant(name: &'src str, typ: Self) -> Self {
-        Self::new(TermEnum::Constant { name, typ })
+        Self::new(TermEnum::Constant {
+            name,
+            typ: typ.clone(),
+        })
+        .set_type_to(typ)
     }
 
     /// Apply typing rules between type and value constructors.
@@ -135,9 +141,10 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::Apply {
             function,
             argument,
-            typ,
+            typ: typ.clone(),
             evaluation,
         })
+        .set_type_to(typ)
     }
 
     pub fn has_type(self, ctx: &Context<'src>, mut typ: Self) -> Self {
@@ -162,7 +169,7 @@ impl<'src> Term<'src> {
         binding: VariableBinding<Self>,
     ) -> Self {
         Self::add_unify_constraint(ctx, value.typ(), binding.variable.typ());
-        Self::new(TermEnum::Let { value, binding })
+        Self::new(TermEnum::Let { value, binding }).set_type()
     }
 
     #[cfg_attr(doc, katexit)]
@@ -183,7 +190,7 @@ impl<'src> Term<'src> {
     /// language.
     pub(crate) fn pi(ctx: &Context<'src>, mut binding: VariableBinding<Self>) -> Self {
         binding.in_term.unify_type(ctx);
-        Self::new(TermEnum::Pi(binding))
+        Self::new(TermEnum::Pi(binding)).set_type()
     }
 
     #[cfg_attr(doc, katexit)]
@@ -199,7 +206,7 @@ impl<'src> Term<'src> {
     /// }
     /// $$
     pub(crate) fn lambda(binding: VariableBinding<Self>) -> Self {
-        Self::new(TermEnum::Lambda(binding))
+        Self::new(TermEnum::Lambda(binding)).set_type()
     }
 
     pub(crate) fn variable_name(&mut self) -> Option<&'src str> {
@@ -278,6 +285,22 @@ impl<'src> Term<'src> {
             type_of: Vec::new(),
             term,
         }))
+    }
+
+    fn set_type_to(self, mut typ: Self) -> Self {
+        typ.collapse_links();
+
+        let IndirectTerm::Value { type_of, .. } = &mut *typ.0.borrow_mut() else {
+            panic!("Expected value")
+        };
+
+        type_of.push(self.clone());
+        self
+    }
+
+    fn set_type(self) -> Self {
+        let typ = self.typ();
+        self.set_type_to(typ)
     }
 
     fn for_each(&mut self, f: &mut impl FnMut(&mut Self) -> Result<()>) -> Result<()> {
@@ -822,6 +845,7 @@ impl<'src> VariableBinding<Term<'src>> {
     }
 
     fn allocate_fresh_variable(&mut self) -> Result<Term<'src>> {
+        // TODO: How do we set `type_of`?
         let TermEnum::Variable {
             name, fresh, typ, ..
         } = &mut *self.variable.value()
