@@ -687,6 +687,7 @@ impl<'src> Term<'src> {
                 panic!("Expected value")
             };
 
+            // TODO: Remove duplicates, or use a `HashSet`
             type_of.append(old_type_of);
 
             IndirectTerm::Link {
