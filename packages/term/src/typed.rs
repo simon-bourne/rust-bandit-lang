@@ -845,7 +845,6 @@ impl<'src> VariableBinding<Term<'src>> {
     }
 
     fn allocate_fresh_variable(&mut self) -> Result<Term<'src>> {
-        // TODO: How do we set `type_of`?
         let TermEnum::Variable {
             name, fresh, typ, ..
         } = &mut *self.variable.value()
