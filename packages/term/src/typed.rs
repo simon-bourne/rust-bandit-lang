@@ -15,8 +15,14 @@ mod pretty;
 pub struct Term<'src>(SharedMut<IndirectTerm<'src>>);
 
 enum IndirectTerm<'src> {
-    Value { term: TermEnum<'src> },
-    Link { target: Term<'src> },
+    Value {
+        // TODO: This creates `Rc` cycles
+        type_of: Vec<Term<'src>>,
+        term: TermEnum<'src>,
+    },
+    Link {
+        target: Term<'src>,
+    },
 }
 
 impl<'src> Term<'src> {
@@ -108,7 +114,7 @@ impl<'src> Term<'src> {
         let typ = Self::unknown_type();
 
         ctx.constraint({
-            clone!(function, argument, mut typ, ctx);
+            clone!(function, mut argument, mut typ, ctx);
 
             async move {
                 let variable = Self::variable(None, argument.typ());
@@ -116,7 +122,7 @@ impl<'src> Term<'src> {
                 Self::unify(&ctx, &mut function_type, &mut function.typ()).await?;
 
                 let mut result_type = if let TermEnum::Pi(binding) = &mut *function_type.value() {
-                    binding.apply(&argument)?
+                    binding.apply(&mut argument)?
                 } else {
                     panic!("Expected a PI type")
                 };
@@ -229,7 +235,7 @@ impl<'src> Term<'src> {
             }
             TermEnum::Unknown { typ, .. } => {
                 // We create a fresh type so we can substitute variables
-                let fresh_type = &typ.fresh_variables()?;
+                let fresh_type = &mut typ.fresh_variables()?;
                 typ.replace_with(fresh_type);
                 drop(value);
                 return Ok(self.clone());
@@ -268,7 +274,10 @@ impl<'src> Term<'src> {
     }
 
     fn new(term: TermEnum<'src>) -> Self {
-        Self(SharedMut::new(IndirectTerm::Value { term }))
+        Self(SharedMut::new(IndirectTerm::Value {
+            type_of: Vec::new(),
+            term,
+        }))
     }
 
     fn for_each(&mut self, f: &mut impl FnMut(&mut Self) -> Result<()>) -> Result<()> {
@@ -408,7 +417,7 @@ impl<'src> Term<'src> {
         let mut in_term = if let TermEnum::Pi(binding) = &mut *self.value()
             && binding.evaluation == Evaluation::Static
         {
-            binding.apply(&Self::unknown_value())?
+            binding.apply(&mut Self::unknown_value())?
         } else {
             return Ok(ControlFlow::Continue(()));
         };
@@ -478,14 +487,14 @@ impl<'src> Term<'src> {
                 function, argument, ..
             } => Some(function.evaluate_apply(ctx, argument)?),
             TermEnum::Let { value, binding } => {
-                Some(binding.apply(&value.evaluate(ctx)?)?.evaluate(ctx)?)
+                Some(binding.apply(&mut value.evaluate(ctx)?)?.evaluate(ctx)?)
             }
             TermEnum::Constant { name, .. } => ctx.constant_value(name)?,
             _ => None,
         };
 
-        if let Some(reduced) = reduced {
-            self.replace_with(&reduced);
+        if let Some(mut reduced) = reduced {
+            self.replace_with(&mut reduced);
         }
 
         Ok(self.clone())
@@ -640,11 +649,28 @@ impl<'src> Term<'src> {
         SharedMut::is_same(&x.0, &y.0)
     }
 
-    fn replace_with(&mut self, other: &Self) {
+    fn replace_with(&mut self, other: &mut Self) {
         self.collapse_links();
-        self.0.replace_with(IndirectTerm::Link {
-            target: other.clone(),
+        other.collapse_links();
+        self.0.replace_with(|old| {
+            let IndirectTerm::Value {
+                type_of: old_type_of,
+                ..
+            } = old
+            else {
+                panic!("Expected value")
+            };
+            let IndirectTerm::Value { type_of, .. } = &mut *other.0.borrow_mut() else {
+                panic!("Expected value")
+            };
+
+            type_of.append(old_type_of);
+
+            IndirectTerm::Link {
+                target: other.clone(),
+            }
         });
+
         *self = other.clone();
     }
 
@@ -768,7 +794,7 @@ impl<'src> VariableBinding<Term<'src>> {
         self.variable.clone().variable_name()
     }
 
-    fn apply(&mut self, argument: &Term<'src>) -> Result<Term<'src>> {
+    fn apply(&mut self, argument: &mut Term<'src>) -> Result<Term<'src>> {
         // We need all bound variables to be fresh, as this variable might appear in the
         // type of other bound variables. e.g. `∀a. ∀b. b : a`. Free variables don't
         // need to be fresh, as this variable would be out of scope. For example, `b` is
@@ -829,9 +855,9 @@ impl<'src> VariableBinding<Term<'src>> {
 
         // Keep the name if we can
         if binding0.variable_name().is_some() {
-            binding1.variable.replace_with(&binding0.variable);
+            binding1.variable.replace_with(&mut binding0.variable);
         } else {
-            binding0.variable.replace_with(&binding1.variable);
+            binding0.variable.replace_with(&mut binding1.variable);
         }
 
         Term::unify_upto_eval(ctx, &mut binding0.in_term, &mut binding1.in_term)
