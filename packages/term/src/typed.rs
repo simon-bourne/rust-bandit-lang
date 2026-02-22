@@ -426,6 +426,17 @@ impl<'src> Term<'src> {
         Ok(ControlFlow::Break(()))
     }
 
+    // TODO: This is the wrong way to do this.
+    //
+    // We don't want to add an implicit argument to every value with this implicit
+    // type. We only want to do it for the values that we're trying to unify with a
+    // type without an implicit param.
+    //
+    // Ideally, we'd like to do this before each call to `unify`, but we might not
+    // know the types then.
+    //
+    // I think the best way to do this is to scan through afterward and add implicit
+    // parameters to everything that needs them.
     fn unify_implicit_parameter(
         &mut self,
         ctx: &Context<'src>,
@@ -437,13 +448,31 @@ impl<'src> Term<'src> {
             return Ok(ControlFlow::Continue(()));
         }
 
+        // TODO: Does everything with type of `self` need the same `static_argument`?
+        let static_argument = Self::unknown_value();
+
         let mut in_term = if let TermEnum::Pi(binding) = &mut *self.value()
             && binding.evaluation == Evaluation::Static
         {
-            binding.apply(&mut Self::unknown_value())?
+            binding.apply(&mut static_argument.clone())?
         } else {
             return Ok(ControlFlow::Continue(()));
         };
+
+        for static_function in &mut *self.try_values_of_type()? {
+            // TODO: Add a swap function that collapses links
+            static_function.try_collapse_links()?;
+            let placeholder = Self::unknown_value();
+            placeholder.0.swap(&static_function.0);
+
+            let static_apply = Self::apply(
+                ctx,
+                placeholder,
+                static_argument.clone(),
+                Evaluation::Static,
+            );
+            static_function.0.swap(&static_apply.0);
+        }
 
         Self::unify_upto_eval(ctx, &mut in_term, other)?;
         Ok(ControlFlow::Break(()))
@@ -738,6 +767,21 @@ impl<'src> Term<'src> {
 
         Ok(RefMut::map(borrow, |x| match x {
             IndirectTerm::Value { term, .. } => term,
+            IndirectTerm::Link { .. } => {
+                unreachable!("Links should be collapsed at this point")
+            }
+        }))
+    }
+
+    fn try_values_of_type<'a>(&'a mut self) -> Result<RefMut<'a, Vec<Self>>> {
+        self.try_collapse_links()?;
+        let borrow = self
+            .0
+            .try_borrow_mut()
+            .map_err(|_| InferenceError::InfiniteTerm)?;
+
+        Ok(RefMut::map(borrow, |x| match x {
+            IndirectTerm::Value { type_of, .. } => type_of,
             IndirectTerm::Link { .. } => {
                 unreachable!("Links should be collapsed at this point")
             }
