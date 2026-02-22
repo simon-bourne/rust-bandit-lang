@@ -718,17 +718,7 @@ impl<'src> Term<'src> {
                     ..
                 } => {
                     if *evaluation == Evaluation::Dynamic && function.typ().is_static_pi() {
-                        function.try_collapse_links()?;
-                        let placeholder = Self::unknown_value();
-                        placeholder.0.swap(&function.0);
-
-                        let static_apply = Self::apply(
-                            ctx,
-                            placeholder,
-                            Self::unknown_value(),
-                            Evaluation::Static,
-                        );
-                        function.0.swap(&static_apply.0);
+                        function.add_implicit_argument(ctx)?;
                     }
                 }
                 // TODO: Handle other cases
@@ -738,6 +728,16 @@ impl<'src> Term<'src> {
 
             Ok(())
         })
+    }
+
+    fn add_implicit_argument(&mut self, ctx: &Context<'src>) -> Result<()> {
+        self.try_collapse_links()?;
+        let placeholder = Self::unknown_value();
+        placeholder.0.swap(&self.0);
+
+        let static_apply = Self::apply(ctx, placeholder, Self::unknown_value(), Evaluation::Static);
+        self.0.swap(&static_apply.0);
+        Ok(())
     }
 
     fn is_static_pi(&mut self) -> bool {
