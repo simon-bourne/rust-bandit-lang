@@ -151,13 +151,17 @@ impl<'a> Context<'a> {
 
     pub fn infer_types(&mut self) -> Result<()> {
         let this = self.rc();
+        let mut terms = Vec::new();
 
         for Value { value, typ } in this.constants.values() {
-            self.desugar_term(value)?
-                .has_type(self, self.desugar_term(typ)?);
+            terms.push(
+                self.desugar_term(value)?
+                    .has_type(self, self.desugar_term(typ)?),
+            );
         }
 
         for data in this.types.values() {
+            // TODO: Add to `terms`
             let value_constructors: Result<Vec<_>> = data
                 .value_constructors
                 .iter()
@@ -167,12 +171,20 @@ impl<'a> Context<'a> {
                 .type_constructor(self, value_constructors?);
         }
 
-        this.constraints.solve()?;
+        while !this.constraints.is_empty() {
+            this.constraints.solve()?;
+
+            // TODO: Do this for `data`.
+            for term in &mut terms {
+                // TODO: Do this before evaluating as well
+                term.infer_implicits(self)?;
+            }
+        }
 
         // We need to solve constraints before we `check_scope`, so we don't introduce
         // any new scope escapes
-        for Value { value, .. } in this.constants.values() {
-            self.desugar_term(value)?.check_scope()?;
+        for term in &mut terms {
+            term.check_scope()?;
         }
 
         Ok(())

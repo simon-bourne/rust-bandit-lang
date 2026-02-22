@@ -15,6 +15,10 @@ impl<'a> Constraints<'a> {
         self.0.borrow_mut().push(constraint.boxed_local())
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.borrow().is_empty()
+    }
+
     // TODO: Tidy
     pub fn solve(&self) -> Result<()> {
         loop {

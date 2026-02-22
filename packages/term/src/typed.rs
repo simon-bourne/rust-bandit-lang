@@ -702,6 +702,52 @@ impl<'src> Term<'src> {
         matches!(&*self.clone().value(), TermEnum::Unknown { .. })
     }
 
+    // TODO: Call this before eval
+    pub fn infer_implicits(&mut self, ctx: &Context<'src>) -> Result<()> {
+        dbg!(&self);
+        self.for_each(&mut |term| {
+            // TODO: What if we've unified a static PI type with some type that gets
+            // discarded (like `Self::type_of_type().typ()`)? We need to check it's not a
+            // discardable type before unifying, or have a `typ: Option<Term>` on
+            // everything.
+            match &mut *term.value() {
+                TermEnum::Apply {
+                    function,
+                    evaluation,
+                    ..
+                } => {
+                    if *evaluation == Evaluation::Dynamic && function.typ().is_static_pi() {
+                        function.try_collapse_links()?;
+                        let placeholder = Self::unknown_value();
+                        placeholder.0.swap(&function.0);
+
+                        let static_apply = Self::apply(
+                            ctx,
+                            placeholder,
+                            Self::unknown_value(),
+                            Evaluation::Static,
+                        );
+                        function.0.swap(&static_apply.0);
+                    }
+                }
+                // TODO: Handle other cases
+                TermEnum::Type => {}
+                _ => {}
+            };
+
+            Ok(())
+        })
+    }
+
+    fn is_static_pi(&mut self) -> bool {
+        // TODO: VariableBinding::is_static()?
+        if let TermEnum::Pi(binding) = &*self.value() {
+            binding.evaluation == Evaluation::Static
+        } else {
+            false
+        }
+    }
+
     fn typ(&self) -> Self {
         match &*self.clone().value() {
             TermEnum::Type | TermEnum::Pi(_) => Term::type_of_type(),

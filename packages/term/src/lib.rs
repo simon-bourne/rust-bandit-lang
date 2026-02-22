@@ -39,6 +39,10 @@ impl<T> SharedMut<T> {
         self.0.try_borrow_mut()
     }
 
+    pub fn swap(&self, other: &Self) {
+        self.0.swap(&other.0)
+    }
+
     pub fn replace_with(&self, x: T) -> T {
         RefCell::replace(self.0.as_ref(), x)
     }

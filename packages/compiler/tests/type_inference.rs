@@ -58,6 +58,7 @@ fn infer_types<'src>(input: &'src str) -> Result<typed::Term<'src>, InferenceErr
     let ctx_owner = context();
     let mut ctx = ctx_owner.handle();
     let mut term = parse(input).desugar(&ctx)?;
+    term.infer_implicits(&ctx)?;
     ctx.infer_types()?;
     term.check_scope()?;
     Ok(term)
@@ -125,7 +126,12 @@ fn simple_id() {
 // TODO: Can we remove brackets around `(∀a ⇒ a → a)`?
 #[test]
 fn infer_implicit_argument() {
-    "id one".infers("(id : (∀a ⇒ a → a)) (one : Int) : Int");
+    "id one".infers("((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int");
+}
+
+#[test]
+fn check_implicit_argument() {
+    "id @ Int one".infers("((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int");
 }
 
 #[test]
@@ -135,7 +141,7 @@ fn infer_type_is_type() {
 
 #[test]
 fn infer_implicit_argument_isolation() {
-    "add (id one) (id @ Int one)".infers("((add : Int → Int → Int) ((id : (∀a ⇒ a → a)) (one : Int) : Int) : Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int");
+    "add (id one) (id @ Int one)".infers("((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int");
 }
 
 #[test]
