@@ -702,15 +702,25 @@ impl<'src> Term<'src> {
         matches!(&*self.clone().value(), TermEnum::Unknown { .. })
     }
 
+    // TODO: There's a general problem if a type isn't represented in `Term`.
+    //
+    // # Examples
+    //
+    // ## Type Annotation
+    //
+    // We'd like to be able to infer `id @ Int : Int -> Int` from `id : Int -> Int`,
+    // but the type annotation isn't in the term. Maybe type annotation should be a
+    // function `.is_type_of : (type : Type) -> (term : type) -> type`? Like `:`
+    // with it's arguments reversed.
+    //
+    // ## Type of Type
+    //
+    // Is this a problem? This has type `Type`, but it isn't stored. It's type could
+    // unify with `∀a. Type`
+
     // TODO: Call this before eval
     pub fn infer_implicits(&mut self, ctx: &Context<'src>) -> Result<()> {
-        // TODO: What if we have a term like `id : Int -> Int`? This should be inferred
-        // as `id @ Int : Int -> Int`
         self.for_each(&mut |term| {
-            // TODO: What if we've unified a static PI type with some type that gets
-            // discarded (like `Self::type_of_type().typ()`)? We need to check it's not a
-            // discardable type before unifying, or have a `typ: Option<Term>` on
-            // everything.
             match &mut *term.value() {
                 TermEnum::Apply {
                     function,
