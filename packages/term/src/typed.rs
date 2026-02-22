@@ -704,7 +704,8 @@ impl<'src> Term<'src> {
 
     // TODO: Call this before eval
     pub fn infer_implicits(&mut self, ctx: &Context<'src>) -> Result<()> {
-        dbg!(&self);
+        // TODO: What if we have a term like `id : Int -> Int`? This should be inferred
+        // as `id @ Int : Int -> Int`
         self.for_each(&mut |term| {
             // TODO: What if we've unified a static PI type with some type that gets
             // discarded (like `Self::type_of_type().typ()`)? We need to check it's not a
