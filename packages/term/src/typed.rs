@@ -355,7 +355,7 @@ impl<'src> Term<'src> {
     fn add_unify_constraint(ctx: &Context<'src>, mut x: Self, mut y: Self) {
         ctx.constraint({
             clone!(ctx);
-            async move { Self::unify(&ctx, &mut x, &mut y).await }
+            async move { Self::unify(&ctx.clone(), &mut x, &mut y).await }
         })
     }
 
@@ -369,11 +369,7 @@ impl<'src> Term<'src> {
     }
 
     fn unify_type(&mut self, ctx: &Context<'src>) {
-        ctx.constraint({
-            let mut typ = self.typ();
-            clone!(ctx);
-            async move { Self::unify(&ctx, &mut typ, &mut Self::type_of_type()).await }
-        })
+        Self::add_unify_constraint(ctx, self.typ(), Self::type_of_type())
     }
 
     fn unify_unknown(&mut self, ctx: &Context<'src>, other: &mut Self) -> Result<ControlFlow<()>> {
@@ -434,15 +430,7 @@ impl<'src> Term<'src> {
         }
 
         if x.is_reducible() || y.is_reducible() {
-            ctx.constraint({
-                clone!(ctx, mut x, mut y);
-
-                async move {
-                    x.evaluate_known(&ctx).await?;
-                    y.evaluate_known(&ctx).await?;
-                    Self::unify_upto_eval(&ctx, &mut x, &mut y)
-                }
-            });
+            Self::add_unify_constraint(ctx, x.clone(), y.clone());
             return Ok(());
         }
 
