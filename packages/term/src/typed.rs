@@ -878,6 +878,8 @@ impl<'src> VariableBinding<Term<'src>> {
             return Err(InferenceError::CouldntUnify);
         }
 
+        // TODO: Is this enough? Don't we need to do full unify with eval? Unfortunately
+        // that fails with an inifinite term though.
         Term::unify_upto_eval(
             ctx,
             &mut binding0.variable.typ(),
