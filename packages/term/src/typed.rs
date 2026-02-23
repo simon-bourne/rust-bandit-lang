@@ -417,6 +417,8 @@ impl<'src> Term<'src> {
         Ok(ControlFlow::Break(()))
     }
 
+    // TODO: This name is confusing. It actually does do complete unification, but
+    // some of it might be done in a constraint.
     fn unify_upto_eval(ctx: &Context<'src>, x: &mut Self, y: &mut Self) -> Result<()> {
         if Self::is_same(x, y)
             || x.unify_unknown(ctx, y)?.is_break()
@@ -889,8 +891,6 @@ impl<'src> VariableBinding<Term<'src>> {
             return Err(InferenceError::CouldntUnify);
         }
 
-        // TODO: Is this enough? Don't we need to do full unify with eval? Unfortunately
-        // that fails with an inifinite term though.
         Term::unify_upto_eval(
             ctx,
             &mut binding0.variable.typ(),
