@@ -702,34 +702,44 @@ impl<'src> Term<'src> {
         matches!(&*self.clone().value(), TermEnum::Unknown { .. })
     }
 
-    // TODO: There's a general problem if a type isn't represented in `Term`.
-    //
-    // # Examples
-    //
-    // ## Type Annotation
+    // TODO: Type Annotation
     //
     // We'd like to be able to infer `id @ Int : Int -> Int` from `id : Int -> Int`,
     // but the type annotation isn't in the term. Maybe type annotation should be a
     // function `.is_type_of : (type : Type) -> (term : type) -> type`? Like `:`
     // with it's arguments reversed.
-    //
-    // ## Type of Type
-    //
-    // Is this a problem? This has type `Type`, but it isn't stored. It's type could
-    // unify with `∀a. Type`
 
     // TODO: Call this before eval
+
+    /// Infer the presence of implicit arguments
+    ///
+    /// This applies the typing rules again to see if we're missing any implicit
+    /// arguments, and adds them if necessary.
     pub fn infer_implicits(&mut self, ctx: &Context<'src>) -> Result<()> {
         self.for_each(&mut |term| {
             match &mut *term.value() {
                 TermEnum::Apply {
                     function,
+                    argument,
                     evaluation,
                     ..
                 } => {
-                    if *evaluation == Evaluation::Dynamic && function.typ().is_static_pi() {
+                    // Example: `id 1` should be `id @ Int 1`
+                    let mut function_typ = function.typ();
+
+                    if *evaluation == Evaluation::Dynamic && function_typ.is_static_pi() {
                         function.add_implicit_argument(ctx)?;
                     }
+
+                    // Example: If `f : (Int → Int) → Int` the `f id` shoud be `f (id @ Int)`
+                    if let TermEnum::Pi(binding) = &mut *function_typ.value()
+                        && !binding.variable.typ().is_static_pi()
+                        && argument.typ().is_static_pi()
+                    {
+                        argument.add_implicit_argument(ctx)?;
+                    }
+
+                    // TODO: Example: If `f: Int -> ∀a. a` then `f 1 : Int` should be `f 1 @ Int`
                 }
                 // TODO: Handle other cases
                 TermEnum::Type => {}

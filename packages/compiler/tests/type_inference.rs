@@ -20,6 +20,7 @@ fn context<'src>() -> ContextOwner<'src> {
         ("true", "Bool"),
         ("abs", "Int → Int"),
         ("add", "Int → Int → Int"),
+        ("higher_order", "(Int → Int) → Int"),
         ("id", "∀a ⇒ a → a"),
         ("float_to_int", "Float → Int"),
         ("polymorphic", "∀a ⇒ a"),
@@ -125,8 +126,15 @@ fn simple_id() {
 // ⇒ a → a`?
 // TODO: Can we remove brackets around `(∀a ⇒ a → a)`?
 #[test]
-fn infer_implicit_argument() {
+fn infer_implicit_param_on_function() {
     "id one".infers("((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int");
+}
+
+#[test]
+fn infer_implicit_param_on_argument() {
+    "higher_order id".infers(
+        "(higher_order : (Int → Int) → Int) ((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) : Int",
+    );
 }
 
 #[test]
