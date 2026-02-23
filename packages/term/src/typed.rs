@@ -739,7 +739,8 @@ impl<'src> Term<'src> {
                         argument.add_implicit_argument(ctx)?;
                     }
 
-                    // TODO: Example: If `f: Int -> ∀a. a` then `f 1 : Int` should be `f 1 @ Int`
+                    // TODO: Example: If `f: Int -> ∀a. a` then `f 1 : Int`
+                    // should be `f 1 @ Int`
                 }
                 // TODO: Handle other cases
                 TermEnum::Type => {}
