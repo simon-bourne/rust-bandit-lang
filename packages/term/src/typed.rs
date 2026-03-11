@@ -716,29 +716,39 @@ impl<'src> Term<'src> {
                 argument,
                 evaluation,
                 ..
-            } => {
-                // Example: `id 1` should be `id @ Int 1`
-                let mut function_typ = function.typ();
-
-                if *evaluation == Evaluation::Dynamic && function_typ.is_static_pi() {
-                    function.add_implicit_argument(ctx)?;
-                }
-
-                // Example: If `f : (Int → Int) → Int` the `f id` shoud be `f (id @ Int)`
-                if let TermEnum::Pi(binding) = &mut *function_typ.value()
-                    && !binding.variable.typ().is_static_pi()
-                    && argument.typ().is_static_pi()
-                {
-                    argument.add_implicit_argument(ctx)?;
-                }
-
-                // TODO: Example: If `f: Int -> ∀a. a` then `f 1 : Int`
-                // should be `f 1 @ Int`
-            }
+            } => Self::infer_implicit_apply(function, argument, *evaluation, ctx)?,
             // TODO: Handle other cases
             TermEnum::Type => {}
+
             _ => {}
         };
+
+        Ok(())
+    }
+
+    fn infer_implicit_apply(
+        function: &mut Self,
+        argument: &mut Self,
+        evaluation: Evaluation,
+        ctx: &Context<'src>,
+    ) -> Result<()> {
+        // Example: `id 1` should be `id @ Int 1`
+        let mut function_typ = function.typ();
+
+        if evaluation == Evaluation::Dynamic && function_typ.is_static_pi() {
+            function.add_implicit_argument(ctx)?;
+        }
+
+        // Example: If `f : (Int → Int) → Int` the `f id` shoud be `f (id @ Int)`
+        if let TermEnum::Pi(binding) = &mut *function_typ.value()
+            && !binding.variable.typ().is_static_pi()
+            && argument.typ().is_static_pi()
+        {
+            argument.add_implicit_argument(ctx)?;
+        }
+
+        // TODO: Example: If `f: Int -> ∀a. a` then `f 1 : Int`
+        // should be `f 1 @ Int`
 
         Ok(())
     }
