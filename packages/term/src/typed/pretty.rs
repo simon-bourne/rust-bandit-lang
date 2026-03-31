@@ -46,6 +46,7 @@ impl<'src> Pretty for Term<'src> {
                 }
             }
             TermEnum::Lambda(binding) => binding.to_document(r"\", r"\\", parent, layout),
+            TermEnum::NeedImplicit(value) => value.to_document(parent, layout),
         }
     }
 }

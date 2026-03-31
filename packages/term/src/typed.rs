@@ -256,6 +256,7 @@ impl<'src> Term<'src> {
                 typ: typ.fresh_variables()?,
                 evaluation: *evaluation,
             },
+            TermEnum::NeedImplicit(value) => TermEnum::NeedImplicit(value.fresh_variables()?),
         }))
     }
 
@@ -295,6 +296,7 @@ impl<'src> Term<'src> {
             }
             TermEnum::Pi(binding) => binding.for_each(f)?,
             TermEnum::Lambda(binding) => binding.for_each(f)?,
+            TermEnum::NeedImplicit(value) => value.for_each(f)?,
         }
 
         Ok(())
@@ -347,6 +349,7 @@ impl<'src> Term<'src> {
             }
             TermEnum::Pi(binding) => binding.check_scope()?,
             TermEnum::Lambda(binding) => binding.check_scope()?,
+            TermEnum::NeedImplicit(value) => value.check_scope()?,
         }
 
         Ok(())
@@ -492,6 +495,7 @@ impl<'src> Term<'src> {
             | TermEnum::Variable { .. }
             | TermEnum::Constant { .. } => {}
             TermEnum::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
+            TermEnum::NeedImplicit(_) => unreachable!("Expected NeedImplicit to be resolved"),
             TermEnum::Pi(_) | TermEnum::Type => Err(InferenceError::UnexpectedTypeDuringEval)?,
         }
 
@@ -609,6 +613,9 @@ impl<'src> Term<'src> {
             (TermEnum::Lambda(binding0), TermEnum::Lambda(binding1)) => {
                 VariableBinding::unify(ctx, binding0, binding1)?
             }
+            (TermEnum::NeedImplicit(value0), TermEnum::NeedImplicit(value1)) => {
+                Self::unify_upto_eval(ctx, value0, value1)?
+            }
             // It's safer to explicitly ignore each variant
             (TermEnum::Type, _rhs)
             | (TermEnum::Apply { .. }, _rhs)
@@ -617,7 +624,8 @@ impl<'src> Term<'src> {
             | (TermEnum::Unknown { .. }, _rhs)
             | (TermEnum::Let { .. }, _rhs)
             | (TermEnum::Pi(_), _rhs)
-            | (TermEnum::Lambda(_), _rhs) => Err(InferenceError::CouldntUnify)?,
+            | (TermEnum::Lambda(_), _rhs)
+            | (TermEnum::NeedImplicit(_), _rhs) => Err(InferenceError::CouldntUnify)?,
         }
 
         Ok(())
@@ -785,6 +793,7 @@ impl<'src> Term<'src> {
                 binding.in_term.typ(),
                 binding.evaluation,
             ),
+            TermEnum::NeedImplicit(value) => value.typ(),
         }
     }
 }
@@ -824,6 +833,7 @@ enum TermEnum<'src> {
     },
     Pi(VariableBinding<Term<'src>>),
     Lambda(VariableBinding<Term<'src>>),
+    NeedImplicit(Term<'src>),
 }
 
 enum VariableScope {
