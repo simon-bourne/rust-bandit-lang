@@ -46,7 +46,12 @@ impl<'src> Pretty for Term<'src> {
                 }
             }
             TermEnum::Lambda(binding) => binding.to_document(r"\", r"\\", parent, layout),
-            TermEnum::NeedImplicit(value) => value.to_document(parent, layout),
+            TermEnum::NeedImplicit { argument, value } => Document::concat([
+                Document::text("need-implicit"),
+                argument.to_document(parent, layout),
+                Document::text("⇒"),
+                value.to_document(parent, layout),
+            ]),
         }
     }
 }

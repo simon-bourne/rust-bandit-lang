@@ -256,7 +256,10 @@ impl<'src> Term<'src> {
                 typ: typ.fresh_variables()?,
                 evaluation: *evaluation,
             },
-            TermEnum::NeedImplicit(value) => TermEnum::NeedImplicit(value.fresh_variables()?),
+            TermEnum::NeedImplicit { argument, value } => TermEnum::NeedImplicit {
+                argument: argument.fresh_variables()?,
+                value: value.fresh_variables()?,
+            },
         }))
     }
 
@@ -296,7 +299,10 @@ impl<'src> Term<'src> {
             }
             TermEnum::Pi(binding) => binding.for_each(f)?,
             TermEnum::Lambda(binding) => binding.for_each(f)?,
-            TermEnum::NeedImplicit(value) => value.for_each(f)?,
+            TermEnum::NeedImplicit { argument, value } => {
+                argument.for_each(f)?;
+                value.for_each(f)?
+            }
         }
 
         Ok(())
@@ -349,7 +355,10 @@ impl<'src> Term<'src> {
             }
             TermEnum::Pi(binding) => binding.check_scope()?,
             TermEnum::Lambda(binding) => binding.check_scope()?,
-            TermEnum::NeedImplicit(value) => value.check_scope()?,
+            TermEnum::NeedImplicit { argument, value } => {
+                argument.check_scope()?;
+                value.check_scope()?
+            }
         }
 
         Ok(())
@@ -404,15 +413,22 @@ impl<'src> Term<'src> {
             return Ok(ControlFlow::Continue(()));
         }
 
-        let mut in_term = if let TermEnum::Pi(binding) = &mut *self.value()
+        // TODO: Does this work for nested static Π types?
+        let (mut in_term, argument) = if let TermEnum::Pi(binding) = &mut *self.value()
             && binding.evaluation == Evaluation::Static
         {
-            binding.apply(&Self::unknown_value())?
+            let argument = Self::unknown_value();
+            (binding.apply(&argument)?, argument)
         } else {
             return Ok(ControlFlow::Continue(()));
         };
 
         Self::unify_upto_eval(ctx, &mut in_term, other)?;
+        other.replace_with(&Self::new(TermEnum::NeedImplicit {
+            argument,
+            value: in_term.clone(),
+        }));
+
         Ok(ControlFlow::Break(()))
     }
 
@@ -495,7 +511,9 @@ impl<'src> Term<'src> {
             | TermEnum::Variable { .. }
             | TermEnum::Constant { .. } => {}
             TermEnum::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
-            TermEnum::NeedImplicit(_) => unreachable!("Expected NeedImplicit to be resolved"),
+            TermEnum::NeedImplicit { .. } => {
+                unreachable!("Expected NeedImplicit to be resolved")
+            }
             TermEnum::Pi(_) | TermEnum::Type => Err(InferenceError::UnexpectedTypeDuringEval)?,
         }
 
@@ -613,7 +631,17 @@ impl<'src> Term<'src> {
             (TermEnum::Lambda(binding0), TermEnum::Lambda(binding1)) => {
                 VariableBinding::unify(ctx, binding0, binding1)?
             }
-            (TermEnum::NeedImplicit(value0), TermEnum::NeedImplicit(value1)) => {
+            (
+                TermEnum::NeedImplicit {
+                    argument: argument0,
+                    value: value0,
+                },
+                TermEnum::NeedImplicit {
+                    argument: argument1,
+                    value: value1,
+                },
+            ) => {
+                Self::unify_upto_eval(ctx, argument0, argument1)?;
                 Self::unify_upto_eval(ctx, value0, value1)?
             }
             // It's safer to explicitly ignore each variant
@@ -625,7 +653,7 @@ impl<'src> Term<'src> {
             | (TermEnum::Let { .. }, _rhs)
             | (TermEnum::Pi(_), _rhs)
             | (TermEnum::Lambda(_), _rhs)
-            | (TermEnum::NeedImplicit(_), _rhs) => Err(InferenceError::CouldntUnify)?,
+            | (TermEnum::NeedImplicit { .. }, _rhs) => Err(InferenceError::CouldntUnify)?,
         }
 
         Ok(())
@@ -793,7 +821,7 @@ impl<'src> Term<'src> {
                 binding.in_term.typ(),
                 binding.evaluation,
             ),
-            TermEnum::NeedImplicit(value) => value.typ(),
+            TermEnum::NeedImplicit { value, .. } => value.typ(),
         }
     }
 }
@@ -833,7 +861,12 @@ enum TermEnum<'src> {
     },
     Pi(VariableBinding<Term<'src>>),
     Lambda(VariableBinding<Term<'src>>),
-    NeedImplicit(Term<'src>),
+    // TODO: Not sure this really works. We need unification rules between this and other static Π
+    // types
+    NeedImplicit {
+        argument: Term<'src>,
+        value: Term<'src>,
+    },
 }
 
 enum VariableScope {
