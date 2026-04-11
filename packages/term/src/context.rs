@@ -173,12 +173,6 @@ impl<'a> Context<'a> {
 
         while !this.constraints.is_empty() {
             this.constraints.solve()?;
-
-            // TODO: Do this for `data`.
-            for term in &mut terms {
-                // TODO: Do this before evaluating as well
-                term.infer_implicits(self)?;
-            }
         }
 
         // We need to solve constraints before we `check_scope`, so we don't introduce

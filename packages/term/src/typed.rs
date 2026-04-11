@@ -390,37 +390,12 @@ impl<'src> Term<'src> {
         Ok(ControlFlow::Break(()))
     }
 
-    fn unify_implicit_parameter(
-        &mut self,
-        ctx: &Context<'src>,
-        other: &mut Self,
-    ) -> Result<ControlFlow<()>> {
-        if let TermEnum::Pi(binding) = &*other.value()
-            && binding.evaluation == Evaluation::Static
-        {
-            return Ok(ControlFlow::Continue(()));
-        }
-
-        let mut in_term = if let TermEnum::Pi(binding) = &mut *self.value()
-            && binding.evaluation == Evaluation::Static
-        {
-            binding.apply(&Self::unknown_value())?
-        } else {
-            return Ok(ControlFlow::Continue(()));
-        };
-
-        Self::unify_upto_eval(ctx, &mut in_term, other)?;
-        Ok(ControlFlow::Break(()))
-    }
-
     // TODO: This name is confusing. It actually does do complete unification, but
     // some of it might be done in a constraint.
     fn unify_upto_eval(ctx: &Context<'src>, x: &mut Self, y: &mut Self) -> Result<()> {
         if Self::is_same(x, y)
             || x.unify_unknown(ctx, y)?.is_break()
             || y.unify_unknown(ctx, x)?.is_break()
-            || x.unify_implicit_parameter(ctx, y)?.is_break()
-            || y.unify_implicit_parameter(ctx, x)?.is_break()
         {
             return Ok(());
         }
@@ -690,86 +665,6 @@ impl<'src> Term<'src> {
 
     fn is_unknown(&self) -> bool {
         matches!(&*self.clone().value(), TermEnum::Unknown { .. })
-    }
-
-    // TODO: Type Annotation
-    //
-    // We'd like to be able to infer `id @ Int : Int -> Int` from `id : Int -> Int`,
-    // but the type annotation isn't in the term. Maybe type annotation should be a
-    // function `.is_type_of : (type : Type) -> (term : type) -> type`? Like `:`
-    // with it's arguments reversed.
-
-    // TODO: Call this before eval
-
-    /// Infer the presence of implicit arguments
-    ///
-    /// This applies the typing rules again to see if we're missing any implicit
-    /// arguments, and adds them if necessary.
-    pub fn infer_implicits(&mut self, ctx: &Context<'src>) -> Result<()> {
-        self.for_each(&mut |term| term.infer_implicit(ctx))
-    }
-
-    fn infer_implicit(&mut self, ctx: &Context<'src>) -> Result<()> {
-        match &mut *self.value() {
-            TermEnum::Apply {
-                function,
-                argument,
-                evaluation,
-                ..
-            } => Self::infer_implicit_apply(function, argument, *evaluation, ctx)?,
-            // TODO: Handle other cases
-            TermEnum::Type => {}
-
-            _ => {}
-        };
-
-        Ok(())
-    }
-
-    fn infer_implicit_apply(
-        function: &mut Self,
-        argument: &mut Self,
-        evaluation: Evaluation,
-        ctx: &Context<'src>,
-    ) -> Result<()> {
-        // Example: `id 1` should be `id @ Int 1`
-        let mut function_typ = function.typ();
-
-        if evaluation == Evaluation::Dynamic && function_typ.is_static_pi() {
-            function.add_implicit_argument(ctx)?;
-        }
-
-        // Example: If `f : (Int → Int) → Int` the `f id` shoud be `f (id @ Int)`
-        if let TermEnum::Pi(binding) = &mut *function_typ.value()
-            && !binding.variable.typ().is_static_pi()
-            && argument.typ().is_static_pi()
-        {
-            argument.add_implicit_argument(ctx)?;
-        }
-
-        // TODO: Example: If `f: Int -> ∀a. a` then `f 1 : Int`
-        // should be `f 1 @ Int`
-
-        Ok(())
-    }
-
-    fn add_implicit_argument(&mut self, ctx: &Context<'src>) -> Result<()> {
-        self.try_collapse_links()?;
-        let placeholder = Self::unknown_value();
-        placeholder.0.swap(&self.0);
-
-        let static_apply = Self::apply(ctx, placeholder, Self::unknown_value(), Evaluation::Static);
-        self.0.swap(&static_apply.0);
-        Ok(())
-    }
-
-    fn is_static_pi(&mut self) -> bool {
-        // TODO: VariableBinding::is_static()?
-        if let TermEnum::Pi(binding) = &*self.value() {
-            binding.evaluation == Evaluation::Static
-        } else {
-            false
-        }
     }
 
     fn typ(&self) -> Self {

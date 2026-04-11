@@ -59,7 +59,6 @@ fn infer_types<'src>(input: &'src str) -> Result<typed::Term<'src>, InferenceErr
     let ctx_owner = context();
     let mut ctx = ctx_owner.handle();
     let mut term = parse(input).desugar(&ctx)?;
-    term.infer_implicits(&ctx)?;
     ctx.infer_types()?;
     term.check_scope()?;
     Ok(term)
@@ -122,15 +121,17 @@ fn simple_id() {
     "id @ _ one".infers("((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int");
 }
 
-// TODO: How will we infer the type of `a`? Should unification produce `∀a = Int
-// ⇒ a → a`?
 // TODO: Can we remove brackets around `(∀a ⇒ a → a)`?
 #[test]
+// TODO: Infer implicit params
+#[ignore]
 fn infer_implicit_param_on_function() {
     "id one".infers("((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int");
 }
 
 #[test]
+// TODO: Infer implicit params
+#[ignore]
 fn infer_implicit_param_on_argument() {
     "higher_order id".infers(
         "(higher_order : (Int → Int) → Int) ((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) : Int",
@@ -148,6 +149,8 @@ fn infer_type_is_type() {
 }
 
 #[test]
+// TODO: Infer implicit params
+#[ignore]
 fn infer_implicit_argument_isolation() {
     "add (id one) (id @ Int one)".infers("((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int");
 }
