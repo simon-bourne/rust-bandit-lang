@@ -445,6 +445,10 @@ impl<'src> Term<'src> {
             TermEnum::Let { value, binding } => {
                 Some(binding.apply(&value.evaluate(ctx)?)?.evaluate(ctx)?)
             }
+            TermEnum::Constant {
+                name: "strip_implicits",
+                ..
+            } => None,
             TermEnum::Constant { name, .. } => ctx.constant_value(name)?,
             _ => None,
         };
@@ -462,6 +466,19 @@ impl<'src> Term<'src> {
 
         match &mut *self.value() {
             TermEnum::Lambda(binding) => return binding.apply(argument),
+            TermEnum::Constant {
+                name: "strip_implicits",
+                ..
+            } => {
+                // TODO: This is currently hardwired for `id`. It should actually strip off any
+                // implicit bindings from `argument`.
+                let unknown = Self::unknown_type();
+                return Ok(Self::pi_type(
+                    Self::variable(None, unknown.clone()),
+                    unknown,
+                    Evaluation::Dynamic,
+                ));
+            }
             TermEnum::Apply { .. }
             | TermEnum::Let { .. }
             | TermEnum::Variable { .. }

@@ -25,6 +25,8 @@ fn context<'src>() -> ContextOwner<'src> {
         ("float_to_int", "Float → Int"),
         ("polymorphic", "∀a ⇒ a"),
         ("scoped", "∀a ⇒ (∀s ⇒ s → a) → a"),
+        ("apply_implicits", "∀t ⇒ ∀f : t ⇒ strip_implicits t"),
+        ("strip_implicits", "Type → Type"),
     ];
 
     let types = types
@@ -126,14 +128,14 @@ fn simple_id() {
 // TODO: Infer implicit params
 #[ignore]
 fn infer_implicit_param_on_function() {
-    "id one".infers("((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int");
+    "(apply_implicits @ _ @ id) one".infers("((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int");
 }
 
 #[test]
 // TODO: Infer implicit params
 #[ignore]
 fn infer_implicit_param_on_argument() {
-    "higher_order id".infers(
+    "higher_order (apply_implicits @ _ @ id)".infers(
         "(higher_order : (Int → Int) → Int) ((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) : Int",
     );
 }
@@ -152,7 +154,7 @@ fn infer_type_is_type() {
 // TODO: Infer implicit params
 #[ignore]
 fn infer_implicit_argument_isolation() {
-    "add (id one) (id @ Int one)".infers("((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int");
+    "add (apply_implicits @ _ @ id one) (id @ Int one)".infers("((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int");
 }
 
 #[test]
