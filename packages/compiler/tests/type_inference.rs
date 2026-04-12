@@ -128,7 +128,8 @@ fn simple_id() {
 // TODO: Infer implicit params
 #[ignore]
 fn infer_implicit_param_on_function() {
-    "(apply_implicits @ _ @ id) one".infers("((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int");
+    "(apply_implicits @ _ @ id) one"
+        .infers("((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int");
 }
 
 #[test]
