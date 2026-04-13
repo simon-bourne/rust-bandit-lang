@@ -482,8 +482,8 @@ impl<'src> Term<'src> {
             TermEnum::Apply { .. }
             | TermEnum::Let { .. }
             | TermEnum::Variable { .. }
-            | TermEnum::Constant { .. } => {}
-            TermEnum::Unknown { .. } => unreachable!("Expected Unknown to be inferred"),
+            | TermEnum::Constant { .. }
+            | TermEnum::Unknown { .. } => {}
             TermEnum::Pi(_) | TermEnum::Type => Err(InferenceError::UnexpectedTypeDuringEval)?,
         }
 
