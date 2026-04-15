@@ -491,17 +491,7 @@ impl<'src> Term<'src> {
             TermEnum::Constant {
                 name: "strip_implicits",
                 ..
-            } => {
-                // TODO: This should only work for static application.
-                // TODO: This is currently hardwired for `id`. It should actually strip off any
-                // implicit bindings from `argument`.
-                let unknown = Self::unknown_type();
-                return Ok(Some(Self::pi_type(
-                    Self::variable(None, unknown.clone()),
-                    unknown,
-                    Evaluation::Dynamic,
-                )));
-            }
+            } => return Ok(Some(argument.strip_implicits()?)),
             // TODO: This should only work for static application.
             TermEnum::Apply {
                 function,
@@ -537,6 +527,16 @@ impl<'src> Term<'src> {
         }
 
         Ok(None)
+    }
+
+    fn strip_implicits(&mut self) -> Result<Self> {
+        if let TermEnum::Pi(binding) = &mut *self.value()
+            && binding.evaluation == Evaluation::Static
+        {
+            binding.apply(&Self::unknown_type())?.strip_implicits()
+        } else {
+            Ok(self.clone())
+        }
     }
 
     async fn head(&mut self) -> Result<Self> {
