@@ -172,6 +172,7 @@ impl<'src> Term<'src> {
                 ctx,
                 function.desugar_local(ctx, variables)?,
                 argument.desugar_local(ctx, variables)?,
+                Core::unknown_type(),
                 *evaluation,
             ),
             TermEnum::Variable(name) => ctx.lookup(variables, name)?,

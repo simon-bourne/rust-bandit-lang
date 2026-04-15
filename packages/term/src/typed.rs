@@ -103,12 +103,18 @@ impl<'src> Term<'src> {
         ctx: &Context<'src>,
         function: Self,
         argument: Self,
+        mut typ: Self,
         evaluation: Evaluation,
     ) -> Self {
-        let typ = Self::unknown_type();
+        let application = Self::new(TermEnum::Apply {
+            function: function.clone(),
+            argument: argument.clone(),
+            typ: typ.clone(),
+            evaluation,
+        });
 
         ctx.constraint({
-            clone!(function, argument, mut typ, ctx);
+            clone!(mut application, ctx);
 
             async move {
                 let variable = Self::variable(None, argument.typ());
@@ -122,16 +128,16 @@ impl<'src> Term<'src> {
                 };
 
                 Self::unify(&ctx, &mut typ, &mut result_type).await?;
+
+                if evaluation == Evaluation::Static {
+                    application.evaluate_known(&ctx).await?;
+                }
+
                 Ok(())
             }
         });
 
-        Self::new(TermEnum::Apply {
-            function,
-            argument,
-            typ,
-            evaluation,
-        })
+        application
     }
 
     pub fn has_type(self, ctx: &Context<'src>, mut typ: Self) -> Self {
@@ -440,15 +446,24 @@ impl<'src> Term<'src> {
         // should use a stack and De Bruijn Indices.
         let reduced = match &mut *self.value() {
             TermEnum::Apply {
-                function, argument, ..
-            } => Some(function.evaluate_apply(ctx, argument)?),
+                function,
+                argument,
+                typ,
+                ..
+            } => function.evaluate_apply(ctx, argument, typ)?,
             TermEnum::Let { value, binding } => {
                 Some(binding.apply(&value.evaluate(ctx)?)?.evaluate(ctx)?)
             }
             TermEnum::Constant {
+                name: "apply_implicits",
+                ..
+            } => None,
+            TermEnum::Constant {
                 name: "strip_implicits",
                 ..
             } => None,
+            // TODO: Remove this special case
+            TermEnum::Constant { name: "id", .. } => None,
             TermEnum::Constant { name, .. } => ctx.constant_value(name)?,
             _ => None,
         };
@@ -460,34 +475,68 @@ impl<'src> Term<'src> {
         Ok(self.clone())
     }
 
-    fn evaluate_apply(&mut self, ctx: &Context<'src>, argument: &mut Self) -> Result<Self> {
+    fn evaluate_apply(
+        &mut self,
+        ctx: &Context<'src>,
+        argument: &mut Self,
+        typ: &mut Self,
+    ) -> Result<Option<Self>> {
+        // TODO: Should we evalutate everything, or just the top level?
         self.evaluate(ctx)?;
         argument.evaluate(ctx)?;
+        typ.evaluate(ctx)?;
 
         match &mut *self.value() {
-            TermEnum::Lambda(binding) => return binding.apply(argument),
+            TermEnum::Lambda(binding) => return Ok(Some(binding.apply(argument)?)),
             TermEnum::Constant {
                 name: "strip_implicits",
                 ..
             } => {
+                // TODO: This should only work for static application.
                 // TODO: This is currently hardwired for `id`. It should actually strip off any
                 // implicit bindings from `argument`.
                 let unknown = Self::unknown_type();
-                return Ok(Self::pi_type(
+                return Ok(Some(Self::pi_type(
                     Self::variable(None, unknown.clone()),
                     unknown,
                     Evaluation::Dynamic,
-                ));
+                )));
             }
-            TermEnum::Apply { .. }
-            | TermEnum::Let { .. }
+            // TODO: This should only work for static application.
+            TermEnum::Apply {
+                function,
+                argument: type_argument,
+                ..
+            } => {
+                function.evaluate(ctx)?;
+                let function_argument = argument.clone();
+                type_argument.evaluate(ctx)?;
+
+                if let TermEnum::Constant {
+                    name: "apply_implicits",
+                    ..
+                } = &mut *function.value()
+                {
+                    // TODO: This is currently hardwired for `id`. It should count the static
+                    // applies in `type_argument` and apply that many unknowns to
+                    // `function_argument`
+                    return Ok(Some(Self::apply(
+                        ctx,
+                        function_argument,
+                        Self::unknown_value(),
+                        typ.clone(),
+                        Evaluation::Static,
+                    )));
+                }
+            }
+            TermEnum::Let { .. }
             | TermEnum::Variable { .. }
             | TermEnum::Constant { .. }
             | TermEnum::Unknown { .. } => {}
             TermEnum::Pi(_) | TermEnum::Type => Err(InferenceError::UnexpectedTypeDuringEval)?,
         }
 
-        Ok(self.clone())
+        Ok(None)
     }
 
     async fn head(&mut self) -> Result<Self> {
