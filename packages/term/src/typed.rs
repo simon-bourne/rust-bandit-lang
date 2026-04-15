@@ -499,7 +499,7 @@ impl<'src> Term<'src> {
                 ..
             } => {
                 function.evaluate(ctx)?;
-                let function_argument = argument.clone();
+                let mut function_argument = argument.clone();
                 type_argument.evaluate(ctx)?;
 
                 if let TermEnum::Constant {
@@ -510,12 +510,10 @@ impl<'src> Term<'src> {
                     // TODO: This is currently hardwired for `id`. It should count the static
                     // applies in `type_argument` and apply that many unknowns to
                     // `function_argument`
-                    return Ok(Some(Self::apply(
+                    return Ok(Some(function_argument.apply_implicits(
                         ctx,
-                        function_argument,
-                        Self::unknown_value(),
+                        type_argument,
                         typ.clone(),
-                        Evaluation::Static,
                     )));
                 }
             }
@@ -527,6 +525,27 @@ impl<'src> Term<'src> {
         }
 
         Ok(None)
+    }
+
+    fn apply_implicits(
+        &mut self,
+        ctx: &Context<'src>,
+        input_typ: &mut Self,
+        output_type: Self,
+    ) -> Self {
+        if let TermEnum::Pi(binding) = &mut *input_typ.value()
+            && binding.evaluation == Evaluation::Static
+        {
+            Self::apply(
+                ctx,
+                self.apply_implicits(ctx, &mut binding.in_term, Self::unknown_type()),
+                Self::unknown_value(),
+                output_type,
+                Evaluation::Static,
+            )
+        } else {
+            self.clone()
+        }
     }
 
     fn strip_implicits(&mut self) -> Result<Self> {
