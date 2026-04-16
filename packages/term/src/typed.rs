@@ -103,18 +103,11 @@ impl<'src> Term<'src> {
         ctx: &Context<'src>,
         function: Self,
         argument: Self,
-        mut typ: Self,
+        typ: Self,
         evaluation: Evaluation,
     ) -> Self {
-        let application = Self::new(TermEnum::Apply {
-            function: function.clone(),
-            argument: argument.clone(),
-            typ: typ.clone(),
-            evaluation,
-        });
-
         ctx.constraint({
-            clone!(mut application, ctx);
+            clone!(ctx, function, argument, mut typ);
 
             async move {
                 let variable = Self::variable(None, argument.typ());
@@ -129,15 +122,16 @@ impl<'src> Term<'src> {
 
                 Self::unify(&ctx, &mut typ, &mut result_type).await?;
 
-                if evaluation == Evaluation::Static {
-                    application.evaluate_known(&ctx).await?;
-                }
-
                 Ok(())
             }
         });
 
-        application
+        Self::new(TermEnum::Apply {
+            function: function.clone(),
+            argument: argument.clone(),
+            typ: typ.clone(),
+            evaluation,
+        })
     }
 
     pub fn has_type(self, ctx: &Context<'src>, mut typ: Self) -> Self {
