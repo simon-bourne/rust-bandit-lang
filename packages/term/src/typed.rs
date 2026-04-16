@@ -448,14 +448,6 @@ impl<'src> Term<'src> {
             TermEnum::Let { value, binding } => {
                 Some(binding.apply(&value.evaluate(ctx)?)?.evaluate(ctx)?)
             }
-            TermEnum::Constant {
-                name: "apply_implicits",
-                ..
-            } => None,
-            TermEnum::Constant {
-                name: "strip_implicits",
-                ..
-            } => None,
             // TODO: Remove this special case
             TermEnum::Constant { name: "id", .. } => None,
             TermEnum::Constant { name, .. } => ctx.constant_value(name)?,
@@ -482,36 +474,8 @@ impl<'src> Term<'src> {
 
         match &mut *self.value() {
             TermEnum::Lambda(binding) => return Ok(Some(binding.apply(argument)?)),
-            TermEnum::Constant {
-                name: "strip_implicits",
-                ..
-            } => return Ok(Some(argument.strip_implicits()?)),
-            // TODO: This should only work for static application.
-            TermEnum::Apply {
-                function,
-                argument: type_argument,
-                ..
-            } => {
-                function.evaluate(ctx)?;
-                let mut function_argument = argument.clone();
-                type_argument.evaluate(ctx)?;
-
-                if let TermEnum::Constant {
-                    name: "apply_implicits",
-                    ..
-                } = &mut *function.value()
-                {
-                    // TODO: This is currently hardwired for `id`. It should count the static
-                    // applies in `type_argument` and apply that many unknowns to
-                    // `function_argument`
-                    return Ok(Some(function_argument.add_implicit_arguments(
-                        ctx,
-                        type_argument,
-                        typ.clone(),
-                    )));
-                }
-            }
             TermEnum::Let { .. }
+            | TermEnum::Apply { .. }
             | TermEnum::Variable { .. }
             | TermEnum::Constant { .. }
             | TermEnum::Unknown { .. } => {}
