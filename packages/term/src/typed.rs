@@ -385,6 +385,7 @@ impl<'src> Term<'src> {
             // TODO: Apply isn't always reducible
             TermEnum::Apply { .. } => true,
             TermEnum::Let { .. } => true,
+            // TODO: Constants are reducible
             _ => false,
         }
     }
