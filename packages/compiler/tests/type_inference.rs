@@ -25,8 +25,6 @@ fn context<'src>() -> ContextOwner<'src> {
         ("float_to_int", "Float → Int"),
         ("polymorphic", "∀a ⇒ a"),
         ("scoped", "∀a ⇒ (∀s ⇒ s → a) → a"),
-        ("apply_implicits", "∀t ⇒ ∀f : t ⇒ strip_implicits t"),
-        ("strip_implicits", "Type → Type"),
     ];
 
     let types = types
