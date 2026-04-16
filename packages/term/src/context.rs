@@ -198,7 +198,8 @@ impl<'a> Context<'a> {
         variables: &mut LocalVariables<'a>,
         name: &'a str,
     ) -> Result<typed::Term<'a>> {
-        // TODO: Remove this horrible hack (we need to support constants/vars prefixed with '@' like Lean4)
+        // TODO: Remove this horrible hack (we need to support constants/vars prefixed
+        // with '@' like Lean4)
         if let Some(name) = name.strip_suffix("__with_implicits") {
             return Ok(self.lookup(variables, name)?.apply_implicits(self));
         }
