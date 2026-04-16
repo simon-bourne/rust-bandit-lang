@@ -181,8 +181,8 @@ impl<'src> Term<'src> {
                 ctx,
                 value.desugar_local(ctx, variables)?,
                 binding.desugar(ctx, variables)?,
-            ),
-            TermEnum::Pi(binding) => Core::pi(ctx, binding.desugar(ctx, variables)?),
+            )?,
+            TermEnum::Pi(binding) => Core::pi(ctx, binding.desugar(ctx, variables)?)?,
             TermEnum::FunctionType(left, right) => Core::pi(
                 ctx,
                 VariableBinding {
@@ -190,11 +190,11 @@ impl<'src> Term<'src> {
                     in_term: right.desugar_local(ctx, variables)?,
                     evaluation: Evaluation::Dynamic,
                 },
-            ),
+            )?,
             TermEnum::Lambda(binding) => Core::lambda(binding.desugar(ctx, variables)?),
             TermEnum::HasType { term, typ } => term
                 .desugar_local(ctx, variables)?
-                .has_type(ctx, typ.desugar_local(ctx, variables)?),
+                .has_type(ctx, typ.desugar_local(ctx, variables)?)?,
         })
     }
 
@@ -210,7 +210,7 @@ impl<'src> Term<'src> {
         Ok(match self.0.as_ref() {
             TermEnum::HasType { term, typ } => Ok(term
                 .desugar_variable(ctx, variables)?
-                .has_type(ctx, typ.desugar_local(ctx, variables)?))?,
+                .has_type(ctx, typ.desugar_local(ctx, variables)?)?)?,
             TermEnum::Variable(name) => {
                 typed::Term::variable(Some(name), typed::Term::unknown_type())
             }

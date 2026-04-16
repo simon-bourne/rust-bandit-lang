@@ -156,7 +156,7 @@ impl<'a> Context<'a> {
         for Value { value, typ } in this.constants.values() {
             terms.push(
                 self.desugar_term(value)?
-                    .has_type(self, self.desugar_term(typ)?),
+                    .has_type(self, self.desugar_term(typ)?)?,
             );
         }
 
@@ -168,7 +168,7 @@ impl<'a> Context<'a> {
                 .map(|(_, term)| self.desugar_constant(term))
                 .collect();
             self.desugar_constant(&data.type_constructor)?
-                .type_constructor(self, value_constructors?);
+                .type_constructor(self, value_constructors?)?;
         }
 
         while !this.constraints.is_empty() {

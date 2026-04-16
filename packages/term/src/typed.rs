@@ -57,15 +57,15 @@ impl<'src> Term<'src> {
         mut self,
         ctx: &Context<'src>,
         value_constructors: impl IntoIterator<Item = Self>,
-    ) {
+    ) -> Result<()> {
         assert!(matches!(&*self.value(), TermEnum::Constant { .. }));
-        self.unify_type(ctx);
+        self.unify_type(ctx)?;
 
         ctx.constraint({
             let mut typ = self.typ();
             clone!(ctx);
 
-            async move { Self::unify(&ctx, &mut typ.codomain().await?, &mut Self::type_of_type()).await }
+            async move { Self::unify(&ctx, &mut typ.codomain().await?, &mut Self::type_of_type()) }
         });
 
         ctx.constraint({
@@ -76,12 +76,14 @@ impl<'src> Term<'src> {
             async move {
                 for value_constructor in value_constructors {
                     let head = &mut value_constructor.typ().codomain().await?.head().await?;
-                    Self::unify(&ctx, head, &mut type_constructor).await?;
+                    Self::unify(&ctx, head, &mut type_constructor)?;
                 }
 
                 Ok(())
             }
         });
+
+        Ok(())
     }
 
     #[cfg_attr(doc, katexit)]
@@ -112,15 +114,16 @@ impl<'src> Term<'src> {
             async move {
                 let variable = Self::variable(None, argument.typ());
                 let mut function_type = Self::pi_type(variable, Self::unknown_type(), evaluation);
-                Self::unify(&ctx, &mut function_type, &mut function.typ()).await?;
+                Self::unify(&ctx, &mut function_type, &mut function.typ())?;
 
                 let mut result_type = if let TermEnum::Pi(binding) = &mut *function_type.value() {
+                    // TODO: Do we need to wait for any unknowns before this?
                     binding.apply(&argument)?
                 } else {
                     panic!("Expected a PI type")
                 };
 
-                Self::unify(&ctx, &mut typ, &mut result_type).await?;
+                Self::unify(&ctx, &mut typ, &mut result_type)?;
 
                 Ok(())
             }
@@ -134,10 +137,10 @@ impl<'src> Term<'src> {
         })
     }
 
-    pub fn has_type(self, ctx: &Context<'src>, mut typ: Self) -> Self {
-        typ.unify_type(ctx);
-        Self::add_unify_constraint(ctx, self.typ(), typ);
-        self
+    pub fn has_type(self, ctx: &Context<'src>, mut typ: Self) -> Result<Self> {
+        typ.unify_type(ctx)?;
+        Self::unify(ctx, &mut self.typ(), &mut typ)?;
+        Ok(self)
     }
 
     #[cfg_attr(doc, katexit)]
@@ -154,9 +157,9 @@ impl<'src> Term<'src> {
         ctx: &Context<'src>,
         value: Self,
         binding: VariableBinding<Self>,
-    ) -> Self {
-        Self::add_unify_constraint(ctx, value.typ(), binding.variable.typ());
-        Self::new(TermEnum::Let { value, binding })
+    ) -> Result<Self> {
+        Self::unify(ctx, &mut value.typ(), &mut binding.variable.typ())?;
+        Ok(Self::new(TermEnum::Let { value, binding }))
     }
 
     #[cfg_attr(doc, katexit)]
@@ -175,9 +178,9 @@ impl<'src> Term<'src> {
     ///
     /// We don't use indexed type universes, as this isn't a theorem proving
     /// language.
-    pub(crate) fn pi(ctx: &Context<'src>, mut binding: VariableBinding<Self>) -> Self {
-        binding.in_term.unify_type(ctx);
-        Self::new(TermEnum::Pi(binding))
+    pub(crate) fn pi(ctx: &Context<'src>, mut binding: VariableBinding<Self>) -> Result<Self> {
+        binding.in_term.unify_type(ctx)?;
+        Ok(Self::new(TermEnum::Pi(binding)))
     }
 
     #[cfg_attr(doc, katexit)]
@@ -206,14 +209,13 @@ impl<'src> Term<'src> {
 
             async move {
                 let mut function_type = function.typ();
-                function_type.await_unknown().await?;
                 function_type.evaluate_known(&ctx).await?;
 
                 let mut stripped_function_type = function_type.strip_implicits()?;
-                Self::unify(&ctx, &mut result_type, &mut stripped_function_type).await?;
+                Self::unify(&ctx, &mut result_type, &mut stripped_function_type)?;
                 let mut function_with_implicits =
                     function.add_implicit_arguments(&ctx, &mut function_type, result_type);
-                Self::unify(&ctx, &mut result, &mut function_with_implicits).await
+                Self::unify(&ctx, &mut result, &mut function_with_implicits)
             }
         });
 
@@ -376,13 +378,6 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    fn add_unify_constraint(ctx: &Context<'src>, mut x: Self, mut y: Self) {
-        ctx.constraint({
-            clone!(ctx);
-            async move { Self::unify(&ctx.clone(), &mut x, &mut y).await }
-        })
-    }
-
     fn is_reducible(&mut self) -> bool {
         match &*self.value() {
             // TODO: Apply isn't always reducible
@@ -392,8 +387,8 @@ impl<'src> Term<'src> {
         }
     }
 
-    fn unify_type(&mut self, ctx: &Context<'src>) {
-        Self::add_unify_constraint(ctx, self.typ(), Self::type_of_type())
+    fn unify_type(&mut self, ctx: &Context<'src>) -> Result<()> {
+        Self::unify(ctx, &mut self.typ(), &mut Self::type_of_type())
     }
 
     fn unify_unknown(&mut self, ctx: &Context<'src>, other: &mut Self) -> Result<ControlFlow<()>> {
@@ -410,13 +405,11 @@ impl<'src> Term<'src> {
 
         self.replace_with(other);
         infered.open();
-        Self::unify_upto_eval(ctx, &mut typ, &mut other.typ())?;
+        Self::unify(ctx, &mut typ, &mut other.typ())?;
         Ok(ControlFlow::Break(()))
     }
 
-    // TODO: This name is confusing. It actually does do complete unification, but
-    // some of it might be done in a constraint.
-    fn unify_upto_eval(ctx: &Context<'src>, x: &mut Self, y: &mut Self) -> Result<()> {
+    fn unify(ctx: &Context<'src>, x: &mut Self, y: &mut Self) -> Result<()> {
         if Self::is_same(x, y)
             || x.unify_unknown(ctx, y)?.is_break()
             || y.unify_unknown(ctx, x)?.is_break()
@@ -424,34 +417,13 @@ impl<'src> Term<'src> {
             return Ok(());
         }
 
-        if Self::is_same(x, y) {
-            return Ok(());
-        }
-
-        if x.is_reducible() || y.is_reducible() {
-            Self::add_unify_constraint(ctx, x.clone(), y.clone());
-            return Ok(());
-        }
-
-        Self::unify_known(ctx, x, y)?;
-        x.replace_with(y);
-
-        Ok(())
-    }
-
-    async fn unify(ctx: &Context<'src>, x: &mut Self, y: &mut Self) -> Result<()> {
-        x.evaluate_known(ctx).await?;
-        y.evaluate_known(ctx).await?;
-        Self::unify_upto_eval(ctx, x, y)
+        Self::unify_known(ctx, x, y)
     }
 
     async fn evaluate_known(&mut self, ctx: &Context<'src>) -> Result<()> {
-        if self.is_unknown() {
-            return Ok(());
-        }
+        self.await_all_unknowns().await?;
 
         if self.is_reducible() {
-            self.await_all_unknowns().await?;
             self.check_scope()?;
             self.evaluate(ctx)?;
         }
@@ -472,9 +444,6 @@ impl<'src> Term<'src> {
             TermEnum::Let { value, binding } => {
                 Some(binding.apply(&value.evaluate(ctx)?)?.evaluate(ctx)?)
             }
-            // TODO: Remove this special case. It's required because we unify `result` and
-            // `function_with_implicits` inside `evaluate_apply`
-            TermEnum::Constant { name: "id", .. } => None,
             TermEnum::Constant { name, .. } => ctx.constant_value(name)?,
             _ => None,
         };
@@ -617,7 +586,7 @@ impl<'src> Term<'src> {
                     name: name1,
                     typ: typ1,
                 },
-            ) if name == name1 => Self::unify_upto_eval(ctx, typ, typ1)?,
+            ) if name == name1 => Self::unify(ctx, typ, typ1)?,
             (
                 TermEnum::Apply {
                     function,
@@ -632,9 +601,9 @@ impl<'src> Term<'src> {
                     evaluation: evaluation1,
                 },
             ) if evaluation == evaluation1 => {
-                Self::unify_upto_eval(ctx, function, function1)?;
-                Self::unify_upto_eval(ctx, argument, argument1)?;
-                Self::unify_upto_eval(ctx, typ, typ1)?;
+                Self::unify(ctx, function, function1)?;
+                Self::unify(ctx, argument, argument1)?;
+                Self::unify(ctx, typ, typ1)?;
             }
             (
                 TermEnum::Let { value, binding },
@@ -643,7 +612,7 @@ impl<'src> Term<'src> {
                     binding: binding1,
                 },
             ) => {
-                Self::unify_upto_eval(ctx, value, value1)?;
+                Self::unify(ctx, value, value1)?;
                 VariableBinding::unify(ctx, binding, binding1)?
             }
             (TermEnum::Pi(binding0), TermEnum::Pi(binding1))
@@ -662,10 +631,34 @@ impl<'src> Term<'src> {
             | (TermEnum::Unknown { .. }, _rhs)
             | (TermEnum::Let { .. }, _rhs)
             | (TermEnum::Pi(_), _rhs)
-            | (TermEnum::Lambda(_), _rhs) => Err(InferenceError::CouldntUnify)?,
+            | (TermEnum::Lambda(_), _rhs) => {
+                drop((x_ref, y_ref));
+
+                if x.is_reducible() || y.is_reducible() {
+                    Self::unify_evaluated(ctx, x, y);
+
+                    return Ok(());
+                } else {
+                    return Err(InferenceError::CouldntUnify);
+                };
+            }
         }
 
+        drop((x_ref, y_ref));
+        x.replace_with(y);
+
         Ok(())
+    }
+
+    fn unify_evaluated(ctx: &Context<'src>, x: &mut Self, y: &mut Self) {
+        ctx.constraint({
+            clone!(ctx, mut x, mut y);
+            async move {
+                x.evaluate_known(&ctx).await?;
+                y.evaluate_known(&ctx).await?;
+                Self::unify(&ctx.clone(), &mut x, &mut y)
+            }
+        });
     }
 
     fn is_same(x: &mut Self, y: &mut Self) -> bool {
@@ -856,7 +849,7 @@ impl<'src> VariableBinding<Term<'src>> {
             return Err(InferenceError::CouldntUnify);
         }
 
-        Term::unify_upto_eval(
+        Term::unify(
             ctx,
             &mut binding0.variable.typ(),
             &mut binding1.variable.typ(),
@@ -869,7 +862,7 @@ impl<'src> VariableBinding<Term<'src>> {
             binding0.variable.replace_with(&binding1.variable);
         }
 
-        Term::unify_upto_eval(ctx, &mut binding0.in_term, &mut binding1.in_term)
+        Term::unify(ctx, &mut binding0.in_term, &mut binding1.in_term)
     }
 
     fn check_scope(&mut self) -> Result<()> {
