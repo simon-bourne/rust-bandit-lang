@@ -196,6 +196,30 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::Lambda(binding))
     }
 
+    pub(crate) fn apply_implicits(&mut self, ctx: &Context<'src>) -> Self {
+        let mut result_type = Self::unknown_type();
+        let result = Self::unknown(result_type.clone());
+
+        ctx.constraint({
+            let mut function = self.clone();
+            clone!(ctx, mut result);
+
+            async move {
+                let mut function_type = function.typ();
+                function_type.await_unknown().await?;
+                function_type.evaluate_known(&ctx).await?;
+
+                let mut stripped_function_type = function_type.strip_implicits()?;
+                Self::unify(&ctx, &mut result_type, &mut stripped_function_type).await?;
+                let mut function_with_implicits =
+                    function.add_implicit_arguments(&ctx, &mut function_type, result_type);
+                Self::unify(&ctx, &mut result, &mut function_with_implicits).await
+            }
+        });
+
+        result
+    }
+
     pub(crate) fn variable_name(&mut self) -> Option<&'src str> {
         let TermEnum::Variable { name, .. } = &*self.value() else {
             return None;
@@ -484,30 +508,6 @@ impl<'src> Term<'src> {
         }
 
         Ok(None)
-    }
-
-    pub fn apply_implicits(&mut self, ctx: &Context<'src>) -> Self {
-        let mut result_type = Self::unknown_type();
-        let result = Self::unknown(result_type.clone());
-
-        ctx.constraint({
-            let mut function = self.clone();
-            clone!(ctx, mut result);
-
-            async move {
-                let mut function_type = function.typ();
-                function_type.await_unknown().await?;
-                function_type.evaluate_known(&ctx).await?;
-
-                let mut stripped_function_type = function_type.strip_implicits()?;
-                Self::unify(&ctx, &mut result_type, &mut stripped_function_type).await?;
-                let mut function_with_implicits =
-                    function.add_implicit_arguments(&ctx, &mut function_type, result_type);
-                Self::unify(&ctx, &mut result, &mut function_with_implicits).await
-            }
-        });
-
-        result
     }
 
     fn add_implicit_arguments(
