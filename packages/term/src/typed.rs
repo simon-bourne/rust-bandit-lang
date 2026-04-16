@@ -448,7 +448,8 @@ impl<'src> Term<'src> {
             TermEnum::Let { value, binding } => {
                 Some(binding.apply(&value.evaluate(ctx)?)?.evaluate(ctx)?)
             }
-            // TODO: Remove this special case
+            // TODO: Remove this special case. It's required because we unify `result` and
+            // `function_with_implicits` inside `evaluate_apply`
             TermEnum::Constant { name: "id", .. } => None,
             TermEnum::Constant { name, .. } => ctx.constant_value(name)?,
             _ => None,
