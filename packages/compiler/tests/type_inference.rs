@@ -126,13 +126,13 @@ fn simple_id() {
 // TODO: Can we remove brackets around `(∀a ⇒ a → a)`?
 #[test]
 fn infer_implicit_param_on_function() {
-    "(apply_implicits @ _ @ id) one"
+    "id__with_implicits one"
         .infers("((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int");
 }
 
 #[test]
 fn infer_implicit_param_on_argument() {
-    "higher_order (apply_implicits @ _ @ id)".infers(
+    "higher_order id__with_implicits".infers(
         "(higher_order : (Int → Int) → Int) ((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) : Int",
     );
 }
@@ -149,7 +149,7 @@ fn infer_type_is_type() {
 
 #[test]
 fn infer_implicit_argument_isolation() {
-    "add (apply_implicits @ _ @ id one) (id @ Int one)".infers("((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int");
+    "add (id__with_implicits one) (id @ Int one)".infers("((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int");
 }
 
 #[test]

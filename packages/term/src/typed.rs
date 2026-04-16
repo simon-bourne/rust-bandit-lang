@@ -433,7 +433,7 @@ impl<'src> Term<'src> {
         }
 
         if self.is_reducible() {
-            Self::await_all_unknowns(&mut vec![self.clone()]).await?;
+            self.await_all_unknowns().await?;
             self.check_scope()?;
             self.evaluate(ctx)?;
         }
@@ -510,7 +510,7 @@ impl<'src> Term<'src> {
                     // TODO: This is currently hardwired for `id`. It should count the static
                     // applies in `type_argument` and apply that many unknowns to
                     // `function_argument`
-                    return Ok(Some(function_argument.apply_implicits(
+                    return Ok(Some(function_argument.add_implicit_arguments(
                         ctx,
                         type_argument,
                         typ.clone(),
@@ -527,18 +527,42 @@ impl<'src> Term<'src> {
         Ok(None)
     }
 
-    fn apply_implicits(
+    pub fn apply_implicits(&mut self, ctx: &Context<'src>) -> Self {
+        let mut result_type = Self::unknown_type();
+        let result = Self::unknown(result_type.clone());
+
+        ctx.constraint({
+            let mut function = self.clone();
+            clone!(ctx, mut result);
+
+            async move {
+                let mut function_type = function.typ();
+                function_type.await_unknown().await?;
+                function_type.evaluate_known(&ctx).await?;
+
+                let mut stripped_function_type = function_type.strip_implicits()?;
+                Self::unify(&ctx, &mut result_type, &mut stripped_function_type).await?;
+                let mut function_with_implicits =
+                    function.add_implicit_arguments(&ctx, &mut function_type, result_type);
+                Self::unify(&ctx, &mut result, &mut function_with_implicits).await
+            }
+        });
+
+        result
+    }
+
+    fn add_implicit_arguments(
         &mut self,
         ctx: &Context<'src>,
-        input_typ: &mut Self,
+        input_type: &mut Self,
         output_type: Self,
     ) -> Self {
-        if let TermEnum::Pi(binding) = &mut *input_typ.value()
+        if let TermEnum::Pi(binding) = &mut *input_type.value()
             && binding.evaluation == Evaluation::Static
         {
             Self::apply(
                 ctx,
-                self.apply_implicits(ctx, &mut binding.in_term, Self::unknown_type()),
+                self.add_implicit_arguments(ctx, &mut binding.in_term, Self::unknown_type()),
                 Self::unknown_value(),
                 output_type,
                 Evaluation::Static,
@@ -600,7 +624,9 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    async fn await_all_unknowns(unknowns: &mut Vec<Self>) -> Result<()> {
+    async fn await_all_unknowns(&mut self) -> Result<()> {
+        let mut unknowns = vec![self.clone()];
+
         while let Some(mut term) = unknowns.pop() {
             term.await_unknown().await?;
 
