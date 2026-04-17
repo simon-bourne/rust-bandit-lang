@@ -115,8 +115,8 @@ impl<'src> Term<'src> {
                 let variable = Self::variable(None, argument.typ());
                 let mut function_type = Self::pi_type(variable, Self::unknown_type(), evaluation);
                 Self::unify(&ctx, &mut function_type, &mut function.typ())?;
-                // Wait for unknowns so `binding.apply` replaces all occurrences the variable.
-                // TODO:
+                // Wait for unknowns so `binding.apply` replaces all occurrences of `variable`.
+                // TODO: 
                 // function_type.await_all_unknowns().await?;
 
                 let mut result_type = if let TermEnum::Pi(binding) = &mut *function_type.value() {
@@ -125,16 +125,14 @@ impl<'src> Term<'src> {
                     panic!("Expected a PI type")
                 };
 
-                Self::unify(&ctx, &mut typ, &mut result_type)?;
-
-                Ok(())
+                Self::unify(&ctx, &mut typ, &mut result_type)
             }
         });
 
         Self::new(TermEnum::Apply {
-            function: function.clone(),
-            argument: argument.clone(),
-            typ: typ.clone(),
+            function,
+            argument,
+            typ,
             evaluation,
         })
     }
