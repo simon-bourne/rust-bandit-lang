@@ -116,8 +116,7 @@ impl<'src> Term<'src> {
                 let mut function_type = Self::pi_type(variable, Self::unknown_type(), evaluation);
                 Self::unify(&ctx, &mut function_type, &mut function.typ())?;
                 // Wait for unknowns so `binding.apply` replaces all occurrences of `variable`.
-                // TODO: 
-                // function_type.await_all_unknowns().await?;
+                function_type.await_all_unknowns().await?;
 
                 let mut result_type = if let TermEnum::Pi(binding) = &mut *function_type.value() {
                     binding.apply(&argument)?

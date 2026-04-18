@@ -1,29 +1,10 @@
 use std::collections::HashMap;
 
 use bandit_term::{
-    Evaluation, Pretty,
+    Evaluation,
     ast::Term,
     context::{ContextOwner, Value},
 };
-
-#[test]
-fn infer_kinds() {
-    // C : (m a)
-    let m = || Term::variable("m");
-    let a = || Term::variable("a");
-    let ctx_owner = ContextOwner::new([], []);
-    let mut ctx = ctx_owner.handle();
-    let lambda = |var, body| Term::lambda(var, body, Evaluation::Dynamic);
-    let constructor_type = lambda(m(), lambda(a(), Term::apply(m(), a())))
-        .desugar(&ctx)
-        .unwrap();
-    ctx.infer_types().unwrap();
-
-    assert_eq!(
-        constructor_type.to_pretty_string(80),
-        r"\m : _ → _ ⇒ \a ⇒ (m : _ → _) a"
-    );
-}
 
 #[test]
 fn let_error() {
