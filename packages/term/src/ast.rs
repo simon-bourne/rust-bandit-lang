@@ -48,14 +48,15 @@ impl<'src> Constant<'src> {
     }
 
     pub fn desugar(&self, ctx: &Context<'src>) -> Result<typed::Term<'src>> {
-        Ok(typed::Term::constant(
+        typed::Term::constant(
+            ctx,
             self.name,
             if let Some(typ) = self.typ.as_ref() {
                 typ.desugar(ctx)?
             } else {
                 typed::Term::unknown_type()
             },
-        ))
+        )
     }
 }
 
@@ -186,7 +187,7 @@ impl<'src> Term<'src> {
             TermEnum::FunctionType(left, right) => Core::pi(
                 ctx,
                 VariableBinding {
-                    variable: Core::variable(None, left.desugar_local(ctx, variables)?),
+                    variable: Core::variable(ctx, None, left.desugar_local(ctx, variables)?)?,
                     in_term: right.desugar_local(ctx, variables)?,
                     evaluation: Evaluation::Dynamic,
                 },
@@ -212,9 +213,9 @@ impl<'src> Term<'src> {
                 .desugar_variable(ctx, variables)?
                 .has_type(ctx, typ.desugar_local(ctx, variables)?)?)?,
             TermEnum::Variable(name) => {
-                typed::Term::variable(Some(name), typed::Term::unknown_type())
+                typed::Term::variable(ctx, Some(name), typed::Term::unknown_type())?
             }
-            TermEnum::Unknown => typed::Term::variable(None, typed::Term::unknown_type()),
+            TermEnum::Unknown => typed::Term::variable(ctx, None, typed::Term::unknown_type())?,
             _ => Err(InferenceError::InvalidVariable)?,
         })
     }

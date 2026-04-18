@@ -24,13 +24,6 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::Type)
     }
 
-    pub fn unknown(typ: Self) -> Self {
-        Self::new(TermEnum::Unknown {
-            typ,
-            inferred: Latch::closed(),
-        })
-    }
-
     pub fn unknown_value() -> Self {
         Self::unknown(Self::unknown_type())
     }
@@ -39,17 +32,19 @@ impl<'src> Term<'src> {
         Self::unknown(Self::type_of_type())
     }
 
-    pub fn variable(name: Option<&'src str>, typ: Self) -> Self {
-        Self::new(TermEnum::Variable {
+    pub fn variable(ctx: &Context<'src>, name: Option<&'src str>, mut typ: Self) -> Result<Self> {
+        typ.unify_type(ctx)?;
+        Ok(Self::new(TermEnum::Variable {
             name,
             fresh: None,
             typ,
             scope: VariableScope::Unseen,
-        })
+        }))
     }
 
-    pub fn constant(name: &'src str, typ: Self) -> Self {
-        Self::new(TermEnum::Constant { name, typ })
+    pub fn constant(ctx: &Context<'src>, name: &'src str, mut typ: Self) -> Result<Self> {
+        typ.unify_type(ctx)?;
+        Ok(Self::new(TermEnum::Constant { name, typ }))
     }
 
     /// Apply typing rules between type and value constructors.
@@ -112,7 +107,8 @@ impl<'src> Term<'src> {
             clone!(ctx, function, argument, mut typ);
 
             async move {
-                let variable = Self::variable(None, argument.typ());
+                typ.unify_type(&ctx)?;
+                let variable = Self::variable(&ctx, None, argument.typ())?;
                 let mut function_type = Self::pi_type(variable, Self::unknown_type(), evaluation);
                 Self::unify(&ctx, &mut function_type, &mut function.typ())?;
                 // Wait for unknowns so `binding.apply` replaces all occurrences of `variable`.
@@ -227,6 +223,13 @@ impl<'src> Term<'src> {
         };
 
         *name
+    }
+
+    fn unknown(typ: Self) -> Self {
+        Self::new(TermEnum::Unknown {
+            typ,
+            inferred: Latch::closed(),
+        })
     }
 
     /// Create a copy of `self`, making a fresh variable for every binding.
@@ -831,7 +834,12 @@ impl<'src> VariableBinding<Term<'src>> {
             return self.variable.fresh_variables();
         };
 
-        let variable = Term::variable(*name, typ.fresh_variables()?);
+        let variable = Term::new(TermEnum::Variable {
+            name: *name,
+            fresh: None,
+            typ: typ.fresh_variables()?,
+            scope: VariableScope::Unseen,
+        });
 
         assert!(fresh.is_none());
         *fresh = Some(variable.clone());

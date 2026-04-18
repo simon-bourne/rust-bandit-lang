@@ -24,8 +24,7 @@ fn context<'src>() -> ContextOwner<'src> {
         ("id", "∀a ⇒ a → a"),
         ("float_to_int", "Float → Int"),
         ("polymorphic", "∀a ⇒ a"),
-        // TODO: `s: Type` should be inferred as it's the type of another term.
-        ("scoped", "∀a ⇒ (∀s : Type ⇒ s → a) → a"),
+        ("scoped", "∀a ⇒ (∀s ⇒ s → a) → a"),
     ];
 
     let types = types

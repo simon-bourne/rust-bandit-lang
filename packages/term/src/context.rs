@@ -209,7 +209,7 @@ impl<'a> Context<'a> {
         let term = if let Some(local) = variables.lookup(name) {
             local
         } else if let Some(constant) = this.constants.get(name) {
-            typed::Term::constant(name, self.desugar_term(&constant.typ)?)
+            typed::Term::constant(self, name, self.desugar_term(&constant.typ)?)?
         } else if let Some(data) = this.types.get(name) {
             self.desugar_constant(&data.type_constructor)?
         } else {
