@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use async_executor::{LocalExecutor, Task};
 use futures::executor::block_on;
 
-use crate::Result;
+use crate::{InferenceError, Result};
 
 #[derive(Default)]
 pub struct Constraints<'a> {
@@ -12,6 +12,10 @@ pub struct Constraints<'a> {
 }
 
 impl<'a> Constraints<'a> {
+    /// Add a constraint
+    ///
+    /// Be careful about blocking in `constraint`. If no constraints can make
+    /// progress, `solve` returns an error saying it's blocked.
     pub fn add(&self, constraint: impl Future<Output = Result<()>> + 'a) {
         let task = self.executor.spawn(constraint);
         self.queue.borrow_mut().push(task);
