@@ -85,6 +85,11 @@ fn evaluate_recursively() {
 }
 
 #[test]
+fn blocks_on_unknown() {
+    r"one : (\x ⇒ _) Int".fails()
+}
+
+#[test]
 fn evaluate_recursively2() {
     r"one : let x = Int ⇒ (\y ⇒ y) x".infers("one : Int");
 }

@@ -171,9 +171,7 @@ impl<'a> Context<'a> {
                 .type_constructor(self, value_constructors?)?;
         }
 
-        while !this.constraints.is_empty() {
-            this.constraints.solve()?;
-        }
+        this.constraints.solve()?;
 
         // We need to solve constraints before we `check_scope`, so we don't introduce
         // any new scope escapes
