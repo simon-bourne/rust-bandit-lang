@@ -60,7 +60,13 @@ impl<'src> Term<'src> {
             let mut typ = self.typ();
             clone!(ctx);
 
-            async move { Self::unify(&ctx, &mut typ.codomain().await?, &mut Self::type_of_type()) }
+            async move {
+                Self::unify(
+                    &ctx,
+                    &mut typ.codomain(&ctx).await?,
+                    &mut Self::type_of_type(),
+                )
+            }
         });
 
         ctx.constraint({
@@ -70,7 +76,12 @@ impl<'src> Term<'src> {
 
             async move {
                 for value_constructor in value_constructors {
-                    let head = &mut value_constructor.typ().codomain().await?.head().await?;
+                    let head = &mut value_constructor
+                        .typ()
+                        .codomain(&ctx)
+                        .await?
+                        .head(&ctx)
+                        .await?;
                     Self::unify(&ctx, head, &mut type_constructor)?;
                 }
 
@@ -112,7 +123,7 @@ impl<'src> Term<'src> {
                 let mut function_type = Self::pi_type(variable, Self::unknown_type(), evaluation);
                 Self::unify(&ctx, &mut function_type, &mut function.typ())?;
                 // Wait for unknowns so `binding.apply` replaces all occurrences of `variable`.
-                function_type.await_all_unknowns().await?;
+                function_type.await_all_unknowns(&ctx).await?;
 
                 let mut result_type = if let TermEnum::Pi(binding) = &mut *function_type.value() {
                     binding.apply(&argument)?
@@ -424,7 +435,7 @@ impl<'src> Term<'src> {
     }
 
     async fn evaluate_known(&mut self, ctx: &Context<'src>) -> Result<()> {
-        self.await_all_unknowns().await?;
+        self.await_all_unknowns(ctx).await?;
 
         if self.is_reducible() {
             self.check_scope()?;
@@ -513,8 +524,8 @@ impl<'src> Term<'src> {
         }
     }
 
-    async fn head(&mut self) -> Result<Self> {
-        self.await_unknown().await?;
+    async fn head(&mut self, ctx: &Context<'src>) -> Result<Self> {
+        self.await_unknown(ctx).await?;
         let mut function = {
             let TermEnum::Apply { function, .. } = &mut *self.try_value()? else {
                 return Ok(self.clone());
@@ -523,11 +534,11 @@ impl<'src> Term<'src> {
             function.clone()
         };
 
-        Box::pin(function.head()).await
+        Box::pin(function.head(ctx)).await
     }
 
-    async fn codomain(&mut self) -> Result<Self> {
-        self.await_unknown().await?;
+    async fn codomain(&mut self, ctx: &Context<'src>) -> Result<Self> {
+        self.await_unknown(ctx).await?;
         let mut in_term = {
             let TermEnum::Pi(binding) = &mut *self.try_value()? else {
                 return Ok(self.clone());
@@ -536,10 +547,10 @@ impl<'src> Term<'src> {
             binding.in_term.clone()
         };
 
-        Box::pin(in_term.codomain()).await
+        Box::pin(in_term.codomain(ctx)).await
     }
 
-    async fn await_unknown(&mut self) -> Result<()> {
+    async fn await_unknown(&mut self, ctx: &Context<'src>) -> Result<()> {
         // TODO: We need a test for this
         let inferred = if let TermEnum::Unknown { inferred, .. } = &*self.try_value()? {
             Some(inferred.clone())
@@ -548,18 +559,18 @@ impl<'src> Term<'src> {
         };
 
         if let Some(inferred) = inferred {
-            inferred.wait().await;
+            ctx.wait(&inferred).await;
         }
 
         assert!(self.is_known());
         Ok(())
     }
 
-    async fn await_all_unknowns(&mut self) -> Result<()> {
+    async fn await_all_unknowns(&mut self, ctx: &Context<'src>) -> Result<()> {
         let mut unknowns = vec![self.clone()];
 
         while let Some(mut term) = unknowns.pop() {
-            term.await_unknown().await?;
+            term.await_unknown(ctx).await?;
 
             term.for_each(&mut |t| {
                 if matches!(&*t.try_value()?, TermEnum::Unknown { .. }) {

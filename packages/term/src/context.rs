@@ -4,7 +4,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::{InferenceError, Result, ast, constraints::Constraints, typed};
+use crate::{InferenceError, Result, ast, constraints::Constraints, sync::Latch, typed};
 
 enum Term<'a> {
     Typed(typed::Term<'a>),
@@ -191,6 +191,10 @@ impl<'a> Context<'a> {
             .map(|(name, Value { value, .. })| (*name, self.desugar_term(value)))
             .collect::<Vec<_>>()
             .into_iter()
+    }
+
+    pub async fn wait(&self, latch: &Latch) {
+        self.rc().constraints.wait(latch).await
     }
 
     pub(crate) fn lookup(
