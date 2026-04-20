@@ -33,7 +33,6 @@ pub enum Token<'src> {
     #[token("from", |_| Keyword::From)]
     #[token("if", |_| Keyword::If)]
     #[token("let", |_| Keyword::Let)]
-    #[token("static", |_| Keyword::Static)]
     #[token("loop", |_| Keyword::Loop)]
     #[token("of", |_| Keyword::Of)]
     #[token("private", |_| Keyword::Private)]
@@ -54,7 +53,7 @@ pub enum Token<'src> {
     #[token(r"\")]
     Lambda,
     #[token(r"\\")]
-    StaticLambda,
+    ImplicitLambda,
 
     #[regex(r"(?&ident)")]
     Identifier(&'src str),
@@ -168,7 +167,6 @@ pub enum Keyword {
     From,
     If,
     Let,
-    Static,
     Loop,
     Of,
     Private,
@@ -198,7 +196,6 @@ impl Keyword {
             KW::From => "from",
             KW::If => "if",
             KW::Let => "let",
-            KW::Static => "static",
             KW::Loop => "loop",
             KW::Of => "of",
             KW::Private => "private",

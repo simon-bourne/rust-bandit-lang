@@ -15,9 +15,9 @@ impl<'src> Pretty for Term<'src> {
                 function,
                 argument,
                 typ,
-                evaluation,
+                argument_style,
             } => has_type(
-                BinaryOperator(function, Operator::Apply(*evaluation), argument),
+                BinaryOperator(function, Operator::Apply(*argument_style), argument),
                 typ,
             )
             .to_document(parent, layout),
@@ -34,7 +34,7 @@ impl<'src> Pretty for Term<'src> {
             TermEnum::Pi(binding) => {
                 if binding.variable_name().is_none() {
                     let layout = layout.without_types();
-                    Operator::Arrow(binding.evaluation).to_document(
+                    Operator::Arrow(binding.discriminator).to_document(
                         parent,
                         &binding.variable.typ(),
                         &binding.in_term,
@@ -45,7 +45,7 @@ impl<'src> Pretty for Term<'src> {
                     binding.pi_to_document(parent, layout)
                 }
             }
-            TermEnum::Lambda(binding) => binding.to_document(r"\", r"\\", parent, layout),
+            TermEnum::Lambda(binding) => binding.lambda_to_document(parent, layout),
         }
     }
 }

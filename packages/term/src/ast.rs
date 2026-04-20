@@ -1,4 +1,4 @@
-use crate::{Evaluation, InferenceError, Result, VariableBinding, context::ContextOwner, typed};
+use crate::{ArgumentStyle, InferenceError, Result, VariableBinding, context::ContextOwner, typed};
 
 mod pretty;
 
@@ -101,7 +101,7 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::Apply {
             function: self,
             argument,
-            evaluation: Evaluation::Dynamic,
+            argument_style: ArgumentStyle::Explicit,
         })
     }
 
@@ -109,17 +109,17 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::Apply {
             function: self,
             argument,
-            evaluation: Evaluation::Static,
+            argument_style: ArgumentStyle::Implicit,
         })
     }
 
-    pub fn let_binding(variable: Self, value: Self, in_term: Self, evaluation: Evaluation) -> Self {
+    pub fn let_binding(variable: Self, value: Self, in_term: Self) -> Self {
         Self::new(TermEnum::Let {
             value,
             binding: VariableBinding {
                 variable,
                 in_term,
-                evaluation,
+                discriminator: (),
             },
         })
     }
@@ -128,7 +128,7 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::Pi(VariableBinding {
             variable,
             in_term,
-            evaluation: Evaluation::Static,
+            discriminator: ArgumentStyle::Implicit,
         }))
     }
 
@@ -136,11 +136,11 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::FunctionType(input_type, output_type))
     }
 
-    pub fn lambda(variable: Self, in_term: Self, evaluation: Evaluation) -> Self {
+    pub fn lambda(variable: Self, in_term: Self, discriminator: ArgumentStyle) -> Self {
         Self::new(TermEnum::Lambda(VariableBinding {
             variable,
             in_term,
-            evaluation,
+            discriminator,
         }))
     }
 
@@ -168,13 +168,13 @@ impl<'src> Term<'src> {
             TermEnum::Apply {
                 function,
                 argument,
-                evaluation,
+                argument_style,
             } => Core::apply(
                 ctx,
                 function.desugar_local(ctx, variables)?,
                 argument.desugar_local(ctx, variables)?,
                 Core::unknown_type(),
-                *evaluation,
+                *argument_style,
             ),
             TermEnum::Variable(name) => ctx.lookup(variables, name)?,
             TermEnum::Unknown => Core::unknown_value(),
@@ -189,7 +189,7 @@ impl<'src> Term<'src> {
                 VariableBinding {
                     variable: Core::variable(ctx, None, left.desugar_local(ctx, variables)?)?,
                     in_term: right.desugar_local(ctx, variables)?,
-                    evaluation: Evaluation::Dynamic,
+                    discriminator: ArgumentStyle::Explicit,
                 },
             )?,
             TermEnum::Lambda(binding) => Core::lambda(binding.desugar(ctx, variables)?),
@@ -221,36 +221,34 @@ impl<'src> Term<'src> {
     }
 }
 
-type Binding<'src> = VariableBinding<Term<'src>>;
-
 enum TermEnum<'src> {
     Type,
     Apply {
         function: Term<'src>,
         argument: Term<'src>,
-        evaluation: Evaluation,
+        argument_style: ArgumentStyle,
     },
     Variable(&'src str),
     Unknown,
     Let {
         value: Term<'src>,
-        binding: Binding<'src>,
+        binding: VariableBinding<Term<'src>, ()>,
     },
-    Pi(Binding<'src>),
+    Pi(VariableBinding<Term<'src>, ArgumentStyle>),
     FunctionType(Term<'src>, Term<'src>),
-    Lambda(Binding<'src>),
+    Lambda(VariableBinding<Term<'src>, ArgumentStyle>),
     HasType {
         term: Term<'src>,
         typ: Term<'src>,
     },
 }
 
-impl<'src> Binding<'src> {
+impl<'src, Discriminator: Clone> VariableBinding<Term<'src>, Discriminator> {
     fn desugar(
         &self,
         ctx: &Context<'src>,
         variables: &mut LocalVariables<'src>,
-    ) -> Result<VariableBinding<typed::Term<'src>>> {
+    ) -> Result<VariableBinding<typed::Term<'src>, Discriminator>> {
         let variable = self.variable.desugar_variable(ctx, variables)?;
         let in_term = variables.in_scope(variable.clone(), |variables| {
             self.in_term.desugar_local(ctx, variables)
@@ -259,7 +257,7 @@ impl<'src> Binding<'src> {
         Ok(VariableBinding {
             variable,
             in_term,
-            evaluation: self.evaluation,
+            discriminator: self.discriminator.clone(),
         })
     }
 }

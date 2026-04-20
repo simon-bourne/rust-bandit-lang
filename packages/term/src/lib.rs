@@ -87,14 +87,14 @@ impl fmt::Display for InferenceError {
 impl Error for InferenceError {}
 
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub enum Evaluation {
-    Static,
-    Dynamic,
+pub enum ArgumentStyle {
+    Implicit,
+    Explicit,
 }
 
 #[derive(Clone)]
-struct VariableBinding<Term> {
+struct VariableBinding<Term, Discriminator> {
     variable: Term,
     in_term: Term,
-    evaluation: Evaluation,
+    discriminator: Discriminator,
 }

@@ -9,7 +9,7 @@ fn pi() {
 
 #[test]
 fn lambda() {
-    parse(r"(\x ⇒ x) Type", r"(\x ⇒ x) Type");
+    parse(r"(\x = x) Type", r"(\x = x) Type");
 }
 
 #[test]

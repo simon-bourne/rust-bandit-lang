@@ -76,22 +76,22 @@ fn evaluate_let() {
 
 #[test]
 fn evaluate_apply() {
-    r"one : (\x ⇒ x) Int".infers("one : Int");
+    r"one : (\x = x) Int".infers("one : Int");
 }
 
 #[test]
 fn evaluate_recursively() {
-    r"one : let x = (\y ⇒ y) Int ⇒ x".infers("one : Int");
-}
-
-#[test]
-fn blocks_on_unknown() {
-    r"one : (\x ⇒ _) Int".fails()
+    r"one : let x = (\y = y) Int ⇒ x".infers("one : Int");
 }
 
 #[test]
 fn evaluate_recursively2() {
-    r"one : let x = Int ⇒ (\y ⇒ y) x".infers("one : Int");
+    r"one : let x = Int ⇒ (\y = y) x".infers("one : Int");
+}
+
+#[test]
+fn blocks_on_unknown() {
+    r"one : (\x = _) Int".fails()
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn simple_apply() {
 
 #[test]
 fn simple_lambda() {
-    r"(\x ⇒ x : Int) : Int → Int".infers(r"\x : Int ⇒ x : Int");
+    r"(\x = x : Int) : Int → Int".infers(r"\x : Int = x : Int");
 }
 
 #[test]
@@ -162,7 +162,7 @@ fn scope_escape() {
 
 #[test]
 fn occurs_check() {
-    r"\x ⇒ x x".fails();
+    r"\x = x x".fails();
 }
 
 #[test]
@@ -181,7 +181,7 @@ fn polymorphic_let() {
 
 #[test]
 fn simple_polymorphic_lambda() {
-    r"\x : (∀b ⇒ b) ⇒ x".infers(r"\x : (∀b ⇒ b) ⇒ x : (∀b ⇒ b)");
+    r"\x : (∀b ⇒ b) = x".infers(r"\x : (∀b ⇒ b) = x : (∀b ⇒ b)");
 }
 
 #[test]
@@ -191,7 +191,7 @@ fn simple_polymorphic_let() {
 
 #[test]
 fn polymorphic_lambda() {
-    r"\id2 : (∀a ⇒ a → a) ⇒ add (id2 @ Int one) (float_to_int (id2 @ Float pi))".infers(
-        r"\id2 : (∀a ⇒ a → a) ⇒ ((add : Int → Int → Int) (((id2 : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a ⇒ a → a)) @ (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int",
+    r"\id2 : (∀a ⇒ a → a) = add (id2 @ Int one) (float_to_int (id2 @ Float pi))".infers(
+        r"\id2 : (∀a ⇒ a → a) = ((add : Int → Int → Int) (((id2 : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a ⇒ a → a)) @ (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int",
     );
 }

@@ -1,6 +1,6 @@
 // TODO: Newline to separate let binding and expression.
 use bandit_term::{
-    Evaluation,
+    ArgumentStyle,
     ast::{Constant, Data, Definition, Function},
 };
 use winnow::{
@@ -93,10 +93,9 @@ fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
         typ(),
         variable(),
         forall(),
-        lambda(Token::Lambda, Evaluation::Dynamic),
-        lambda(Token::StaticLambda, Evaluation::Static),
-        let_binding(Keyword::Let, Evaluation::Dynamic),
-        let_binding(Keyword::Static, Evaluation::Static),
+        lambda(Token::Lambda, ArgumentStyle::Explicit),
+        lambda(Token::ImplicitLambda, ArgumentStyle::Implicit),
+        let_binding(Keyword::Let),
         parenthesized(term),
     ))
 }
@@ -105,6 +104,7 @@ fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     identifier().verify_map(|name| (name == "Type").then(Term::type_of_type))
 }
 
+// TODO: parse ⇒ and →
 fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(
         Keyword::Forall,
@@ -113,25 +113,20 @@ fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     .map(|(variable, in_term)| Term::pi_type(variable, in_term))
 }
 
-fn let_binding<'tok, 'src: 'tok>(
-    keyword: Keyword,
-    evaluation: Evaluation,
-) -> impl Parser<'tok, 'src, Term<'src>> {
+fn let_binding<'tok, 'src: 'tok>(keyword: Keyword) -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(
         keyword,
         (term, Operator::Assign, term, Operator::Implies, term),
     )
-    .map(move |(var, _assign, value, _linend, in_term)| {
-        Term::let_binding(var, value, in_term, evaluation)
-    })
+    .map(move |(var, _assign, value, _linend, in_term)| Term::let_binding(var, value, in_term))
 }
 
 fn lambda<'tok, 'src: 'tok>(
     token: Token<'src>,
-    evaluation: Evaluation,
+    arg_style: ArgumentStyle,
 ) -> impl Parser<'tok, 'src, Term<'src>> {
-    preceded(token, separated_pair(term, Operator::Implies, term))
-        .map(move |(variable, in_term)| Term::lambda(variable, in_term, evaluation))
+    preceded(token, separated_pair(term, Operator::Assign, term))
+        .map(move |(variable, in_term)| Term::lambda(variable, in_term, arg_style))
 }
 
 fn unknown<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {

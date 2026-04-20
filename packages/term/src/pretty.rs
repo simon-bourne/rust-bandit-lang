@@ -4,7 +4,7 @@ use derive_more::Constructor;
 use pretty::RcDoc;
 
 use super::VariableBinding;
-use crate::Evaluation;
+use crate::ArgumentStyle;
 
 pub trait Pretty {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document;
@@ -35,41 +35,46 @@ impl<T: Pretty> Pretty for &'_ T {
     }
 }
 
-impl<Term: Pretty> VariableBinding<Term> {
-    pub fn pi_to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        assert!(
-            self.evaluation == Evaluation::Static,
-            "Dynamic PI bindings are not supported"
-        );
-        self.binding_to_document("∀", parent, layout)
-    }
-
-    pub fn to_document(
+impl<Term: Pretty> VariableBinding<Term, ArgumentStyle> {
+    pub fn pi_to_document(
         &self,
-        dynamic_binder: &str,
-        static_binder: &str,
         parent: Option<(Operator, Side)>,
         layout: Layout,
-    ) -> Document {
-        let binder = match self.evaluation {
-            Evaluation::Static => static_binder,
-            Evaluation::Dynamic => dynamic_binder,
+    ) -> RcDoc<'static> {
+        let binder = match self.discriminator {
+            ArgumentStyle::Implicit => " ⇒ ",
+            ArgumentStyle::Explicit => " → ",
         };
-        self.binding_to_document(binder, parent, layout)
+
+        self.to_document("∀", binder, parent, layout)
     }
 
-    fn binding_to_document(
+    pub fn lambda_to_document(
         &self,
-        binder: &str,
+        parent: Option<(Operator, Side)>,
+        layout: Layout,
+    ) -> RcDoc<'static> {
+        let prefix = match self.discriminator {
+            ArgumentStyle::Implicit => r"\\",
+            ArgumentStyle::Explicit => r"\",
+        };
+
+        self.to_document(prefix, " = ", parent, layout)
+    }
+
+    fn to_document(
+        &self,
+        prefix: &'static str,
+        binder: &'static str,
         parent: Option<(Operator, Side)>,
         layout: Layout,
     ) -> RcDoc<'static> {
         parenthesize_if(
             parent.is_some(),
             [
-                Document::as_string(binder),
+                Document::text(prefix),
                 self.variable.to_document(None, layout),
-                Document::text(" ⇒ "),
+                Document::text(binder),
                 self.in_term.to_document(None, layout),
             ],
         )
@@ -119,15 +124,10 @@ impl Pretty for Option<&str> {
 
 pub fn pretty_let<Term: Pretty>(
     value: &impl Pretty,
-    binding: &VariableBinding<Term>,
+    binding: &VariableBinding<Term, ()>,
     parent: Option<(Operator, Side)>,
     layout: Layout,
 ) -> Document {
-    let symbol = match binding.evaluation {
-        Evaluation::Static => "static",
-        Evaluation::Dynamic => "let",
-    };
-
     let assignment = Operator::Equals.to_document(
         None,
         &binding.variable,
@@ -139,7 +139,7 @@ pub fn pretty_let<Term: Pretty>(
     parenthesize_if(
         parent.is_some(),
         [
-            Document::text(symbol),
+            Document::text("let"),
             Document::text(" "),
             assignment,
             Document::text(" ⇒ "),
@@ -170,8 +170,8 @@ impl<Left: Pretty, Right: Pretty> Pretty for BinaryOperator<Left, Right> {
 pub enum Operator {
     Equals,
     HasType,
-    Arrow(Evaluation),
-    Apply(Evaluation),
+    Arrow(ArgumentStyle),
+    Apply(ArgumentStyle),
 }
 
 impl Operator {
@@ -179,10 +179,10 @@ impl Operator {
         match self {
             Self::Equals => " = ",
             Self::HasType => " : ",
-            Self::Arrow(Evaluation::Dynamic) => " → ",
-            Self::Arrow(Evaluation::Static) => " ⇒ ",
-            Self::Apply(Evaluation::Dynamic) => " ",
-            Self::Apply(Evaluation::Static) => " @ ",
+            Self::Arrow(ArgumentStyle::Explicit) => " → ",
+            Self::Arrow(ArgumentStyle::Implicit) => " ⇒ ",
+            Self::Apply(ArgumentStyle::Explicit) => " ",
+            Self::Apply(ArgumentStyle::Implicit) => " @ ",
         }
     }
 
@@ -237,8 +237,8 @@ impl Operator {
             Self::Equals => 0,
             Self::HasType => 1,
             Self::Arrow(_) => 2,
-            Self::Apply(Evaluation::Dynamic) => 3,
-            Self::Apply(Evaluation::Static) => 4,
+            Self::Apply(ArgumentStyle::Explicit) => 3,
+            Self::Apply(ArgumentStyle::Implicit) => 4,
         }
     }
 

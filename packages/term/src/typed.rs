@@ -5,7 +5,7 @@ use clonelet::clone;
 use katexit::katexit;
 
 use crate::{
-    Evaluation, InferenceError, Pretty, Result, SharedMut, VariableBinding, context::Context,
+    ArgumentStyle, InferenceError, Pretty, Result, SharedMut, VariableBinding, context::Context,
     sync::Latch,
 };
 
@@ -101,7 +101,7 @@ impl<'src> Term<'src> {
         function: Self,
         argument: Self,
         typ: Self,
-        evaluation: Evaluation,
+        argument_style: ArgumentStyle,
     ) -> Self {
         ctx.constraint({
             clone!(ctx, function, argument, mut typ);
@@ -109,7 +109,8 @@ impl<'src> Term<'src> {
             async move {
                 typ.unify_type(&ctx)?;
                 let variable = Self::variable(&ctx, None, argument.typ())?;
-                let mut function_type = Self::pi_type(variable, Self::unknown_type(), evaluation);
+                let mut function_type =
+                    Self::pi_type(variable, Self::unknown_type(), argument_style);
                 Self::unify(&ctx, &mut function_type, &mut function.typ())?;
                 // Wait for unknowns so `binding.apply` replaces all occurrences of `variable`.
                 function_type.await_all_unknowns().await?;
@@ -128,7 +129,7 @@ impl<'src> Term<'src> {
             function,
             argument,
             typ,
-            evaluation,
+            argument_style,
         })
     }
 
@@ -151,7 +152,7 @@ impl<'src> Term<'src> {
     pub(crate) fn let_binding(
         ctx: &Context<'src>,
         value: Self,
-        binding: VariableBinding<Self>,
+        binding: VariableBinding<Self, ()>,
     ) -> Result<Self> {
         Self::unify(ctx, &mut value.typ(), &mut binding.variable.typ())?;
         Ok(Self::new(TermEnum::Let { value, binding }))
@@ -173,7 +174,10 @@ impl<'src> Term<'src> {
     ///
     /// We don't use indexed type universes, as this isn't a theorem proving
     /// language.
-    pub(crate) fn pi(ctx: &Context<'src>, mut binding: VariableBinding<Self>) -> Result<Self> {
+    pub(crate) fn pi(
+        ctx: &Context<'src>,
+        mut binding: VariableBinding<Self, ArgumentStyle>,
+    ) -> Result<Self> {
         binding.in_term.unify_type(ctx)?;
         Ok(Self::new(TermEnum::Pi(binding)))
     }
@@ -190,7 +194,7 @@ impl<'src> Term<'src> {
     ///     \Gamma \vdash \lambda x : A . \\: e : \Pi x : A . \\: B
     /// }
     /// $$
-    pub(crate) fn lambda(binding: VariableBinding<Self>) -> Self {
+    pub(crate) fn lambda(binding: VariableBinding<Self, ArgumentStyle>) -> Self {
         Self::new(TermEnum::Lambda(binding))
     }
 
@@ -277,21 +281,21 @@ impl<'src> Term<'src> {
                 function,
                 argument,
                 typ,
-                evaluation,
+                argument_style,
             } => TermEnum::Apply {
                 function: function.fresh_variables()?,
                 argument: argument.fresh_variables()?,
                 typ: typ.fresh_variables()?,
-                evaluation: *evaluation,
+                argument_style: *argument_style,
             },
         }))
     }
 
-    fn pi_type(variable: Self, result_type: Self, evaluation: Evaluation) -> Self {
+    fn pi_type(variable: Self, result_type: Self, discriminator: ArgumentStyle) -> Self {
         Self::new(TermEnum::Pi(VariableBinding {
             variable,
             in_term: result_type,
-            evaluation,
+            discriminator,
         }))
     }
 
@@ -489,14 +493,14 @@ impl<'src> Term<'src> {
         output_type: Self,
     ) -> Self {
         if let TermEnum::Pi(binding) = &mut *input_type.value()
-            && binding.evaluation == Evaluation::Static
+            && binding.discriminator == ArgumentStyle::Implicit
         {
             Self::apply(
                 ctx,
                 self.add_implicit_arguments(ctx, &mut binding.in_term, Self::unknown_type()),
                 Self::unknown_value(),
                 output_type,
-                Evaluation::Static,
+                ArgumentStyle::Implicit,
             )
         } else {
             self.clone()
@@ -505,7 +509,7 @@ impl<'src> Term<'src> {
 
     fn strip_implicits(&mut self) -> Result<Self> {
         if let TermEnum::Pi(binding) = &mut *self.value()
-            && binding.evaluation == Evaluation::Static
+            && binding.discriminator == ArgumentStyle::Implicit
         {
             binding.apply(&Self::unknown_type())?.strip_implicits()
         } else {
@@ -595,15 +599,15 @@ impl<'src> Term<'src> {
                     function,
                     argument,
                     typ,
-                    evaluation,
+                    argument_style,
                 },
                 TermEnum::Apply {
                     function: function1,
                     argument: argument1,
                     typ: typ1,
-                    evaluation: evaluation1,
+                    argument_style: argument_style1,
                 },
-            ) if evaluation == evaluation1 => {
+            ) if argument_style == argument_style1 => {
                 Self::unify(ctx, function, function1)?;
                 Self::unify(ctx, argument, argument1)?;
                 Self::unify(ctx, typ, typ1)?;
@@ -619,7 +623,7 @@ impl<'src> Term<'src> {
                 VariableBinding::unify(ctx, binding, binding1)?
             }
             (TermEnum::Pi(binding0), TermEnum::Pi(binding1))
-                if binding0.evaluation == binding1.evaluation =>
+                if binding0.discriminator == binding1.discriminator =>
             {
                 VariableBinding::unify(ctx, binding0, binding1)?
             }
@@ -744,7 +748,7 @@ impl<'src> Term<'src> {
             TermEnum::Lambda(binding) => Term::pi_type(
                 binding.variable.clone(),
                 binding.in_term.typ(),
-                binding.evaluation,
+                binding.discriminator,
             ),
         }
     }
@@ -762,7 +766,7 @@ enum TermEnum<'src> {
         function: Term<'src>,
         argument: Term<'src>,
         typ: Term<'src>,
-        evaluation: Evaluation,
+        argument_style: ArgumentStyle,
     },
     Variable {
         name: Option<&'src str>,
@@ -781,10 +785,10 @@ enum TermEnum<'src> {
     },
     Let {
         value: Term<'src>,
-        binding: VariableBinding<Term<'src>>,
+        binding: VariableBinding<Term<'src>, ()>,
     },
-    Pi(VariableBinding<Term<'src>>),
-    Lambda(VariableBinding<Term<'src>>),
+    Pi(VariableBinding<Term<'src>, ArgumentStyle>),
+    Lambda(VariableBinding<Term<'src>, ArgumentStyle>),
 }
 
 enum VariableScope {
@@ -794,7 +798,7 @@ enum VariableScope {
     Bound,
 }
 
-impl<'src> VariableBinding<Term<'src>> {
+impl<'src, Discriminator: Clone + Eq + PartialEq> VariableBinding<Term<'src>, Discriminator> {
     pub fn variable_name(&self) -> Option<&'src str> {
         self.variable.clone().variable_name()
     }
@@ -822,7 +826,7 @@ impl<'src> VariableBinding<Term<'src>> {
         Ok(Self {
             variable,
             in_term,
-            evaluation: self.evaluation,
+            discriminator: self.discriminator.clone(),
         })
     }
 
@@ -853,7 +857,7 @@ impl<'src> VariableBinding<Term<'src>> {
     }
 
     fn unify(ctx: &Context<'src>, binding0: &mut Self, binding1: &mut Self) -> Result<()> {
-        if binding0.evaluation != binding1.evaluation {
+        if binding0.discriminator != binding1.discriminator {
             return Err(InferenceError::CouldntUnify);
         }
 
