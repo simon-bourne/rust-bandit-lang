@@ -8,11 +8,7 @@ impl Pretty for Term<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         match self.0.as_ref() {
             TermEnum::Type => Document::text("Type"),
-            TermEnum::Apply {
-                function,
-                argument,
-                argument_style,
-            } => Operator::Apply(*argument_style)
+            TermEnum::Apply { function, argument } => Operator::Apply(ArgumentStyle::Explicit)
                 .to_document(parent, function, argument, layout, layout),
             TermEnum::Variable(name) => Document::as_string(name),
             TermEnum::Unknown => Document::text("_"),
@@ -26,6 +22,11 @@ impl Pretty for Term<'_> {
             TermEnum::HasType { term, typ } => {
                 Operator::HasType.to_document(parent, term, typ, layout, layout)
             }
+            TermEnum::SpecifyImplicits(term) => Document::concat([
+                Document::text("["),
+                term.to_document(None, layout),
+                Document::text("]"),
+            ]),
         }
     }
 }

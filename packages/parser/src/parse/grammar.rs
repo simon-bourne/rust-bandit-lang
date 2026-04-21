@@ -6,8 +6,8 @@ use bandit_term::{
 use winnow::{
     Parser as _, Result,
     combinator::{
-        alt, delimited, opt, preceded, repeat, separated, separated_foldl1, separated_foldr1,
-        separated_pair, terminated,
+        alt, delimited, opt, preceded, repeat, separated, separated_foldr1, separated_pair,
+        terminated,
     },
     token::any,
 };
@@ -76,15 +76,7 @@ fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 }
 
 fn function_applications<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    repeat(1.., static_apply()).map(|es: Vec<_>| es.into_iter().reduce(Term::apply).unwrap())
-}
-
-fn static_apply<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    separated_foldl1(
-        primary(),
-        Operator::StaticApply,
-        |input_type, _, output_type| Term::static_apply(input_type, output_type),
-    )
+    repeat(1.., primary()).map(|es: Vec<_>| es.into_iter().reduce(Term::apply).unwrap())
 }
 
 fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
@@ -96,6 +88,7 @@ fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
         lambda(Token::Lambda, ArgumentStyle::Explicit),
         lambda(Token::ImplicitLambda, ArgumentStyle::Implicit),
         let_binding(Keyword::Let),
+        specify_implicits(term),
         parenthesized(term),
     ))
 }
@@ -145,6 +138,12 @@ fn identifier<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, &'src str> {
             None
         }
     })
+}
+
+fn specify_implicits<'tok, 'src: 'tok>(
+    parser: impl Parser<'tok, 'src, Term<'src>>,
+) -> impl Parser<'tok, 'src, Term<'src>> {
+    grouped(Grouping::Brackets, parser).map(Term::specify_implicits)
 }
 
 fn parenthesized<'tok, 'src: 'tok, T>(
