@@ -62,7 +62,6 @@ pub enum Token<'src> {
     Unknown,
 
     // ASCII operators
-    #[token("@", |_| Operator::StaticApply)]
     #[token("and", |_| Operator::And)]
     #[token("or", |_| Operator::Or)]
     #[token("not", |_| Operator::Not)]
@@ -230,7 +229,6 @@ pub enum Operator {
     GreaterOrEqual,
 
     Apply,
-    StaticApply,
     Assign,
     HasType,
     To,
@@ -259,7 +257,6 @@ impl Operator {
             Self::HasType => ":",
             Self::Assign => "=",
             Self::Apply => "<-",
-            Self::StaticApply => "@",
             Self::To => "->",
             Self::Implies => "=>",
         }
