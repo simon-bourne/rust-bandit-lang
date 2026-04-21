@@ -173,24 +173,24 @@ fn multi_id() {
 
 #[test]
 fn polymorphic_let() {
-    "let id2 : (∀a ⇒ a → a) = [id] ⇒ add ([id2 Int] one) (float_to_int ([id2 Float] pi))".infers(
+    "let id2 : ∀a ⇒ a → a = [id] ⇒ add ([id2 Int] one) (float_to_int ([id2 Float] pi))".infers(
         "let id2 : (∀a ⇒ a → a) = id ⇒ ((add : Int → Int → Int) (((id2 : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a ⇒ a → a)) @ (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
 }
 
 #[test]
 fn simple_polymorphic_lambda() {
-    r"\x : (∀b ⇒ b) = x".infers(r"\x : (∀b ⇒ b) = x : (∀b ⇒ b)");
+    r"\x : ∀b ⇒ b = x".infers(r"\x : (∀b ⇒ b) = x : (∀b ⇒ b)");
 }
 
 #[test]
 fn simple_polymorphic_let() {
-    "let x : (∀b ⇒ b) = [polymorphic] ⇒ x".infers("let x : (∀a ⇒ a) = polymorphic ⇒ x : (∀a ⇒ a)");
+    "let x : ∀b ⇒ b = [polymorphic] ⇒ x".infers("let x : (∀a ⇒ a) = polymorphic ⇒ x : (∀a ⇒ a)");
 }
 
 #[test]
 fn polymorphic_lambda() {
-    r"\id2 : (∀a ⇒ a → a) = add ([id2 Int] one) (float_to_int ([id2 Float] pi))".infers(
+    r"\id2 : ∀a ⇒ a → a = add ([id2 Int] one) (float_to_int ([id2 Float] pi))".infers(
         r"\id2 : (∀a ⇒ a → a) = ((add : Int → Int → Int) (((id2 : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a ⇒ a → a)) @ (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int",
     );
 }
