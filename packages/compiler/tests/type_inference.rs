@@ -129,13 +129,12 @@ fn simple_id() {
 // TODO: Can we remove brackets around `(∀a ⇒ a → a)`?
 #[test]
 fn infer_implicit_param_on_function() {
-    "id__with_implicits one"
-        .infers("((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int");
+    "id one".infers("((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int");
 }
 
 #[test]
 fn infer_implicit_param_on_argument() {
-    "higher_order id__with_implicits".infers(
+    "higher_order id".infers(
         "(higher_order : (Int → Int) → Int) ((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) : Int",
     );
 }
@@ -152,7 +151,7 @@ fn infer_type_is_type() {
 
 #[test]
 fn infer_implicit_argument_isolation() {
-    "add (id__with_implicits one) ([id Int] one)".infers("((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int");
+    "add (id one) ([id Int] one)".infers("((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int");
 }
 
 #[test]
@@ -174,7 +173,7 @@ fn multi_id() {
 
 #[test]
 fn polymorphic_let() {
-    "let id2 : (∀a ⇒ a → a) = id ⇒ add ([id2 Int] one) (float_to_int ([id2 Float] pi))".infers(
+    "let id2 : (∀a ⇒ a → a) = [id] ⇒ add ([id2 Int] one) (float_to_int ([id2 Float] pi))".infers(
         "let id2 : (∀a ⇒ a → a) = id ⇒ ((add : Int → Int → Int) (((id2 : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a ⇒ a → a)) @ (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
 }
@@ -186,7 +185,7 @@ fn simple_polymorphic_lambda() {
 
 #[test]
 fn simple_polymorphic_let() {
-    "let x : (∀b ⇒ b) = polymorphic ⇒ x".infers("let x : (∀a ⇒ a) = polymorphic ⇒ x : (∀a ⇒ a)");
+    "let x : (∀b ⇒ b) = [polymorphic] ⇒ x".infers("let x : (∀a ⇒ a) = polymorphic ⇒ x : (∀a ⇒ a)");
 }
 
 #[test]

@@ -4,7 +4,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::{InferenceError, Result, ast, constraints::Constraints, typed};
+use crate::{ArgumentStyle, InferenceError, Result, ast, constraints::Constraints, typed};
 
 enum Term<'a> {
     Typed(typed::Term<'a>),
@@ -195,18 +195,21 @@ impl<'a> Context<'a> {
         &self,
         variables: &mut LocalVariables<'a>,
         name: &'a str,
+        arg_style: ArgumentStyle,
     ) -> Result<typed::Term<'a>> {
-        // TODO: Remove this horrible hack (we need to support constants/vars prefixed
-        // with '@' like Lean4)
-        if let Some(name) = name.strip_suffix("__with_implicits") {
-            return Ok(self.lookup(variables, name)?.apply_implicits(self));
-        }
-
         let this = self.rc();
 
-        let term = if let Some(local) = variables.lookup(name) {
-            local
-        } else if let Some(constant) = this.constants.get(name) {
+        if let Some(local) = variables.lookup(name) {
+            return Ok(local);
+        };
+
+        if arg_style == ArgumentStyle::Explicit {
+            return Ok(self
+                .lookup(variables, name, ArgumentStyle::Implicit)?
+                .apply_implicits(self));
+        }
+
+        let mut term = if let Some(constant) = this.constants.get(name) {
             typed::Term::constant(self, name, self.desugar_term(&constant.typ)?)?
         } else if let Some(data) = this.types.get(name) {
             self.desugar_constant(&data.type_constructor)?
@@ -214,7 +217,11 @@ impl<'a> Context<'a> {
             return Err(InferenceError::VariableNotFound)?;
         };
 
-        Ok(term)
+        Ok(if arg_style == ArgumentStyle::Explicit {
+            term.apply_implicits(self)
+        } else {
+            term
+        })
     }
 
     pub(crate) fn constant_value(&self, name: &'a str) -> Result<Option<typed::Term<'a>>> {

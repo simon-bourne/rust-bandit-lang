@@ -173,7 +173,7 @@ impl<'src> Term<'src> {
                 Core::unknown_type(),
                 arg_style,
             ),
-            TermEnum::Variable(name) => ctx.lookup(variables, name)?,
+            TermEnum::Variable(name) => ctx.lookup(variables, name, arg_style)?,
             TermEnum::Unknown => Core::unknown_value(),
             TermEnum::Let { value, binding } => Core::let_binding(
                 ctx,
