@@ -67,6 +67,7 @@ fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     })
 }
 
+// TODO: Parse ⇒ and →
 fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     separated_foldr1(
         function_applications(),
@@ -109,6 +110,7 @@ fn forall<'tok, 'src: 'tok>(
 fn let_binding<'tok, 'src: 'tok>(keyword: Keyword) -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(
         keyword,
+        // TODO: Implies to `in`
         (term, Operator::Assign, term, Operator::Implies, term),
     )
     .map(move |(var, _assign, value, _linend, in_term)| Term::let_binding(var, value, in_term))
