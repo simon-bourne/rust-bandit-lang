@@ -24,35 +24,34 @@ pub struct Function<'src> {
 }
 
 pub struct Data<'src> {
-    pub type_constructor: Constant<'src>,
-    pub value_constructors: Vec<Constant<'src>>,
+    pub type_constructor: Declaration<'src>,
+    pub value_constructors: Vec<Declaration<'src>>,
 }
 
 impl<'src> Data<'src> {
     pub fn new(
-        name: &'src str,
-        typ: Option<Term<'src>>,
-        value_constructors: Vec<Constant<'src>>,
+        type_constructor: Declaration<'src>,
+        value_constructors: Vec<Declaration<'src>>,
     ) -> Self {
         Self {
-            type_constructor: Constant { name, typ },
+            type_constructor,
             value_constructors,
         }
     }
 }
 
 #[derive(Constructor)]
-pub struct Constant<'src> {
+pub struct Declaration<'src> {
     name: &'src str,
     typ: Option<Term<'src>>,
 }
 
-impl<'src> Constant<'src> {
+impl<'src> Declaration<'src> {
     pub fn name(&self) -> &'src str {
         self.name
     }
 
-    pub fn desugar(&self, ctx: &Context<'src>) -> Result<typed::Term<'src>> {
+    pub fn desugar_constant(&self, ctx: &Context<'src>) -> Result<typed::Term<'src>> {
         typed::Term::constant(
             ctx,
             self.name,
@@ -62,6 +61,20 @@ impl<'src> Constant<'src> {
                 typed::Term::unknown_type()
             },
         )
+    }
+
+    fn desugar_variable(
+        &self,
+        ctx: &Context<'src>,
+        variables: &mut LocalVariables<'src>,
+    ) -> Result<typed::Term<'src>> {
+        let typ = if let Some(typ) = &self.typ {
+            typ.desugar_local(ctx, variables, Explicit)?
+        } else {
+            typed::Term::unknown_type()
+        };
+
+        typed::Term::variable(ctx, Some(self.name), typ)
     }
 }
 
@@ -109,7 +122,7 @@ impl<'src> Term<'src> {
         })
     }
 
-    pub fn let_binding(variable: VariableDeclaration<'src>, value: Self, in_term: Self) -> Self {
+    pub fn let_binding(variable: Declaration<'src>, value: Self, in_term: Self) -> Self {
         Self::new(TermEnum::Let {
             value,
             binding: VariableBinding {
@@ -121,7 +134,7 @@ impl<'src> Term<'src> {
     }
 
     pub fn pi_type(
-        variable: VariableDeclaration<'src>,
+        variable: Declaration<'src>,
         in_term: Self,
         discriminator: ArgumentStyle,
     ) -> Self {
@@ -145,7 +158,7 @@ impl<'src> Term<'src> {
     }
 
     pub fn lambda(
-        variable: VariableDeclaration<'src>,
+        variable: Declaration<'src>,
         in_term: Self,
         discriminator: ArgumentStyle,
     ) -> Self {
@@ -244,30 +257,8 @@ enum TermEnum<'src> {
     SpecifyImplicits(Term<'src>),
 }
 
-#[derive(Constructor)]
-pub struct VariableDeclaration<'src> {
-    name: &'src str,
-    typ: Option<Term<'src>>,
-}
-
-impl<'src> VariableDeclaration<'src> {
-    fn desugar(
-        &self,
-        ctx: &Context<'src>,
-        variables: &mut LocalVariables<'src>,
-    ) -> Result<typed::Term<'src>> {
-        let typ = if let Some(typ) = &self.typ {
-            typ.desugar_local(ctx, variables, Explicit)?
-        } else {
-            typed::Term::unknown_type()
-        };
-
-        typed::Term::variable(ctx, Some(self.name), typ)
-    }
-}
-
 impl<'src> Variable for Term<'src> {
-    type Declaration = VariableDeclaration<'src>;
+    type Declaration = Declaration<'src>;
 }
 
 impl<'src, Discriminator: Clone> VariableBinding<Term<'src>, Discriminator> {
@@ -276,7 +267,7 @@ impl<'src, Discriminator: Clone> VariableBinding<Term<'src>, Discriminator> {
         ctx: &Context<'src>,
         variables: &mut LocalVariables<'src>,
     ) -> Result<VariableBinding<typed::Term<'src>, Discriminator>> {
-        let variable = self.variable.desugar(ctx, variables)?;
+        let variable = self.variable.desugar_variable(ctx, variables)?;
         let in_term = variables.in_scope(variable.clone(), |variables| {
             self.in_term.desugar_local(ctx, variables, Explicit)
         })?;

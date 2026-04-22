@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bandit_term::{
-    ast::{Term, VariableDeclaration},
+    ast::{Declaration, Term},
     context::{ContextOwner, Value},
 };
 
@@ -13,7 +13,7 @@ fn let_error() {
         let float_type = Term::variable("Float");
         let one = Term::variable("one").has_type(int_type());
         let let_binding = Term::let_binding(
-            VariableDeclaration::new("x", None),
+            Declaration::new("x", None),
             one,
             Term::variable("x").has_type(float_type),
         );

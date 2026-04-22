@@ -1,6 +1,6 @@
 use crate::{
     ArgumentStyle, Pretty,
-    ast::{Data, Definition, Function, Term, TermEnum, VariableDeclaration},
+    ast::{Data, Declaration, Definition, Function, Term, TermEnum},
     pretty::{Document, Layout, Operator, Side, TypeAnnotated},
 };
 
@@ -31,7 +31,7 @@ impl Pretty for Term<'_> {
     }
 }
 
-impl Pretty for VariableDeclaration<'_> {
+impl Pretty for Declaration<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         TypeAnnotated::new(self.name, self.typ.as_ref()).to_document(parent, layout)
     }

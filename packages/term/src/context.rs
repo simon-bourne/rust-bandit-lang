@@ -53,7 +53,7 @@ impl<'src> Data<'src> {
 }
 
 enum Constant<'src> {
-    Ast(ast::Constant<'src>),
+    Ast(ast::Declaration<'src>),
     Typed(typed::Term<'src>),
 }
 
@@ -61,7 +61,7 @@ enum Constant<'src> {
 type MutableConstant<'src> = RefCell<Constant<'src>>;
 
 impl<'src> Constant<'src> {
-    fn new(value: ast::Constant<'src>) -> MutableConstant<'src> {
+    fn new(value: ast::Declaration<'src>) -> MutableConstant<'src> {
         RefCell::new(Self::Ast(value))
     }
 }
@@ -254,7 +254,7 @@ impl<'a> Context<'a> {
 
         let typed_constant = match &mut *constant {
             Constant::Typed(constant) => constant.clone(),
-            Constant::Ast(constant) => constant.desugar(self)?,
+            Constant::Ast(constant) => constant.desugar_constant(self)?,
         };
 
         *constant = Constant::Typed(typed_constant.clone());

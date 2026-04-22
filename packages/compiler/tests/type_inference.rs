@@ -1,7 +1,7 @@
 use bandit_parser::{lex::Token, parse::term};
 use bandit_term::{
     InferenceError, Pretty,
-    ast::{Data, Term},
+    ast::{Data, Declaration, Term},
     context::{ContextOwner, Value},
     typed,
 };
@@ -27,9 +27,12 @@ fn context<'src>() -> ContextOwner<'src> {
         ("scoped", "∀a ⇒ (∀s ⇒ s → a) → a"),
     ];
 
-    let types = types
-        .into_iter()
-        .map(|name| Data::new(name, Some(Term::type_of_type()), Vec::new()));
+    let types = types.into_iter().map(|name| {
+        Data::new(
+            Declaration::new(name, Some(Term::type_of_type())),
+            Vec::new(),
+        )
+    });
     let items = items
         .into_iter()
         .map(|(name, typ)| (name, Value::with_type(Term::unknown(), parse(typ))));

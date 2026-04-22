@@ -1,7 +1,7 @@
 // TODO: Newline to separate let binding and expression.
 use bandit_term::{
     ArgumentStyle,
-    ast::{Constant, Data, Definition, Function, VariableDeclaration},
+    ast::{Data, Declaration, Definition, Function},
 };
 use winnow::{
     Parser as _, Result,
@@ -32,15 +32,9 @@ fn function_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Function<'
 }
 
 fn data_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Data<'src>> {
-    preceded(
-        Keyword::Data,
-        (identifier(), opt(has_type()), block(value_constructor())),
+    preceded(Keyword::Data, (declaration(), block(declaration()))).map(
+        |(type_constructor, value_constructors)| Data::new(type_constructor, value_constructors),
     )
-    .map(|(name, typ, value_constructors)| Data::new(name, typ, value_constructors))
-}
-
-fn value_constructor<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Constant<'src>> {
-    (identifier(), opt(has_type())).map(|(name, typ)| Constant::new(name, typ))
 }
 
 fn has_type<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
@@ -124,13 +118,13 @@ fn variable<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     identifier().map(Term::variable)
 }
 
-fn untyped_declaration<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, VariableDeclaration<'src>> {
-    identifier().map(|name| VariableDeclaration::new(name, None))
+fn untyped_declaration<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Declaration<'src>> {
+    identifier().map(|name| Declaration::new(name, None))
 }
 
-fn declaration<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, VariableDeclaration<'src>> {
+fn declaration<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Declaration<'src>> {
     (identifier(), opt(preceded(Operator::HasType, term)))
-        .map(|(name, typ)| VariableDeclaration::new(name, typ))
+        .map(|(name, typ)| Declaration::new(name, typ))
 }
 
 fn identifier<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, &'src str> {
