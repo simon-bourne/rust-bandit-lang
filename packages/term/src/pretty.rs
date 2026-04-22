@@ -4,7 +4,7 @@ use derive_more::Constructor;
 use pretty::RcDoc;
 
 use super::VariableBinding;
-use crate::ArgumentStyle;
+use crate::{ArgumentStyle, Variable};
 
 pub trait Pretty {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document;
@@ -35,7 +35,11 @@ impl<T: Pretty> Pretty for &'_ T {
     }
 }
 
-impl<Term: Pretty> VariableBinding<Term, ArgumentStyle> {
+impl<Term> VariableBinding<Term, ArgumentStyle>
+where
+    Term: Variable + Pretty,
+    Term::Declaration: Pretty,
+{
     pub fn pi_to_document(
         &self,
         parent: Option<(Operator, Side)>,
@@ -81,7 +85,11 @@ impl<Term: Pretty> VariableBinding<Term, ArgumentStyle> {
     }
 }
 
-impl<Term: Pretty> VariableBinding<Term, ()> {
+impl<Term> VariableBinding<Term, ()>
+where
+    Term: Variable + Pretty,
+    Term::Declaration: Pretty,
+{
     pub fn let_to_document(
         &self,
         value: &impl Pretty,

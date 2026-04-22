@@ -1,6 +1,6 @@
 use crate::{
     ArgumentStyle::{self, Explicit, Implicit},
-    InferenceError, Result, VariableBinding,
+    Result, Variable, VariableBinding,
     context::ContextOwner,
     typed,
 };
@@ -109,7 +109,7 @@ impl<'src> Term<'src> {
         })
     }
 
-    pub fn let_binding(variable: Self, value: Self, in_term: Self) -> Self {
+    pub fn let_binding(variable: VariableDeclaration<'src>, value: Self, in_term: Self) -> Self {
         Self::new(TermEnum::Let {
             value,
             binding: VariableBinding {
@@ -120,7 +120,11 @@ impl<'src> Term<'src> {
         })
     }
 
-    pub fn pi_type(variable: Self, in_term: Self, discriminator: ArgumentStyle) -> Self {
+    pub fn pi_type(
+        variable: VariableDeclaration<'src>,
+        in_term: Self,
+        discriminator: ArgumentStyle,
+    ) -> Self {
         Self::new(TermEnum::Pi(VariableBinding {
             variable,
             in_term,
@@ -140,7 +144,11 @@ impl<'src> Term<'src> {
         ))
     }
 
-    pub fn lambda(variable: Self, in_term: Self, discriminator: ArgumentStyle) -> Self {
+    pub fn lambda(
+        variable: VariableDeclaration<'src>,
+        in_term: Self,
+        discriminator: ArgumentStyle,
+    ) -> Self {
         Self::new(TermEnum::Lambda(VariableBinding {
             variable,
             in_term,
@@ -150,18 +158,6 @@ impl<'src> Term<'src> {
 
     pub fn has_type(self, typ: Self) -> Self {
         Self::new(TermEnum::HasType { term: self, typ })
-    }
-
-    // TODO: Store this directly in `VariableBinding`, rather than creating a term
-    // and extracting the data inside `desugar_variable`
-    pub fn declare_variable(name: &'src str, typ: Option<Self>) -> Self {
-        let var = Self::new(TermEnum::Variable(name));
-
-        if let Some(typ) = typ {
-            var.has_type(typ)
-        } else {
-            var
-        }
     }
 
     pub fn variable(name: &'src str) -> Self {
@@ -224,23 +220,6 @@ impl<'src> Term<'src> {
     fn new(term: TermEnum<'src>) -> Self {
         Self(Box::new(term))
     }
-
-    fn desugar_variable(
-        &self,
-        ctx: &Context<'src>,
-        variables: &mut LocalVariables<'src>,
-    ) -> Result<typed::Term<'src>> {
-        Ok(match self.0.as_ref() {
-            TermEnum::HasType { term, typ } => Ok(term
-                .desugar_variable(ctx, variables)?
-                .has_type(ctx, typ.desugar_local(ctx, variables, Explicit)?)?)?,
-            TermEnum::Variable(name) => {
-                typed::Term::variable(ctx, Some(name), typed::Term::unknown_type())?
-            }
-            TermEnum::Unknown => typed::Term::variable(ctx, None, typed::Term::unknown_type())?,
-            _ => Err(InferenceError::InvalidVariable)?,
-        })
-    }
 }
 
 enum TermEnum<'src> {
@@ -265,13 +244,39 @@ enum TermEnum<'src> {
     SpecifyImplicits(Term<'src>),
 }
 
+#[derive(Constructor)]
+pub struct VariableDeclaration<'src> {
+    name: &'src str,
+    typ: Option<Term<'src>>,
+}
+
+impl<'src> VariableDeclaration<'src> {
+    fn desugar(
+        &self,
+        ctx: &Context<'src>,
+        variables: &mut LocalVariables<'src>,
+    ) -> Result<typed::Term<'src>> {
+        let typ = if let Some(typ) = &self.typ {
+            typ.desugar_local(ctx, variables, Explicit)?
+        } else {
+            typed::Term::unknown_type()
+        };
+
+        typed::Term::variable(ctx, Some(self.name), typ)
+    }
+}
+
+impl<'src> Variable for Term<'src> {
+    type Declaration = VariableDeclaration<'src>;
+}
+
 impl<'src, Discriminator: Clone> VariableBinding<Term<'src>, Discriminator> {
     fn desugar(
         &self,
         ctx: &Context<'src>,
         variables: &mut LocalVariables<'src>,
     ) -> Result<VariableBinding<typed::Term<'src>, Discriminator>> {
-        let variable = self.variable.desugar_variable(ctx, variables)?;
+        let variable = self.variable.desugar(ctx, variables)?;
         let in_term = variables.in_scope(variable.clone(), |variables| {
             self.in_term.desugar_local(ctx, variables, Explicit)
         })?;

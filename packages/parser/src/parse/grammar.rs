@@ -1,7 +1,7 @@
 // TODO: Newline to separate let binding and expression.
 use bandit_term::{
     ArgumentStyle,
-    ast::{Constant, Data, Definition, Function},
+    ast::{Constant, Data, Definition, Function, VariableDeclaration},
 };
 use winnow::{
     Parser as _, Result,
@@ -95,7 +95,7 @@ fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 }
 
 fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    let forall_binder = alt((variable(), parenthesized(binder())));
+    let forall_binder = alt((untyped_declaration(), parenthesized(declaration())));
     preceded(Keyword::Forall, (forall_binder, pi_argument_style(), term))
         .map(|(variable, arg_style, in_term)| Term::pi_type(variable, in_term, arg_style))
 }
@@ -103,7 +103,7 @@ fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     preceded(
         Keyword::Let,
-        (binder(), Token::Assign, term, Keyword::In, term),
+        (declaration(), Token::Assign, term, Keyword::In, term),
     )
     .map(|(var, _assign, value, _linend, in_term)| Term::let_binding(var, value, in_term))
 }
@@ -111,7 +111,7 @@ fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     (
         lambda_argument_style(),
-        separated_pair(term, Token::Assign, term),
+        separated_pair(declaration(), Token::Assign, term),
     )
         .map(move |(arg_style, (variable, in_term))| Term::lambda(variable, in_term, arg_style))
 }
@@ -124,9 +124,13 @@ fn variable<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     identifier().map(Term::variable)
 }
 
-fn binder<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
+fn untyped_declaration<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, VariableDeclaration<'src>> {
+    identifier().map(|name| VariableDeclaration::new(name, None))
+}
+
+fn declaration<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, VariableDeclaration<'src>> {
     (identifier(), opt(preceded(Operator::HasType, term)))
-        .map(|(name, typ)| Term::declare_variable(name, typ))
+        .map(|(name, typ)| VariableDeclaration::new(name, typ))
 }
 
 fn identifier<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, &'src str> {

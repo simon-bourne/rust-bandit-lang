@@ -92,9 +92,12 @@ pub enum ArgumentStyle {
     Explicit,
 }
 
-#[derive(Clone)]
-struct VariableBinding<Term, Discriminator> {
-    variable: Term,
+trait Variable {
+    type Declaration;
+}
+
+struct VariableBinding<Term: Variable, Discriminator> {
+    variable: <Term as Variable>::Declaration,
     in_term: Term,
     discriminator: Discriminator,
 }

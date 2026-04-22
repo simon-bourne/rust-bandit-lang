@@ -5,8 +5,8 @@ use clonelet::clone;
 use katexit::katexit;
 
 use crate::{
-    ArgumentStyle, InferenceError, Pretty, Result, SharedMut, VariableBinding, context::Context,
-    sync::Latch,
+    ArgumentStyle, InferenceError, Pretty, Result, SharedMut, Variable, VariableBinding,
+    context::Context, sync::Latch,
 };
 
 mod pretty;
@@ -796,6 +796,10 @@ enum VariableScope {
     OutOfScope,
     Free,
     Bound,
+}
+
+impl<'src> Variable for Term<'src> {
+    type Declaration = Self;
 }
 
 impl<'src, Discriminator: Clone + Eq + PartialEq> VariableBinding<Term<'src>, Discriminator> {
