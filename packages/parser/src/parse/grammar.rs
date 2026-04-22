@@ -66,7 +66,7 @@ fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     separated_foldr1(
         function_applications(),
-        argument_style(),
+        pi_argument_style(),
         |input_type, arg_style, output_type| {
             Term::function_type(input_type, output_type, arg_style)
         },
@@ -83,8 +83,7 @@ fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
         typ(),
         variable(),
         forall(),
-        lambda(Token::Lambda, ArgumentStyle::Explicit),
-        lambda(Token::ImplicitLambda, ArgumentStyle::Implicit),
+        lambda(),
         let_binding(),
         specify_implicits(term),
         parenthesized(term),
@@ -97,7 +96,7 @@ fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 
 fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     let forall_binder = alt((variable(), parenthesized(binder())));
-    preceded(Keyword::Forall, (forall_binder, argument_style(), term))
+    preceded(Keyword::Forall, (forall_binder, pi_argument_style(), term))
         .map(|(variable, arg_style, in_term)| Term::pi_type(variable, in_term, arg_style))
 }
 
@@ -106,12 +105,12 @@ fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
         .map(|(var, _assign, value, _linend, in_term)| Term::let_binding(var, value, in_term))
 }
 
-fn lambda<'tok, 'src: 'tok>(
-    token: Token<'src>,
-    arg_style: ArgumentStyle,
-) -> impl Parser<'tok, 'src, Term<'src>> {
-    preceded(token, separated_pair(term, Token::Assign, term))
-        .map(move |(variable, in_term)| Term::lambda(variable, in_term, arg_style))
+fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
+    (
+        lambda_argument_style(),
+        separated_pair(term, Token::Assign, term),
+    )
+        .map(move |(arg_style, (variable, in_term))| Term::lambda(variable, in_term, arg_style))
 }
 
 fn unknown<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
@@ -137,10 +136,17 @@ fn identifier<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, &'src str> {
     })
 }
 
-fn argument_style<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, ArgumentStyle> {
+fn pi_argument_style<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, ArgumentStyle> {
     alt((
         Operator::To.value(ArgumentStyle::Explicit),
         Operator::Implies.value(ArgumentStyle::Implicit),
+    ))
+}
+
+fn lambda_argument_style<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, ArgumentStyle> {
+    alt((
+        Token::Lambda.value(ArgumentStyle::Explicit),
+        Token::ImplicitLambda.value(ArgumentStyle::Implicit),
     ))
 }
 
