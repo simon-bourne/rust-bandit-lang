@@ -70,6 +70,11 @@ fn one() {
 }
 
 #[test]
+fn forall_brackets() {
+    "[scoped]".infers("scoped : ∀a ⇒ (∀s ⇒ s → a) → a")
+}
+
+#[test]
 fn evaluate_let() {
     "one : let x = Int ⇒ x".infers("one : Int");
 }
@@ -123,25 +128,24 @@ fn partial_add() {
 
 #[test]
 fn simple_id() {
-    "[id _] one".infers("((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int");
+    "[id _] one".infers("((id : ∀a ⇒ a → a) @ (Int : Type) : Int → Int) (one : Int) : Int");
 }
 
-// TODO: Can we remove brackets around `(∀a ⇒ a → a)`?
 #[test]
 fn infer_implicit_param_on_function() {
-    "id one".infers("((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int");
+    "id one".infers("((id : ∀a ⇒ a → a) @ (Int : Type) : Int → Int) (one : Int) : Int");
 }
 
 #[test]
 fn infer_implicit_param_on_argument() {
     "higher_order id".infers(
-        "(higher_order : (Int → Int) → Int) ((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) : Int",
+        "(higher_order : (Int → Int) → Int) ((id : ∀a ⇒ a → a) @ (Int : Type) : Int → Int) : Int",
     );
 }
 
 #[test]
 fn check_implicit_argument() {
-    "[id Int] one".infers("((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int");
+    "[id Int] one".infers("((id : ∀a ⇒ a → a) @ (Int : Type) : Int → Int) (one : Int) : Int");
 }
 
 #[test]
@@ -151,7 +155,7 @@ fn infer_type_is_type() {
 
 #[test]
 fn infer_implicit_argument_isolation() {
-    "add (id one) ([id Int] one)".infers("((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int");
+    "add (id one) ([id Int] one)".infers("((add : Int → Int → Int) (((id : ∀a ⇒ a → a) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) (((id : ∀a ⇒ a → a) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int");
 }
 
 #[test]
@@ -167,30 +171,30 @@ fn occurs_check() {
 #[test]
 fn multi_id() {
     "add ([id Int] one) (float_to_int ([id Float] pi))".infers(
-        "((add : Int → Int → Int) (((id : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : (∀a ⇒ a → a)) @ (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
+        "((add : Int → Int → Int) (((id : ∀a ⇒ a → a) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id : ∀a ⇒ a → a) @ (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
 }
 
 #[test]
 fn polymorphic_let() {
     "let id2 : ∀a ⇒ a → a = [id] ⇒ add ([id2 Int] one) (float_to_int ([id2 Float] pi))".infers(
-        "let id2 : (∀a ⇒ a → a) = id ⇒ ((add : Int → Int → Int) (((id2 : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a ⇒ a → a)) @ (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
+        "let id2 : ∀a ⇒ a → a = id ⇒ ((add : Int → Int → Int) (((id2 : ∀a ⇒ a → a) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : ∀a ⇒ a → a) @ (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
 }
 
 #[test]
 fn simple_polymorphic_lambda() {
-    r"\x : ∀b ⇒ b = x".infers(r"\x : (∀b ⇒ b) = x : (∀b ⇒ b)");
+    r"\x : ∀b ⇒ b = x".infers(r"\x : ∀b ⇒ b = x : ∀b ⇒ b");
 }
 
 #[test]
 fn simple_polymorphic_let() {
-    "let x : ∀b ⇒ b = [polymorphic] ⇒ x".infers("let x : (∀a ⇒ a) = polymorphic ⇒ x : (∀a ⇒ a)");
+    "let x : ∀b ⇒ b = [polymorphic] ⇒ x".infers("let x : ∀a ⇒ a = polymorphic ⇒ x : ∀a ⇒ a");
 }
 
 #[test]
 fn polymorphic_lambda() {
     r"\id2 : ∀a ⇒ a → a = add ([id2 Int] one) (float_to_int ([id2 Float] pi))".infers(
-        r"\id2 : (∀a ⇒ a → a) = ((add : Int → Int → Int) (((id2 : (∀a ⇒ a → a)) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : (∀a ⇒ a → a)) @ (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int",
+        r"\id2 : ∀a ⇒ a → a = ((add : Int → Int → Int) (((id2 : ∀a ⇒ a → a) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : ∀a ⇒ a → a) @ (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int",
     );
 }

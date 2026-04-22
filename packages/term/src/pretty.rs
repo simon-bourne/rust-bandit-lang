@@ -70,7 +70,8 @@ impl<Term: Pretty> VariableBinding<Term, ArgumentStyle> {
         layout: Layout,
     ) -> RcDoc<'static> {
         parenthesize_if(
-            parent.is_some(),
+            // A unary prefix operator with the lowest priority
+            matches!(parent, Some((_, Side::Left))),
             [
                 Document::text(prefix),
                 self.variable.to_document(None, layout),
