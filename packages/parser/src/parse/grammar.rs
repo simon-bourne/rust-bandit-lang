@@ -84,7 +84,8 @@ fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
         unknown(),
         typ(),
         variable(),
-        forall(),
+        forall(Operator::Implies, ArgumentStyle::Implicit),
+        forall(Operator::To, ArgumentStyle::Explicit),
         lambda(Token::Lambda, ArgumentStyle::Explicit),
         lambda(Token::ImplicitLambda, ArgumentStyle::Implicit),
         let_binding(Keyword::Let),
@@ -97,13 +98,12 @@ fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     identifier().verify_map(|name| (name == "Type").then(Term::type_of_type))
 }
 
-// TODO: parse ⇒ and →
-fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    preceded(
-        Keyword::Forall,
-        separated_pair(term, Operator::Implies, term),
-    )
-    .map(|(variable, in_term)| Term::pi_type(variable, in_term))
+fn forall<'tok, 'src: 'tok>(
+    operator: Operator,
+    arg_style: ArgumentStyle,
+) -> impl Parser<'tok, 'src, Term<'src>> {
+    preceded(Keyword::Forall, separated_pair(term, operator, term))
+        .map(move |(variable, in_term)| Term::pi_type(variable, in_term, arg_style))
 }
 
 fn let_binding<'tok, 'src: 'tok>(keyword: Keyword) -> impl Parser<'tok, 'src, Term<'src>> {

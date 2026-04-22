@@ -120,11 +120,11 @@ impl<'src> Term<'src> {
         })
     }
 
-    pub fn pi_type(variable: Self, in_term: Self) -> Self {
+    pub fn pi_type(variable: Self, in_term: Self, discriminator: ArgumentStyle) -> Self {
         Self::new(TermEnum::Pi(VariableBinding {
             variable,
             in_term,
-            discriminator: Implicit,
+            discriminator,
         }))
     }
 
