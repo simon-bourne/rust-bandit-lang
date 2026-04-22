@@ -128,8 +128,16 @@ impl<'src> Term<'src> {
         }))
     }
 
-    pub fn function_type(input_type: Self, output_type: Self) -> Self {
-        Self::new(TermEnum::FunctionType(input_type, output_type))
+    pub fn function_type(
+        input_type: Self,
+        output_type: Self,
+        argument_style: ArgumentStyle,
+    ) -> Self {
+        Self::new(TermEnum::FunctionType(
+            input_type,
+            output_type,
+            argument_style,
+        ))
     }
 
     pub fn lambda(variable: Self, in_term: Self, discriminator: ArgumentStyle) -> Self {
@@ -181,7 +189,7 @@ impl<'src> Term<'src> {
                 binding.desugar(ctx, variables)?,
             )?,
             TermEnum::Pi(binding) => Core::pi(ctx, binding.desugar(ctx, variables)?)?,
-            TermEnum::FunctionType(left, right) => Core::pi(
+            TermEnum::FunctionType(left, right, discriminator) => Core::pi(
                 ctx,
                 VariableBinding {
                     variable: Core::variable(
@@ -190,7 +198,7 @@ impl<'src> Term<'src> {
                         left.desugar_local(ctx, variables, Explicit)?,
                     )?,
                     in_term: right.desugar_local(ctx, variables, Explicit)?,
-                    discriminator: Explicit,
+                    discriminator: *discriminator,
                 },
             )?,
             TermEnum::Lambda(binding) => Core::lambda(binding.desugar(ctx, variables)?),
@@ -236,7 +244,7 @@ enum TermEnum<'src> {
         binding: VariableBinding<Term<'src>, ()>,
     },
     Pi(VariableBinding<Term<'src>, ArgumentStyle>),
-    FunctionType(Term<'src>, Term<'src>),
+    FunctionType(Term<'src>, Term<'src>, ArgumentStyle),
     Lambda(VariableBinding<Term<'src>, ArgumentStyle>),
     HasType {
         term: Term<'src>,

@@ -32,6 +32,7 @@ pub enum Token<'src> {
     #[token("forall", |_| Keyword::Forall)]
     #[token("from", |_| Keyword::From)]
     #[token("if", |_| Keyword::If)]
+    #[token("in", |_| Keyword::In)]
     #[token("let", |_| Keyword::Let)]
     #[token("loop", |_| Keyword::Loop)]
     #[token("of", |_| Keyword::Of)]
@@ -61,6 +62,9 @@ pub enum Token<'src> {
     #[token("_")]
     Unknown,
 
+    #[token("=")]
+    Assign,
+
     // ASCII operators
     #[token("and", |_| Operator::And)]
     #[token("or", |_| Operator::Or)]
@@ -75,7 +79,6 @@ pub enum Token<'src> {
     #[token(">", |_| Operator::GreaterThan)]
     #[token("<=", |_| Operator::LessOrEqual)]
     #[token(">=", |_| Operator::GreaterOrEqual)]
-    #[token("=", |_| Operator::Assign)]
     #[token(":", |_| Operator::HasType)]
     #[token("->", |_| Operator::To)]
     #[token("=>", |_| Operator::Implies)]
@@ -165,6 +168,7 @@ pub enum Keyword {
     Forall,
     From,
     If,
+    In,
     Let,
     Loop,
     Of,
@@ -194,6 +198,7 @@ impl Keyword {
             KW::Forall => "forall",
             KW::From => "from",
             KW::If => "if",
+            KW::In => "in",
             KW::Let => "let",
             KW::Loop => "loop",
             KW::Of => "of",
@@ -229,7 +234,6 @@ pub enum Operator {
     GreaterOrEqual,
 
     Apply,
-    Assign,
     HasType,
     To,
     Implies,
@@ -255,7 +259,6 @@ impl Operator {
             Self::GreaterOrEqual => ">=",
 
             Self::HasType => ":",
-            Self::Assign => "=",
             Self::Apply => "<-",
             Self::To => "->",
             Self::Implies => "=>",

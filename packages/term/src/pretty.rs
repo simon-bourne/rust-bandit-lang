@@ -143,7 +143,7 @@ pub fn pretty_let<Term: Pretty>(
             Document::text("let"),
             Document::text(" "),
             assignment,
-            Document::text(" ⇒ "),
+            Document::text(" in "),
             binding.in_term.to_document(None, layout),
         ],
     )
@@ -235,6 +235,7 @@ impl Operator {
 
     fn precedence(self) -> usize {
         match self {
+            // TODO: Assignment is not an operator
             Self::Equals => 0,
             Self::HasType => 1,
             Self::Arrow(_) => 2,

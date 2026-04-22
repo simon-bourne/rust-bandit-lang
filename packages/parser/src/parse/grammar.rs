@@ -27,11 +27,7 @@ pub fn definitions<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Vec<Definition
 }
 
 fn function_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Function<'src>> {
-    (
-        identifier(),
-        opt(has_type()),
-        preceded(Operator::Assign, term),
-    )
+    (identifier(), opt(has_type()), preceded(Token::Assign, term))
         .map(|(name, typ, value)| Function::new(name, typ, value))
 }
 
@@ -67,12 +63,13 @@ fn type_annotations<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     })
 }
 
-// TODO: Parse ⇒ and →
 fn function_types<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     separated_foldr1(
         function_applications(),
-        Operator::To,
-        |input_type, _, output_type| Term::function_type(input_type, output_type),
+        argument_style(),
+        |input_type, arg_style, output_type| {
+            Term::function_type(input_type, output_type, arg_style)
+        },
     )
 }
 
@@ -85,11 +82,10 @@ fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
         unknown(),
         typ(),
         variable(),
-        forall(Operator::Implies, ArgumentStyle::Implicit),
-        forall(Operator::To, ArgumentStyle::Explicit),
+        forall(),
         lambda(Token::Lambda, ArgumentStyle::Explicit),
         lambda(Token::ImplicitLambda, ArgumentStyle::Implicit),
-        let_binding(Keyword::Let),
+        let_binding(),
         specify_implicits(term),
         parenthesized(term),
     ))
@@ -99,28 +95,22 @@ fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     identifier().verify_map(|name| (name == "Type").then(Term::type_of_type))
 }
 
-fn forall<'tok, 'src: 'tok>(
-    operator: Operator,
-    arg_style: ArgumentStyle,
-) -> impl Parser<'tok, 'src, Term<'src>> {
-    preceded(Keyword::Forall, separated_pair(term, operator, term))
-        .map(move |(variable, in_term)| Term::pi_type(variable, in_term, arg_style))
+fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
+    let forall_binder = alt((variable(), parenthesized(binder())));
+    preceded(Keyword::Forall, (forall_binder, argument_style(), term))
+        .map(|(variable, arg_style, in_term)| Term::pi_type(variable, in_term, arg_style))
 }
 
-fn let_binding<'tok, 'src: 'tok>(keyword: Keyword) -> impl Parser<'tok, 'src, Term<'src>> {
-    preceded(
-        keyword,
-        // TODO: Implies to `in`
-        (term, Operator::Assign, term, Operator::Implies, term),
-    )
-    .map(move |(var, _assign, value, _linend, in_term)| Term::let_binding(var, value, in_term))
+fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
+    preceded(Keyword::Let, (term, Token::Assign, term, Keyword::In, term))
+        .map(|(var, _assign, value, _linend, in_term)| Term::let_binding(var, value, in_term))
 }
 
 fn lambda<'tok, 'src: 'tok>(
     token: Token<'src>,
     arg_style: ArgumentStyle,
 ) -> impl Parser<'tok, 'src, Term<'src>> {
-    preceded(token, separated_pair(term, Operator::Assign, term))
+    preceded(token, separated_pair(term, Token::Assign, term))
         .map(move |(variable, in_term)| Term::lambda(variable, in_term, arg_style))
 }
 
@@ -132,6 +122,11 @@ fn variable<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     identifier().map(Term::variable)
 }
 
+fn binder<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
+    // TODO: Limit this to var name with optional type annotation
+    term
+}
+
 fn identifier<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, &'src str> {
     any.verify_map(|t: SrcToken| {
         if let Token::Identifier(name) = t.0 {
@@ -140,6 +135,13 @@ fn identifier<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, &'src str> {
             None
         }
     })
+}
+
+fn argument_style<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, ArgumentStyle> {
+    alt((
+        Operator::To.value(ArgumentStyle::Explicit),
+        Operator::Implies.value(ArgumentStyle::Implicit),
+    ))
 }
 
 fn specify_implicits<'tok, 'src: 'tok>(

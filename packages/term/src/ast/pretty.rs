@@ -14,8 +14,8 @@ impl Pretty for Term<'_> {
             TermEnum::Unknown => Document::text("_"),
             TermEnum::Let { value, binding } => pretty_let(value, binding, parent, layout),
             TermEnum::Pi(binding) => binding.pi_to_document(parent, layout),
-            TermEnum::FunctionType(input_type, output_type) => Operator::Arrow(
-                ArgumentStyle::Explicit,
+            TermEnum::FunctionType(input_type, output_type, arg_style) => Operator::Arrow(
+                *arg_style,
             )
             .to_document(parent, input_type, output_type, layout, layout),
             TermEnum::Lambda(binding) => binding.lambda_to_document(parent, layout),

@@ -8,6 +8,16 @@ fn pi() {
 }
 
 #[test]
+fn implicit_function() {
+    parse("x ⇒ x", "x ⇒ x");
+}
+
+#[test]
+fn explicit_function() {
+    parse("x → x", "x → x");
+}
+
+#[test]
 fn lambda() {
     parse(r"(\x = x) Type", r"(\x = x) Type");
 }

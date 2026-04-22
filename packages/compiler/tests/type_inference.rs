@@ -76,7 +76,7 @@ fn forall_brackets() {
 
 #[test]
 fn evaluate_let() {
-    "one : let x = Int ⇒ x".infers("one : Int");
+    "one : let x = Int in x".infers("one : Int");
 }
 
 #[test]
@@ -86,12 +86,12 @@ fn evaluate_apply() {
 
 #[test]
 fn evaluate_recursively() {
-    r"one : let x = (\y = y) Int ⇒ x".infers("one : Int");
+    r"one : let x = (\y = y) Int in x".infers("one : Int");
 }
 
 #[test]
 fn evaluate_recursively2() {
-    r"one : let x = Int ⇒ (\y = y) x".infers("one : Int");
+    r"one : let x = Int in (\y = y) x".infers("one : Int");
 }
 
 #[test]
@@ -111,14 +111,14 @@ fn simple_lambda() {
 
 #[test]
 fn bad_type_annotation() {
-    "let id2 = id ⇒ (id2 : Type → Int → Int)".fails()
+    "let id2 = id in (id2 : Type → Int → Int)".fails()
 }
 
 #[test]
 // We can't unify `x` with `Type` as `x` is a bound variable, and the `let`
 // binding isn't evaluated.
 fn self_referential_type() {
-    r"let x = Type ⇒ x : x".fails()
+    r"let x = Type in x : x".fails()
 }
 
 #[test]
@@ -177,8 +177,8 @@ fn multi_id() {
 
 #[test]
 fn polymorphic_let() {
-    "let id2 : ∀a ⇒ a → a = [id] ⇒ add ([id2 Int] one) (float_to_int ([id2 Float] pi))".infers(
-        "let id2 : ∀a ⇒ a → a = id ⇒ ((add : Int → Int → Int) (((id2 : ∀a ⇒ a → a) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : ∀a ⇒ a → a) @ (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
+    "let id2 : ∀a ⇒ a → a = [id] in add ([id2 Int] one) (float_to_int ([id2 Float] pi))".infers(
+        "let id2 : ∀a ⇒ a → a = id in ((add : Int → Int → Int) (((id2 : ∀a ⇒ a → a) @ (Int : Type) : Int → Int) (one : Int) : Int) : Int → Int) ((float_to_int : Float → Int) (((id2 : ∀a ⇒ a → a) @ (Float : Type) : Float → Float) (pi : Float) : Float) : Int) : Int"
     );
 }
 
@@ -189,7 +189,7 @@ fn simple_polymorphic_lambda() {
 
 #[test]
 fn simple_polymorphic_let() {
-    "let x : ∀b ⇒ b = [polymorphic] ⇒ x".infers("let x : ∀a ⇒ a = polymorphic ⇒ x : ∀a ⇒ a");
+    "let x : ∀b ⇒ b = [polymorphic] in x".infers("let x : ∀a ⇒ a = polymorphic in x : ∀a ⇒ a");
 }
 
 #[test]
