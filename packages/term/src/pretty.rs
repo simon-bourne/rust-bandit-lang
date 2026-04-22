@@ -69,17 +69,52 @@ impl<Term: Pretty> VariableBinding<Term, ArgumentStyle> {
         parent: Option<(Operator, Side)>,
         layout: Layout,
     ) -> RcDoc<'static> {
-        parenthesize_if(
-            // A unary prefix operator with the lowest priority
-            matches!(parent, Some((_, Side::Left))),
+        parenthesize_unary_prefix(
             [
                 Document::text(prefix),
                 self.variable.to_document(None, layout),
                 Document::text(binder),
                 self.in_term.to_document(None, layout),
             ],
+            parent,
         )
     }
+}
+
+impl<Term: Pretty> VariableBinding<Term, ()> {
+    pub fn let_to_document(
+        &self,
+        value: &impl Pretty,
+        parent: Option<(Operator, Side)>,
+        layout: Layout,
+    ) -> Document {
+        let assignment = Operator::Equals.to_document(
+            None,
+            &self.variable,
+            value,
+            layout,
+            layout.without_types().variable_value(),
+        );
+
+        parenthesize_unary_prefix(
+            [
+                Document::text("let"),
+                Document::text(" "),
+                assignment,
+                Document::text(" in "),
+                self.in_term.to_document(None, layout),
+            ],
+            parent,
+        )
+    }
+}
+
+// A unary prefix operator with the lowest priority
+fn parenthesize_unary_prefix(
+    docs: impl IntoIterator<Item = Document>,
+    parent: Option<(Operator, Side)>,
+) -> RcDoc<'static> {
+    parenthesize_if(matches!(parent, Some((_, Side::Left))), docs)
 }
 
 #[derive(Constructor)]
@@ -121,32 +156,6 @@ impl Pretty for Option<&str> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
         self.unwrap_or("_").to_document(parent, layout)
     }
-}
-
-pub fn pretty_let<Term: Pretty>(
-    value: &impl Pretty,
-    binding: &VariableBinding<Term, ()>,
-    parent: Option<(Operator, Side)>,
-    layout: Layout,
-) -> Document {
-    let assignment = Operator::Equals.to_document(
-        None,
-        &binding.variable,
-        value,
-        layout,
-        layout.without_types().variable_value(),
-    );
-
-    parenthesize_if(
-        parent.is_some(),
-        [
-            Document::text("let"),
-            Document::text(" "),
-            assignment,
-            Document::text(" in "),
-            binding.in_term.to_document(None, layout),
-        ],
-    )
 }
 
 pub fn parenthesize_if(condition: bool, docs: impl IntoIterator<Item = Document>) -> Document {

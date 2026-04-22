@@ -1,7 +1,7 @@
 use crate::{
     ArgumentStyle, Pretty,
     ast::{Data, Definition, Function, Term, TermEnum},
-    pretty::{Document, Layout, Operator, Side, TypeAnnotated, pretty_let},
+    pretty::{Document, Layout, Operator, Side, TypeAnnotated},
 };
 
 impl Pretty for Term<'_> {
@@ -12,7 +12,7 @@ impl Pretty for Term<'_> {
                 .to_document(parent, function, argument, layout, layout),
             TermEnum::Variable(name) => Document::as_string(name),
             TermEnum::Unknown => Document::text("_"),
-            TermEnum::Let { value, binding } => pretty_let(value, binding, parent, layout),
+            TermEnum::Let { value, binding } => binding.let_to_document(value, parent, layout),
             TermEnum::Pi(binding) => binding.pi_to_document(parent, layout),
             TermEnum::FunctionType(input_type, output_type, arg_style) => Operator::Arrow(
                 *arg_style,

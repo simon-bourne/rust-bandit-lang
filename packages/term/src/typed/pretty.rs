@@ -3,7 +3,7 @@ use derive_more::Constructor;
 use super::Term;
 use crate::{
     Pretty,
-    pretty::{BinaryOperator, Document, Layout, Operator, Side, TypeAnnotated, pretty_let},
+    pretty::{BinaryOperator, Document, Layout, Operator, Side, TypeAnnotated},
     typed::TermEnum,
 };
 
@@ -30,7 +30,7 @@ impl<'src> Pretty for Term<'src> {
             TermEnum::Unknown { typ, .. } => {
                 has_type(WithId::new(self, None), typ).to_document(parent, layout)
             }
-            TermEnum::Let { value, binding } => pretty_let(value, binding, parent, layout),
+            TermEnum::Let { value, binding } => binding.let_to_document(value, parent, layout),
             TermEnum::Pi(binding) => {
                 if binding.variable_name().is_none() {
                     let layout = layout.without_types();
