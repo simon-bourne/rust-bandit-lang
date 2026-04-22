@@ -101,8 +101,11 @@ fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 }
 
 fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    preceded(Keyword::Let, (term, Token::Assign, term, Keyword::In, term))
-        .map(|(var, _assign, value, _linend, in_term)| Term::let_binding(var, value, in_term))
+    preceded(
+        Keyword::Let,
+        (binder(), Token::Assign, term, Keyword::In, term),
+    )
+    .map(|(var, _assign, value, _linend, in_term)| Term::let_binding(var, value, in_term))
 }
 
 fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
