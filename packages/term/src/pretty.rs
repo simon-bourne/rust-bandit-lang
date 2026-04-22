@@ -96,19 +96,13 @@ where
         parent: Option<(Operator, Side)>,
         layout: Layout,
     ) -> Document {
-        let assignment = Operator::Equals.to_document(
-            None,
-            &self.variable,
-            value,
-            layout,
-            layout.without_types().variable_value(),
-        );
-
         parenthesize_unary_prefix(
             [
                 Document::text("let"),
                 Document::text(" "),
-                assignment,
+                self.variable.to_document(None, layout),
+                Document::text(" = "),
+                value.to_document(None, layout.without_types()),
                 Document::text(" in "),
                 self.in_term.to_document(None, layout),
             ],
@@ -186,7 +180,6 @@ impl<Left: Pretty, Right: Pretty> Pretty for BinaryOperator<Left, Right> {
 
 #[derive(Copy, Clone)]
 pub enum Operator {
-    Equals,
     HasType,
     Arrow(ArgumentStyle),
     Apply(ArgumentStyle),
@@ -195,7 +188,6 @@ pub enum Operator {
 impl Operator {
     pub fn symbol(self) -> &'static str {
         match self {
-            Self::Equals => " = ",
             Self::HasType => " : ",
             Self::Arrow(ArgumentStyle::Explicit) => " → ",
             Self::Arrow(ArgumentStyle::Implicit) => " ⇒ ",
@@ -252,18 +244,15 @@ impl Operator {
 
     fn precedence(self) -> usize {
         match self {
-            // TODO: Assignment is not an operator
-            Self::Equals => 0,
-            Self::HasType => 1,
-            Self::Arrow(_) => 2,
-            Self::Apply(ArgumentStyle::Explicit) => 3,
-            Self::Apply(ArgumentStyle::Implicit) => 4,
+            Self::HasType => 0,
+            Self::Arrow(_) => 1,
+            Self::Apply(ArgumentStyle::Explicit) => 2,
+            Self::Apply(ArgumentStyle::Implicit) => 3,
         }
     }
 
     fn associativity(self) -> Side {
         match self {
-            Self::Equals => Side::Right,
             Self::HasType => Side::Right,
             Self::Arrow(_) => Side::Right,
             Self::Apply(_) => Side::Left,
@@ -284,13 +273,6 @@ pub struct Layout {
     pub annotate_type: bool,
     pub show_id: bool,
     pub show_unknown: bool,
-    pub variable: LayoutVariable,
-}
-
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum LayoutVariable {
-    Name,
-    Value,
 }
 
 impl Layout {
@@ -299,20 +281,12 @@ impl Layout {
             annotate_type: true,
             show_id: true,
             show_unknown: true,
-            variable: LayoutVariable::Name,
         }
     }
 
     pub fn without_types(self) -> Self {
         Self {
             annotate_type: false,
-            ..self
-        }
-    }
-
-    pub fn variable_value(self) -> Self {
-        Self {
-            variable: LayoutVariable::Value,
             ..self
         }
     }
@@ -324,7 +298,6 @@ impl Default for Layout {
             annotate_type: true,
             show_id: false,
             show_unknown: false,
-            variable: LayoutVariable::Name,
         }
     }
 }

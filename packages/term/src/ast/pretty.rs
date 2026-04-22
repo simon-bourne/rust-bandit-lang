@@ -48,9 +48,11 @@ impl Pretty for Definition<'_> {
 
 impl Pretty for Function<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        let name = TypeAnnotated::new(self.name, self.typ.as_ref());
-
-        Operator::Equals.to_document(parent, &name, &self.value, layout, layout.without_types())
+        Document::concat([
+            TypeAnnotated::new(self.name, self.typ.as_ref()).to_document(parent, layout),
+            Document::text(" = "),
+            self.value.to_document(parent, layout.without_types()),
+        ])
     }
 }
 
