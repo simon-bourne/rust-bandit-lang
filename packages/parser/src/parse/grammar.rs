@@ -125,8 +125,8 @@ fn variable<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 }
 
 fn binder<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    // TODO: Limit this to var name with optional type annotation
-    term
+    (identifier(), opt(preceded(Operator::HasType, term)))
+        .map(|(name, typ)| Term::declare_variable(name, typ))
 }
 
 fn identifier<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, &'src str> {

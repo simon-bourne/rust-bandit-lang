@@ -152,6 +152,18 @@ impl<'src> Term<'src> {
         Self::new(TermEnum::HasType { term: self, typ })
     }
 
+    // TODO: Store this directly in `VariableBinding`, rather than creating a term
+    // and extracting the data inside `desugar_variable`
+    pub fn declare_variable(name: &'src str, typ: Option<Self>) -> Self {
+        let var = Self::new(TermEnum::Variable(name));
+
+        if let Some(typ) = typ {
+            var.has_type(typ)
+        } else {
+            var
+        }
+    }
+
     pub fn variable(name: &'src str) -> Self {
         Self::new(TermEnum::Variable(name))
     }
