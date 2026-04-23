@@ -1,6 +1,8 @@
+use std::fmt;
+
 use crate::{
     ArgumentStyle::{self, Explicit, Implicit},
-    Result, Variable, VariableBinding,
+    Pretty, Result, Variable, VariableBinding,
     context::ContextOwner,
     typed,
 };
@@ -232,6 +234,12 @@ impl<'src> Term<'src> {
 
     fn new(term: TermEnum<'src>) -> Self {
         Self(Box::new(term))
+    }
+}
+
+impl fmt::Debug for Term<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.debug(f)
     }
 }
 

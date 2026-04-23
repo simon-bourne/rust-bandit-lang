@@ -1,15 +1,13 @@
-use bandit_parser::{lex::Token, parse::term};
+use bandit_parser::parse;
 use bandit_term::{
     InferenceError, Pretty,
     ast::{Data, Declaration, Term},
     context::{ContextOwner, Value},
     typed,
 };
-use winnow::Parser;
 
-fn parse(input: &str) -> Term<'_> {
-    let tokens = Token::layout(input);
-    term.parse(&tokens).unwrap()
+fn term(input: &str) -> Term<'_> {
+    parse::term(input).unwrap()
 }
 
 fn context<'src>() -> ContextOwner<'src> {
@@ -35,7 +33,7 @@ fn context<'src>() -> ContextOwner<'src> {
     });
     let items = items
         .into_iter()
-        .map(|(name, typ)| (name, Value::with_type(Term::unknown(), parse(typ))));
+        .map(|(name, typ)| (name, Value::with_type(Term::unknown(), term(typ))));
     ContextOwner::new(types, items)
 }
 
@@ -61,7 +59,7 @@ impl Test for &str {
 fn infer_types<'src>(input: &'src str) -> Result<typed::Term<'src>, InferenceError> {
     let ctx_owner = context();
     let mut ctx = ctx_owner.handle();
-    let mut term = parse(input).desugar(&ctx)?;
+    let mut term = term(input).desugar(&ctx)?;
     ctx.infer_types()?;
     term.check_scope()?;
     Ok(term)

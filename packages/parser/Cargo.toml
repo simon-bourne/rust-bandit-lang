@@ -7,7 +7,8 @@ publish = false
 [dependencies]
 bandit-term.workspace = true
 logos.workspace = true
-winnow.workspace= true
+winnow.workspace = true
+annotate-snippets.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
