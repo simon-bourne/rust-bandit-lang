@@ -28,7 +28,7 @@ pub fn definitions<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Vec<Definition
 
 fn function_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Function<'src>> {
     (identifier(), opt(has_type()), preceded(Token::Assign, term))
-        .map(|(name, typ, value)| Function::new(name, typ, value))
+        .map_src(|(name, typ, value), src| Function::new(src, name, typ, value))
 }
 
 fn data_definition<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Data<'src>> {
@@ -85,13 +85,16 @@ fn primary<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 }
 
 fn typ<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    identifier().verify_map(|name| (name == "Type").then(Term::type_of_type))
+    identifier()
+        .with_src()
+        .verify_map(|(name, src)| (name == "Type").then(|| Term::type_of_type(src)))
 }
 
 fn forall<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
     let forall_binder = alt((untyped_declaration(), parenthesized(declaration())));
-    preceded(Keyword::Forall, (forall_binder, pi_argument_style(), term))
-        .map(|(variable, arg_style, in_term)| Term::pi_type(variable, in_term, arg_style))
+    preceded(Keyword::Forall, (forall_binder, pi_argument_style(), term)).map_src(
+        |(variable, arg_style, in_term), src| Term::pi_type(src, variable, in_term, arg_style),
+    )
 }
 
 fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
@@ -99,7 +102,9 @@ fn let_binding<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
         Keyword::Let,
         (declaration(), Token::Assign, term, Keyword::In, term),
     )
-    .map(|(var, _assign, value, _linend, in_term)| Term::let_binding(var, value, in_term))
+    .map_src(|(var, _assign, value, _linend, in_term), src| {
+        Term::let_binding(src, var, value, in_term)
+    })
 }
 
 fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
@@ -107,15 +112,17 @@ fn lambda<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
         lambda_argument_style(),
         separated_pair(declaration(), Token::Assign, term),
     )
-        .map(move |(arg_style, (variable, in_term))| Term::lambda(variable, in_term, arg_style))
+        .map_src(move |(arg_style, (variable, in_term)), src| {
+            Term::lambda(src, variable, in_term, arg_style)
+        })
 }
 
 fn unknown<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    Token::Unknown.map(|_| Term::unknown())
+    Token::Unknown.map_src(|_, src| Term::unknown(src))
 }
 
 fn variable<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
-    identifier().map(Term::variable)
+    identifier().map_src(|name, src| Term::variable(src, name))
 }
 
 fn untyped_declaration<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Declaration<'src>> {
@@ -154,7 +161,7 @@ fn lambda_argument_style<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Argument
 fn specify_implicits<'tok, 'src: 'tok>(
     parser: impl Parser<'tok, 'src, Term<'src>>,
 ) -> impl Parser<'tok, 'src, Term<'src>> {
-    grouped(Grouping::Brackets, parser).map(Term::specify_implicits)
+    grouped(Grouping::Brackets, parser).map_src(|term, src| Term::specify_implicits(src, term))
 }
 
 fn parenthesized<'tok, 'src: 'tok, T>(

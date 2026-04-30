@@ -6,7 +6,7 @@ use crate::{
 
 impl Pretty for Term<'_> {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document {
-        match self.0.as_ref() {
+        match self.value.as_ref() {
             TermEnum::Type => Document::text("Type"),
             TermEnum::Apply { function, argument } => Operator::Apply(ArgumentStyle::Explicit)
                 .to_document(parent, function, argument, layout, layout),

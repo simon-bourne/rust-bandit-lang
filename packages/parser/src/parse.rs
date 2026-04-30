@@ -1,7 +1,7 @@
 use std::{error::Error, fmt, ops::Range};
 
 use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
-use bandit_term::ast::{Definition, Term};
+use bandit_term::ast::{Definition, Source, Term};
 use winnow::{
     Parser as _, Result,
     error::{ContextError, ParseError},
@@ -17,6 +17,21 @@ pub type TokenList<'tok, 'src> = &'tok [SrcToken<'src>];
 pub trait Parser<'tok, 'src: 'tok, Out>:
     winnow::Parser<TokenList<'tok, 'src>, Out, ContextError>
 {
+    fn with_src(self) -> impl Parser<'tok, 'src, (Out, Source)>
+    where
+        Self: Sized,
+    {
+        self.with_taken()
+            .map(|(output, taken)| (output, tokens_to_span(taken).into()))
+    }
+
+    fn map_src<F, FOut>(self, mut f: F) -> impl Parser<'tok, 'src, FOut>
+    where
+        Self: Sized,
+        F: FnMut(Out, Source) -> FOut + 'tok,
+    {
+        self.with_src().map(move |(out, source)| f(out, source))
+    }
 }
 
 impl<'tok, 'src: 'tok, Out, T> Parser<'tok, 'src, Out> for T where
@@ -46,6 +61,16 @@ impl<'tok, 'src: 'tok> winnow::Parser<TokenList<'tok, 'src>, Keyword, ContextErr
     }
 }
 
+fn tokens_to_span<'tok, 'src>(tokens: TokenList<'tok, 'src>) -> Range<usize> {
+    if tokens.is_empty() {
+        0..usize::MAX
+    } else {
+        let start = tokens.first().unwrap().1.start;
+        let end = tokens.last().unwrap().1.end;
+        start..end
+    }
+}
+
 #[derive(Debug)]
 pub struct PrettyError<'src> {
     message: String,
@@ -55,20 +80,9 @@ pub struct PrettyError<'src> {
 
 impl<'src> PrettyError<'src> {
     fn new<'tok>(input: &'src str, error: ParseError<TokenList<'tok, 'src>, ContextError>) -> Self {
-        let message = error.inner().to_string();
-        let tokens = error.input();
-
-        let span = if tokens.is_empty() {
-            0..usize::MAX
-        } else {
-            let start = tokens.first().unwrap().1.start;
-            let end = tokens.last().unwrap().1.end;
-            start..end
-        };
-
         Self {
-            message,
-            span,
+            message: error.inner().to_string(),
+            span: tokens_to_span(error.input()),
             input,
         }
     }

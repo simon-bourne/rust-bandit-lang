@@ -1,7 +1,7 @@
 use bandit_parser::parse;
 use bandit_term::{
     InferenceError, Pretty,
-    ast::{Data, Declaration, Term},
+    ast::{Data, Declaration, Source, Term},
     context::{ContextOwner, Value},
     typed,
 };
@@ -27,13 +27,16 @@ fn context<'src>() -> ContextOwner<'src> {
 
     let types = types.into_iter().map(|name| {
         Data::new(
-            Declaration::new(name, Some(Term::type_of_type())),
+            Declaration::new(name, Some(Term::type_of_type(Source::begin()))),
             Vec::new(),
         )
     });
-    let items = items
-        .into_iter()
-        .map(|(name, typ)| (name, Value::with_type(Term::unknown(), term(typ))));
+    let items = items.into_iter().map(|(name, typ)| {
+        (
+            name,
+            Value::with_type(Term::unknown(Source::begin()), term(typ)),
+        )
+    });
     ContextOwner::new(types, items)
 }
 

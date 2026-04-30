@@ -4,7 +4,12 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::{ArgumentStyle, InferenceError, Result, ast, constraints::Constraints, typed};
+use crate::{
+    ArgumentStyle, InferenceError, Result,
+    ast::{self, Source},
+    constraints::Constraints,
+    typed,
+};
 
 enum Term<'a> {
     Typed(typed::Term<'a>),
@@ -20,10 +25,10 @@ pub struct Value<T> {
 }
 
 impl<'src> Value<ast::Term<'src>> {
-    pub fn new(value: ast::Term<'src>) -> Self {
+    pub fn new(source: Source, value: ast::Term<'src>) -> Self {
         Self {
             value,
-            typ: ast::Term::unknown(),
+            typ: ast::Term::unknown(source),
         }
     }
 

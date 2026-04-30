@@ -1,4 +1,8 @@
-use std::fmt;
+use std::{
+    cmp::{max, min},
+    fmt,
+    ops::Range,
+};
 
 use crate::{
     ArgumentStyle::{self, Explicit, Implicit},
@@ -20,6 +24,7 @@ pub enum Definition<'src> {
 
 #[derive(Constructor)]
 pub struct Function<'src> {
+    source: Source,
     name: &'src str,
     typ: Option<Term<'src>>,
     value: Term<'src>,
@@ -81,8 +86,18 @@ impl<'src> Declaration<'src> {
 }
 
 impl<'src> Definition<'src> {
-    pub fn function(name: &'src str, typ: Option<Term<'src>>, value: Term<'src>) -> Self {
-        Self::Function(Function { name, typ, value })
+    pub fn function(
+        source: Source,
+        name: &'src str,
+        typ: Option<Term<'src>>,
+        value: Term<'src>,
+    ) -> Self {
+        Self::Function(Function {
+            source,
+            name,
+            typ,
+            value,
+        })
     }
 
     pub fn context(definitions: impl IntoIterator<Item = Self>) -> ContextOwner<'src> {
@@ -92,7 +107,7 @@ impl<'src> Definition<'src> {
         for definition in definitions {
             match definition {
                 Definition::Function(f) => {
-                    let typ = f.typ.unwrap_or_else(Term::unknown);
+                    let typ = f.typ.unwrap_or_else(|| Term::unknown(f.source));
                     let value = Value::with_type(f.value, typ);
                     functions.push((f.name, value));
                 }
@@ -106,45 +121,97 @@ impl<'src> Definition<'src> {
     }
 }
 
-pub struct Term<'src>(Box<TermEnum<'src>>);
+#[derive(Copy, Clone)]
+pub struct Source {
+    begin: usize,
+    end: usize,
+}
 
-impl<'src> Term<'src> {
-    pub fn type_of_type() -> Self {
-        Self::new(TermEnum::Type)
+impl Source {
+    pub fn begin() -> Self {
+        Self { begin: 0, end: 0 }
     }
 
-    pub fn unknown() -> Self {
-        Self::new(TermEnum::Unknown)
+    pub fn combine(x: Self, y: Self) -> Self {
+        Self {
+            begin: min(x.begin, y.begin),
+            end: max(x.end, y.end),
+        }
+    }
+}
+
+impl From<Source> for Range<usize> {
+    fn from(value: Source) -> Self {
+        value.begin..value.end
+    }
+}
+
+impl From<Range<usize>> for Source {
+    fn from(value: Range<usize>) -> Self {
+        Self {
+            begin: value.start,
+            end: value.end,
+        }
+    }
+}
+
+pub struct Term<'src> {
+    source: Source,
+    value: Box<TermEnum<'src>>,
+}
+
+impl<'src> Term<'src> {
+    pub fn type_of_type(source: Source) -> Self {
+        Self::new(source, TermEnum::Type)
+    }
+
+    pub fn unknown(source: Source) -> Self {
+        Self::new(source, TermEnum::Unknown)
     }
 
     pub fn apply(self, argument: Self) -> Self {
-        Self::new(TermEnum::Apply {
-            function: self,
-            argument,
-        })
+        Self::new(
+            Source::combine(self.source, argument.source),
+            TermEnum::Apply {
+                function: self,
+                argument,
+            },
+        )
     }
 
-    pub fn let_binding(variable: Declaration<'src>, value: Self, in_term: Self) -> Self {
-        Self::new(TermEnum::Let {
-            value,
-            binding: VariableBinding {
-                variable,
-                in_term,
-                discriminator: (),
+    pub fn let_binding(
+        source: Source,
+        variable: Declaration<'src>,
+        value: Self,
+        in_term: Self,
+    ) -> Self {
+        Self::new(
+            source,
+            TermEnum::Let {
+                value,
+                binding: VariableBinding {
+                    variable,
+                    in_term,
+                    discriminator: (),
+                },
             },
-        })
+        )
     }
 
     pub fn pi_type(
+        source: Source,
         variable: Declaration<'src>,
         in_term: Self,
         discriminator: ArgumentStyle,
     ) -> Self {
-        Self::new(TermEnum::Pi(VariableBinding {
-            variable,
-            in_term,
-            discriminator,
-        }))
+        Self::new(
+            source,
+            TermEnum::Pi(VariableBinding {
+                variable,
+                in_term,
+                discriminator,
+            }),
+        )
     }
 
     pub fn function_type(
@@ -152,35 +219,41 @@ impl<'src> Term<'src> {
         output_type: Self,
         argument_style: ArgumentStyle,
     ) -> Self {
-        Self::new(TermEnum::FunctionType(
-            input_type,
-            output_type,
-            argument_style,
-        ))
+        Self::new(
+            Source::combine(input_type.source, output_type.source),
+            TermEnum::FunctionType(input_type, output_type, argument_style),
+        )
     }
 
     pub fn lambda(
+        source: Source,
         variable: Declaration<'src>,
         in_term: Self,
         discriminator: ArgumentStyle,
     ) -> Self {
-        Self::new(TermEnum::Lambda(VariableBinding {
-            variable,
-            in_term,
-            discriminator,
-        }))
+        Self::new(
+            source,
+            TermEnum::Lambda(VariableBinding {
+                variable,
+                in_term,
+                discriminator,
+            }),
+        )
     }
 
     pub fn has_type(self, typ: Self) -> Self {
-        Self::new(TermEnum::HasType { term: self, typ })
+        Self::new(
+            Source::combine(self.source, typ.source),
+            TermEnum::HasType { term: self, typ },
+        )
     }
 
-    pub fn variable(name: &'src str) -> Self {
-        Self::new(TermEnum::Variable(name))
+    pub fn variable(source: Source, name: &'src str) -> Self {
+        Self::new(source, TermEnum::Variable(name))
     }
 
-    pub fn specify_implicits(term: Self) -> Self {
-        Self::new(TermEnum::SpecifyImplicits(term))
+    pub fn specify_implicits(source: Source, term: Self) -> Self {
+        Self::new(source, TermEnum::SpecifyImplicits(term))
     }
 
     pub fn desugar(&self, ctx: &Context<'src>) -> Result<typed::Term<'src>> {
@@ -195,7 +268,7 @@ impl<'src> Term<'src> {
     ) -> Result<typed::Term<'src>> {
         use typed::Term as Core;
 
-        Ok(match self.0.as_ref() {
+        Ok(match self.value.as_ref() {
             TermEnum::Type => Core::type_of_type(),
             TermEnum::Apply { function, argument } => Core::apply(
                 ctx,
@@ -232,8 +305,11 @@ impl<'src> Term<'src> {
         })
     }
 
-    fn new(term: TermEnum<'src>) -> Self {
-        Self(Box::new(term))
+    fn new(source: Source, term: TermEnum<'src>) -> Self {
+        Self {
+            source,
+            value: Box::new(term),
+        }
     }
 }
 
