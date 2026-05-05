@@ -15,3 +15,4 @@ futures.workspace = true
 katexit.workspace = true
 pretty.workspace = true
 async-executor.workspace = true
+slotmap.workspace = true

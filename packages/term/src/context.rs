@@ -4,12 +4,16 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use slotmap::SlotMap;
+
 use crate::{
     ArgumentStyle, InferenceError, Result,
     ast::{self, Source},
     constraints::Constraints,
     typed,
 };
+
+slotmap::new_key_type! { pub struct SourceTermId; }
 
 enum Term<'a> {
     Typed(typed::Term<'a>),
@@ -119,6 +123,7 @@ pub struct ContextData<'a> {
     types: HashMap<&'a str, Data<'a>>,
     constants: HashMap<&'a str, MutableValue<'a>>,
     constraints: Constraints<'a>,
+    term_sources: RefCell<SlotMap<SourceTermId, Source>>,
 }
 
 pub struct ContextOwner<'a>(Rc<ContextData<'a>>);
@@ -138,11 +143,25 @@ impl<'a> ContextOwner<'a> {
                 .map(|(name, value)| (name, value.into()))
                 .collect(),
             constraints: Constraints::default(),
+            term_sources: RefCell::new(SlotMap::with_key()),
         }))
     }
 
     pub fn handle(&self) -> Context<'a> {
         Context(Rc::downgrade(&self.0))
+    }
+}
+
+#[derive(Clone)]
+pub enum TermId {
+    Term(SourceTermId),
+    TypeOf(Box<Self>),
+    Type,
+}
+
+impl TermId {
+    pub fn typ(&self) -> Self {
+        Self::TypeOf(Box::new(self.clone()))
     }
 }
 
@@ -196,6 +215,10 @@ impl<'a> Context<'a> {
             .into_iter()
     }
 
+    pub(crate) fn new_term_id(&self, source: Source) -> TermId {
+        TermId::Term(self.rc().term_sources.borrow_mut().insert(source))
+    }
+
     pub(crate) fn lookup(
         &self,
         variables: &mut LocalVariables<'a>,
@@ -215,7 +238,7 @@ impl<'a> Context<'a> {
         }
 
         let mut term = if let Some(constant) = this.constants.get(name) {
-            typed::Term::constant(self, name, self.desugar_term(&constant.typ)?)?
+            typed::Term::constant(self, todo!(), name, self.desugar_term(&constant.typ)?)?
         } else if let Some(data) = this.types.get(name) {
             self.desugar_constant(&data.type_constructor)?
         } else {
