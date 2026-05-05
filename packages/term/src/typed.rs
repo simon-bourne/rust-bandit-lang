@@ -511,7 +511,7 @@ impl<'src> Term<'src> {
         if let TermEnum::Pi(binding) = &mut *self.value()
             && binding.discriminator == ArgumentStyle::Implicit
         {
-            binding.apply(&Self::unknown_type())?.strip_implicits()
+            binding.apply(&Self::unknown_value())?.strip_implicits()
         } else {
             Ok(self.clone())
         }
