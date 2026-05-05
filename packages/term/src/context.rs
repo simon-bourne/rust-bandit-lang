@@ -156,12 +156,52 @@ impl<'a> ContextOwner<'a> {
 pub enum TermId {
     Term(SourceTermId),
     TypeOf(Box<Self>),
+    Domain(Box<Self>),
+    Range(Box<Self>),
+    WithImplicits(Box<Self>),
+    ImplicitArgument(Box<Self>),
+    Apply {
+        function: Box<Self>,
+        argument: Box<Self>,
+    },
     Type,
 }
 
 impl TermId {
     pub fn typ(&self) -> Self {
-        Self::TypeOf(Box::new(self.clone()))
+        Self::TypeOf(self.boxed())
+    }
+
+    /// The domain of a type. `self` must be a Π type.
+    pub fn domain(&self) -> Self {
+        Self::Domain(self.boxed())
+    }
+
+    /// The range of a type. `self` must be a Π type.
+    pub fn range(&self) -> Self {
+        Self::Domain(self.boxed())
+    }
+
+    /// The result after all implicit arguments have been applied.
+    pub fn with_implicits(&self) -> Self {
+        Self::WithImplicits(self.boxed())
+    }
+
+    /// The implicit argument to `self`
+    pub fn implicit_argument(&self) -> Self {
+        Self::ImplicitArgument(self.boxed())
+    }
+
+    /// Apply `self` (function) to `argument`
+    pub fn apply(&self, argument: &Self) -> Self {
+        Self::Apply {
+            function: self.boxed(),
+            argument: argument.boxed(),
+        }
+    }
+
+    fn boxed(&self) -> Box<Self> {
+        Box::new(self.clone())
     }
 }
 

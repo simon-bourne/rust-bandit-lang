@@ -133,12 +133,14 @@ impl<'src> Term<'src> {
             clone!(ctx, function, argument, mut typ);
 
             async move {
+                let function_typ_id = function.id().typ();
                 typ.unify_type(&ctx)?;
-                let variable = Self::variable(&ctx, todo!(), None, argument.typ())?;
+                let variable =
+                    Self::variable(&ctx, function_typ_id.domain(), None, argument.typ())?;
                 let mut function_type = Self::pi_type(
-                    todo!(),
+                    function_typ_id.clone(),
                     variable,
-                    Self::unknown_type(todo!()),
+                    Self::unknown_type(function_typ_id.range()),
                     argument_style,
                 );
                 Self::unify(&ctx, &mut function_type, &mut function.typ())?;
@@ -234,8 +236,9 @@ impl<'src> Term<'src> {
     }
 
     pub(crate) fn apply_implicits(&mut self, ctx: &Context<'src>) -> Self {
-        let mut result_type = Self::unknown_type(todo!());
-        let result = Self::unknown(todo!(), result_type.clone());
+        let result_id = self.id().with_implicits();
+        let mut result_type = Self::unknown_type(result_id.typ());
+        let result = Self::unknown(result_id, result_type.clone());
 
         ctx.constraint({
             let mut function = self.clone();
@@ -548,11 +551,17 @@ impl<'src> Term<'src> {
         if let TermEnum::Pi(binding) = &mut *input_type.value()
             && binding.discriminator == ArgumentStyle::Implicit
         {
+            let function =
+                self.add_implicit_arguments(ctx, &mut binding.in_term, Self::unknown_type(todo!()));
+            let function_id = function.id();
+            let implicit_argument_id = function_id.implicit_argument();
+            let implicit_argument = Self::unknown_value(implicit_argument_id.clone());
+
             Self::apply(
                 ctx,
-                todo!(),
-                self.add_implicit_arguments(ctx, &mut binding.in_term, Self::unknown_type(todo!())),
-                Self::unknown_value(todo!()),
+                function_id.apply(&implicit_argument_id),
+                function,
+                implicit_argument,
                 output_type,
                 ArgumentStyle::Implicit,
             )
@@ -799,6 +808,10 @@ impl<'src> Term<'src> {
 
     fn is_unknown(&self) -> bool {
         matches!(&*self.clone().value(), TermEnum::Unknown { .. })
+    }
+
+    fn id(&self) -> TermId {
+        self.clone().target().id.clone()
     }
 
     fn typ(&self) -> Self {
