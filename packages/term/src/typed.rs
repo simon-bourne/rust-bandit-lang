@@ -251,7 +251,7 @@ impl<'src> Term<'src> {
                 let mut stripped_function_type = function_type.strip_implicits()?;
                 Self::unify(&ctx, &mut result_type, &mut stripped_function_type)?;
                 let mut function_with_implicits =
-                    function.add_implicit_arguments(&ctx, &mut function_type, result_type);
+                    function.add_implicit_arguments(&ctx, &mut function_type);
                 Self::unify(&ctx, &mut result, &mut function_with_implicits)
             }
         });
@@ -542,23 +542,14 @@ impl<'src> Term<'src> {
         Ok(None)
     }
 
-    fn add_implicit_arguments(
-        &mut self,
-        ctx: &Context<'src>,
-        input_type: &mut Self,
-        output_type: Self,
-    ) -> Self {
+    fn add_implicit_arguments(&mut self, ctx: &Context<'src>, input_type: &mut Self) -> Self {
         if let TargetTerm {
             id,
             term: TermEnum::Pi(binding),
         } = &mut *input_type.target()
             && binding.discriminator == ArgumentStyle::Implicit
         {
-            let function = self.add_implicit_arguments(
-                ctx,
-                &mut binding.in_term,
-                Self::unknown_type(id.range()),
-            );
+            let function = self.add_implicit_arguments(ctx, &mut binding.in_term);
             let function_id = function.id();
             let implicit_argument_id = function_id.implicit_argument();
             let implicit_argument = Self::unknown_value(implicit_argument_id.clone());
@@ -568,7 +559,7 @@ impl<'src> Term<'src> {
                 function_id.apply(&implicit_argument_id),
                 function,
                 implicit_argument,
-                output_type,
+                Self::unknown_type(function_id.range()),
                 ArgumentStyle::Implicit,
             )
         } else {
