@@ -575,7 +575,7 @@ impl<'src> Term<'src> {
             && binding.discriminator == ArgumentStyle::Implicit
         {
             binding
-                .apply(&Self::unknown_type(todo!()))?
+                .apply(&Self::unknown_value(todo!()))?
                 .strip_implicits()
         } else {
             Ok(self.clone())
