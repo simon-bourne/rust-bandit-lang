@@ -548,11 +548,17 @@ impl<'src> Term<'src> {
         input_type: &mut Self,
         output_type: Self,
     ) -> Self {
-        if let TermEnum::Pi(binding) = &mut *input_type.value()
+        if let TargetTerm {
+            id,
+            term: TermEnum::Pi(binding),
+        } = &mut *input_type.target()
             && binding.discriminator == ArgumentStyle::Implicit
         {
-            let function =
-                self.add_implicit_arguments(ctx, &mut binding.in_term, Self::unknown_type(todo!()));
+            let function = self.add_implicit_arguments(
+                ctx,
+                &mut binding.in_term,
+                Self::unknown_type(id.range()),
+            );
             let function_id = function.id();
             let implicit_argument_id = function_id.implicit_argument();
             let implicit_argument = Self::unknown_value(implicit_argument_id.clone());
@@ -571,11 +577,14 @@ impl<'src> Term<'src> {
     }
 
     fn strip_implicits(&mut self) -> Result<Self> {
-        if let TermEnum::Pi(binding) = &mut *self.value()
+        if let TargetTerm {
+            id,
+            term: TermEnum::Pi(binding),
+        } = &mut *self.target()
             && binding.discriminator == ArgumentStyle::Implicit
         {
             binding
-                .apply(&Self::unknown_value(todo!()))?
+                .apply(&Self::unknown_value(id.implicit_argument()))?
                 .strip_implicits()
         } else {
             Ok(self.clone())
