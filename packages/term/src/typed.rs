@@ -543,10 +543,7 @@ impl<'src> Term<'src> {
     }
 
     fn add_implicit_arguments(&mut self, ctx: &Context<'src>, input_type: &mut Self) -> Self {
-        if let TargetTerm {
-            id,
-            term: TermEnum::Pi(binding),
-        } = &mut *input_type.target()
+        if let TermEnum::Pi(binding) = &mut *input_type.value()
             && binding.discriminator == ArgumentStyle::Implicit
         {
             let function = self.add_implicit_arguments(ctx, &mut binding.in_term);
