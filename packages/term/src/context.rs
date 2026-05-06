@@ -22,6 +22,16 @@ enum Term<'a> {
 
 type MutableValue<'a> = Value<RefCell<Term<'a>>>;
 
+impl<'a> MutableValue<'a> {
+    fn id(&self, ctx: &Context<'a>) -> TermId {
+        match &*self.value.borrow() {
+            Term::Typed(term) => term.id(),
+            // TODO: Implement this properly
+            Term::Ast(_) => ctx.new_term_id(Source::begin()),
+        }
+    }
+}
+
 /// The value of a constant: `constant : <type> = <value>`
 pub struct Value<T> {
     value: T,
@@ -285,7 +295,12 @@ impl<'a> Context<'a> {
         }
 
         let mut term = if let Some(constant) = this.constants.get(name) {
-            typed::Term::constant(self, todo!(), name, self.desugar_term(&constant.typ)?)?
+            typed::Term::constant(
+                self,
+                constant.id(self),
+                name,
+                self.desugar_term(&constant.typ)?,
+            )?
         } else if let Some(data) = this.types.get(name) {
             self.desugar_constant(&data.type_constructor)?
         } else {
