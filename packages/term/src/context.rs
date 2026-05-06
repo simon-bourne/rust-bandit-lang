@@ -23,10 +23,14 @@ enum Term<'a> {
 type MutableValue<'a> = Value<RefCell<Term<'a>>>;
 
 impl<'a> MutableValue<'a> {
+    // TODO: Get rid of this.
+    //
+    // Constants and their values need separate id's. So where `name = value`,
+    // `name` and `value` have separate id's. The source locations for each name
+    // should be passed into `ContextOwner::new`, which can allocate ids.
     fn id(&self, ctx: &Context<'a>) -> TermId {
         match &*self.value.borrow() {
             Term::Typed(term) => term.id(),
-            // TODO: Implement this properly
             Term::Ast(_) => ctx.new_term_id(Source::begin()),
         }
     }
