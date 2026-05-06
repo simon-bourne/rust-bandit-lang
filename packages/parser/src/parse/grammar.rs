@@ -126,12 +126,12 @@ fn variable<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Term<'src>> {
 }
 
 fn untyped_declaration<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Declaration<'src>> {
-    identifier().map(|name| Declaration::new(name, None))
+    identifier().map_src(|name, src| Declaration::new(src, name, None))
 }
 
 fn declaration<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, Declaration<'src>> {
     (identifier(), opt(preceded(Operator::HasType, term)))
-        .map(|(name, typ)| Declaration::new(name, typ))
+        .map_src(|(name, typ), src| Declaration::new(src, name, typ))
 }
 
 fn identifier<'tok, 'src: 'tok>() -> impl Parser<'tok, 'src, &'src str> {

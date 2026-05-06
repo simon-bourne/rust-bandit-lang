@@ -27,7 +27,11 @@ fn context<'src>() -> ContextOwner<'src> {
 
     let types = types.into_iter().map(|name| {
         Data::new(
-            Declaration::new(name, Some(Term::type_of_type(Source::begin()))),
+            Declaration::new(
+                Source::begin(),
+                name,
+                Some(Term::type_of_type(Source::begin())),
+            ),
             Vec::new(),
         )
     });

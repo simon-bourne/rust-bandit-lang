@@ -15,7 +15,7 @@ fn let_error() {
         let one = Term::variable(src, "one").has_type(int_type());
         let let_binding = Term::let_binding(
             src,
-            Declaration::new("x", None),
+            Declaration::new(src, "x", None),
             one,
             Term::variable(src, "x").has_type(float_type),
         );

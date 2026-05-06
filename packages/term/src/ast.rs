@@ -7,7 +7,7 @@ use std::{
 use crate::{
     ArgumentStyle::{self, Explicit, Implicit},
     Pretty, Result, Variable, VariableBinding,
-    context::ContextOwner,
+    context::{ContextOwner, TermId},
     typed,
 };
 
@@ -49,6 +49,7 @@ impl<'src> Data<'src> {
 
 #[derive(Constructor)]
 pub struct Declaration<'src> {
+    source: Source,
     name: &'src str,
     typ: Option<Term<'src>>,
 }
@@ -59,16 +60,13 @@ impl<'src> Declaration<'src> {
     }
 
     pub fn desugar_constant(&self, ctx: &Context<'src>) -> Result<typed::Term<'src>> {
-        typed::Term::constant(
-            ctx,
-            todo!(),
-            self.name,
-            if let Some(typ) = self.typ.as_ref() {
-                typ.desugar(ctx)?
-            } else {
-                typed::Term::unknown_type(todo!())
-            },
-        )
+        let id = ctx.new_term_id(self.source);
+        let typ = if let Some(typ) = self.typ.as_ref() {
+            typ.desugar(ctx)?
+        } else {
+            typed::Term::unknown_type(id.typ())
+        };
+        typed::Term::constant(ctx, id, self.name, typ)
     }
 
     fn desugar_variable(
@@ -76,13 +74,14 @@ impl<'src> Declaration<'src> {
         ctx: &Context<'src>,
         variables: &mut LocalVariables<'src>,
     ) -> Result<typed::Term<'src>> {
+        let id = ctx.new_term_id(self.source);
         let typ = if let Some(typ) = &self.typ {
             typ.desugar_local(ctx, variables, Explicit)?
         } else {
-            typed::Term::unknown_type(todo!())
+            typed::Term::unknown_type(id.typ())
         };
 
-        typed::Term::variable(ctx, todo!(), Some(self.name), typ)
+        typed::Term::variable(ctx, id, Some(self.name), typ)
     }
 }
 
@@ -289,20 +288,22 @@ impl<'src> Term<'src> {
                 binding.desugar(ctx, variables)?,
             )?,
             TermEnum::Pi(binding) => Core::pi(ctx, id, binding.desugar(ctx, variables)?)?,
-            TermEnum::FunctionType(left, right, discriminator) => Core::pi(
-                ctx,
-                id,
-                VariableBinding {
-                    variable: Core::variable(
-                        ctx,
-                        todo!(),
-                        None,
-                        left.desugar_local(ctx, variables, Explicit)?,
-                    )?,
-                    in_term: right.desugar_local(ctx, variables, Explicit)?,
-                    discriminator: *discriminator,
-                },
-            )?,
+            TermEnum::FunctionType(left, right, discriminator) => {
+                let left = left.desugar_local(ctx, variables, Explicit)?;
+                let variable =
+                    Core::variable(ctx, TermId::anonymous_variable(&left.id()), None, left)?;
+                let in_term = right.desugar_local(ctx, variables, Explicit)?;
+
+                Core::pi(
+                    ctx,
+                    id,
+                    VariableBinding {
+                        variable,
+                        in_term,
+                        discriminator: *discriminator,
+                    },
+                )?
+            }
             TermEnum::Lambda(binding) => Core::lambda(id, binding.desugar(ctx, variables)?),
             TermEnum::HasType { term, typ } => term
                 .desugar_local(ctx, variables, arg_style)?

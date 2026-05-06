@@ -807,7 +807,7 @@ impl<'src> Term<'src> {
         matches!(&*self.clone().value(), TermEnum::Unknown { .. })
     }
 
-    fn id(&self) -> TermId {
+    pub fn id(&self) -> TermId {
         self.clone().target().id.clone()
     }
 

@@ -155,6 +155,7 @@ impl<'a> ContextOwner<'a> {
 #[derive(Clone)]
 pub enum TermId {
     Term(SourceTermId),
+    AnonymousVariable(Box<Self>),
     TypeOf(Box<Self>),
     Domain(Box<Self>),
     Range(Box<Self>),
@@ -168,8 +169,14 @@ pub enum TermId {
 }
 
 impl TermId {
+    /// The type of a value.
     pub fn typ(&self) -> Self {
         Self::TypeOf(self.boxed())
+    }
+
+    /// An anonymous variable with type `typ`
+    pub fn anonymous_variable(typ: &Self) -> Self {
+        Self::AnonymousVariable(typ.boxed())
     }
 
     /// The domain of a type. `self` must be a Π type.
@@ -179,7 +186,7 @@ impl TermId {
 
     /// The range of a type. `self` must be a Π type.
     pub fn range(&self) -> Self {
-        Self::Domain(self.boxed())
+        Self::Range(self.boxed())
     }
 
     /// The result after all implicit arguments have been applied.
