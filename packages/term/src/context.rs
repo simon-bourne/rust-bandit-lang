@@ -167,64 +167,7 @@ impl<'a> ContextOwner<'a> {
 }
 
 #[derive(Clone)]
-pub enum TermId {
-    Term(SourceTermId),
-    AnonymousVariable(Box<Self>),
-    TypeOf(Box<Self>),
-    Domain(Box<Self>),
-    Range(Box<Self>),
-    WithImplicits(Box<Self>),
-    ImplicitArgument(Box<Self>),
-    Apply {
-        function: Box<Self>,
-        argument: Box<Self>,
-    },
-    Type,
-}
-
-impl TermId {
-    /// The type of a value.
-    pub fn typ(&self) -> Self {
-        Self::TypeOf(self.boxed())
-    }
-
-    /// An anonymous variable with type `typ`
-    pub fn anonymous_variable(typ: &Self) -> Self {
-        Self::AnonymousVariable(typ.boxed())
-    }
-
-    /// The domain of a type. `self` must be a Π type.
-    pub fn domain(&self) -> Self {
-        Self::Domain(self.boxed())
-    }
-
-    /// The range of a type. `self` must be a Π type.
-    pub fn range(&self) -> Self {
-        Self::Range(self.boxed())
-    }
-
-    /// The result after all implicit arguments have been applied.
-    pub fn with_implicits(&self) -> Self {
-        Self::WithImplicits(self.boxed())
-    }
-
-    /// The implicit argument to `self`
-    pub fn implicit_argument(&self) -> Self {
-        Self::ImplicitArgument(self.boxed())
-    }
-
-    /// Apply `self` (function) to `argument`
-    pub fn apply(&self, argument: &Self) -> Self {
-        Self::Apply {
-            function: self.boxed(),
-            argument: argument.boxed(),
-        }
-    }
-
-    fn boxed(&self) -> Box<Self> {
-        Box::new(self.clone())
-    }
-}
+pub struct TermId;
 
 #[derive(Clone)]
 pub struct Context<'a>(Weak<ContextData<'a>>);
@@ -276,8 +219,9 @@ impl<'a> Context<'a> {
             .into_iter()
     }
 
+    // TODO: This should return a slotmap key
     pub(crate) fn new_term_id(&self, source: Source) -> TermId {
-        TermId::Term(self.rc().term_sources.borrow_mut().insert(source))
+        TermId
     }
 
     pub(crate) fn lookup(
@@ -301,7 +245,6 @@ impl<'a> Context<'a> {
         let mut term = if let Some(constant) = this.constants.get(name) {
             typed::Term::constant(
                 self,
-                constant.id(self),
                 name,
                 self.desugar_term(&constant.typ)?,
             )?

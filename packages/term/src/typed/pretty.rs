@@ -36,7 +36,7 @@ impl<'src> Pretty for Term<'src> {
                     let layout = layout.without_types();
                     Operator::Arrow(binding.discriminator).to_document(
                         parent,
-                        &binding.variable.typ(),
+                        &binding.variable.typ(todo!()),
                         &binding.in_term,
                         layout,
                         layout,
