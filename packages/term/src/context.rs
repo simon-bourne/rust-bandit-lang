@@ -13,7 +13,7 @@ use crate::{
     typed,
 };
 
-slotmap::new_key_type! { pub struct SourceTermId; }
+slotmap::new_key_type! { pub struct TermIdKey; }
 
 enum Term<'a> {
     Typed(typed::Term<'a>),
@@ -31,7 +31,7 @@ impl<'a> MutableValue<'a> {
     fn id(&self, ctx: &Context<'a>) -> TermId {
         match &*self.value.borrow() {
             Term::Typed(term) => term.id(),
-            Term::Ast(_) => ctx.new_term_id(Source::begin()),
+            Term::Ast(_) => TermId::source(ctx, Source::begin()),
         }
     }
 }
@@ -137,7 +137,7 @@ pub struct ContextData<'a> {
     types: HashMap<&'a str, Data<'a>>,
     constants: HashMap<&'a str, MutableValue<'a>>,
     constraints: Constraints<'a>,
-    term_sources: RefCell<SlotMap<SourceTermId, Source>>,
+    term_sources: RefCell<SlotMap<TermIdKey, ()>>,
 }
 
 pub struct ContextOwner<'a>(Rc<ContextData<'a>>);
@@ -166,63 +166,76 @@ impl<'a> ContextOwner<'a> {
     }
 }
 
-#[derive(Clone)]
-pub enum TermId {
-    Term(SourceTermId),
-    AnonymousVariable(Box<Self>),
-    TypeOf(Box<Self>),
-    Domain(Box<Self>),
-    Range(Box<Self>),
-    WithImplicits(Box<Self>),
-    ImplicitArgument(Box<Self>),
-    Apply {
-        function: Box<Self>,
-        argument: Box<Self>,
-    },
+enum TermOrigin {
+    Source(Source),
+    AnonymousVariable(TermId),
+    TypeOf(TermId),
+    Domain(TermId),
+    Range(TermId),
+    WithImplicits(TermId),
+    ImplicitArgument(TermId),
+    Apply { function: TermId, argument: TermId },
     Type,
 }
 
+#[derive(Clone)]
+pub struct TermId {
+    id: TermIdKey, // TODO
+    origin: Rc<TermOrigin>,
+}
+
 impl TermId {
+    pub fn type_of_type(ctx: &Context) -> Self {
+        Self::new(ctx, TermOrigin::Type)
+    }
+
+    pub fn source(ctx: &Context, source: Source) -> Self {
+        Self::new(ctx, TermOrigin::Source(source))
+    }
+
     /// The type of a value.
-    pub fn typ(&self) -> Self {
-        Self::TypeOf(self.boxed())
+    pub fn typ(&self, ctx: &Context) -> Self {
+        Self::new(ctx, TermOrigin::TypeOf(self.clone()))
     }
 
     /// An anonymous variable with type `typ`
-    pub fn anonymous_variable(typ: &Self) -> Self {
-        Self::AnonymousVariable(typ.boxed())
+    pub fn anonymous_variable(typ: &Self, ctx: &Context) -> Self {
+        Self::new(ctx, TermOrigin::AnonymousVariable(typ.clone()))
     }
 
     /// The domain of a type. `self` must be a Π type.
-    pub fn domain(&self) -> Self {
-        Self::Domain(self.boxed())
+    pub fn domain(&self, ctx: &Context) -> Self {
+        Self::new(ctx, TermOrigin::Domain(self.clone()))
     }
 
     /// The range of a type. `self` must be a Π type.
-    pub fn range(&self) -> Self {
-        Self::Range(self.boxed())
+    pub fn range(&self, ctx: &Context) -> Self {
+        Self::new(ctx, TermOrigin::Range(self.clone()))
     }
 
     /// The result after all implicit arguments have been applied.
-    pub fn with_implicits(&self) -> Self {
-        Self::WithImplicits(self.boxed())
+    pub fn with_implicits(&self, ctx: &Context) -> Self {
+        Self::new(ctx, TermOrigin::WithImplicits(self.clone()))
     }
 
     /// The implicit argument to `self`
-    pub fn implicit_argument(&self) -> Self {
-        Self::ImplicitArgument(self.boxed())
+    pub fn implicit_argument(&self, ctx: &Context) -> Self {
+        Self::new(ctx, TermOrigin::ImplicitArgument(self.clone()))
     }
 
     /// Apply `self` (function) to `argument`
-    pub fn apply(&self, argument: &Self) -> Self {
-        Self::Apply {
-            function: self.boxed(),
-            argument: argument.boxed(),
-        }
+    pub fn apply(&self, ctx: &Context, argument: &Self) -> Self {
+        Self::new(ctx, TermOrigin::Apply {
+            function: self.clone(),
+            argument: argument.clone(),
+        })
     }
 
-    fn boxed(&self) -> Box<Self> {
-        Box::new(self.clone())
+    fn new(ctx: &Context, origin: TermOrigin) -> Self {
+        Self {
+            id: ctx.rc().term_sources.borrow_mut().insert(()),
+            origin: Rc::new(origin),
+        }
     }
 }
 
@@ -274,10 +287,6 @@ impl<'a> Context<'a> {
             .map(|(name, Value { value, .. })| (*name, self.desugar_term(value)))
             .collect::<Vec<_>>()
             .into_iter()
-    }
-
-    pub(crate) fn new_term_id(&self, source: Source) -> TermId {
-        TermId::Term(self.rc().term_sources.borrow_mut().insert(source))
     }
 
     pub(crate) fn lookup(

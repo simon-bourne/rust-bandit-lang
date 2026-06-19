@@ -30,12 +30,12 @@ impl<'src> Term<'src> {
         Self::new(id, TermEnum::Type)
     }
 
-    pub fn unknown_value(id: TermId) -> Self {
-        Self::unknown(id.clone(), Self::unknown_type(id.typ()))
+    pub fn unknown_value(ctx: &Context<'src>,id: TermId) -> Self {
+        Self::unknown(id.clone(), Self::unknown_type(ctx, id.typ(ctx)))
     }
 
-    pub fn unknown_type(id: TermId) -> Self {
-        Self::unknown(id.clone(), Self::type_of_type(id.typ()))
+    pub fn unknown_type(ctx: &Context<'src>,id: TermId) -> Self {
+        Self::unknown(id.clone(), Self::type_of_type(id.typ(ctx)))
     }
 
     pub fn variable(
@@ -83,7 +83,7 @@ impl<'src> Term<'src> {
                 Self::unify(
                     &ctx,
                     &mut typ.codomain().await?,
-                    &mut Self::type_of_type(TermId::Type),
+                    &mut Self::type_of_type(TermId::type_of_type(&ctx)),
                 )
             }
         });
@@ -133,14 +133,14 @@ impl<'src> Term<'src> {
             clone!(ctx, function, argument, mut typ);
 
             async move {
-                let function_typ_id = function.id().typ();
+                let function_typ_id = function.id().typ(&ctx);
                 typ.unify_type(&ctx)?;
                 let variable =
-                    Self::variable(&ctx, function_typ_id.domain(), None, argument.typ())?;
+                    Self::variable(&ctx, function_typ_id.domain(&ctx), None, argument.typ())?;
                 let mut function_type = Self::pi_type(
                     function_typ_id.clone(),
                     variable,
-                    Self::unknown_type(function_typ_id.range()),
+                    Self::unknown_type(&ctx, function_typ_id.range(&ctx)),
                     argument_style,
                 );
                 Self::unify(&ctx, &mut function_type, &mut function.typ())?;
@@ -236,8 +236,8 @@ impl<'src> Term<'src> {
     }
 
     pub(crate) fn apply_implicits(&mut self, ctx: &Context<'src>) -> Self {
-        let result_id = self.id().with_implicits();
-        let mut result_type = Self::unknown_type(result_id.typ());
+        let result_id = self.id().with_implicits(ctx);
+        let mut result_type = Self::unknown_type(ctx, result_id.typ(ctx));
         let result = Self::unknown(result_id, result_type.clone());
 
         ctx.constraint({
@@ -248,7 +248,7 @@ impl<'src> Term<'src> {
                 let mut function_type = function.typ();
                 function_type.evaluate_known(&ctx).await?;
 
-                let mut stripped_function_type = function_type.strip_implicits()?;
+                let mut stripped_function_type = function_type.strip_implicits(&ctx)?;
                 Self::unify(&ctx, &mut result_type, &mut stripped_function_type)?;
                 let mut function_with_implicits =
                     function.add_implicit_arguments(&ctx, &mut function_type);
@@ -451,7 +451,7 @@ impl<'src> Term<'src> {
     }
 
     fn unify_type(&mut self, ctx: &Context<'src>) -> Result<()> {
-        Self::unify(ctx, &mut self.typ(), &mut Self::type_of_type(TermId::Type))
+        Self::unify(ctx, &mut self.typ(), &mut Self::type_of_type(TermId::type_of_type(ctx)))
     }
 
     fn unify_unknown(&mut self, ctx: &Context<'src>, other: &mut Self) -> Result<ControlFlow<()>> {
@@ -548,15 +548,15 @@ impl<'src> Term<'src> {
         {
             let function = self.add_implicit_arguments(ctx, &mut binding.in_term);
             let function_id = function.id();
-            let implicit_argument_id = function_id.implicit_argument();
-            let implicit_argument = Self::unknown_value(implicit_argument_id.clone());
+            let implicit_argument_id = function_id.implicit_argument(ctx);
+            let implicit_argument = Self::unknown_value(ctx, implicit_argument_id.clone());
 
             Self::apply(
                 ctx,
-                function_id.apply(&implicit_argument_id),
+                function_id.apply(ctx, &implicit_argument_id),
                 function,
                 implicit_argument,
-                Self::unknown_type(function_id.range()),
+                Self::unknown_type(ctx, function_id.range(ctx)),
                 ArgumentStyle::Implicit,
             )
         } else {
@@ -564,7 +564,7 @@ impl<'src> Term<'src> {
         }
     }
 
-    fn strip_implicits(&mut self) -> Result<Self> {
+    fn strip_implicits(&mut self, ctx: &Context<'src>) -> Result<Self> {
         if let TargetTerm {
             id,
             term: TermEnum::Pi(binding),
@@ -572,8 +572,8 @@ impl<'src> Term<'src> {
             && binding.discriminator == ArgumentStyle::Implicit
         {
             binding
-                .apply(&Self::unknown_value(id.implicit_argument()))?
-                .strip_implicits()
+                .apply(&Self::unknown_value(ctx, id.implicit_argument(ctx)))?
+                .strip_implicits(ctx)
         } else {
             Ok(self.clone())
         }
@@ -816,14 +816,15 @@ impl<'src> Term<'src> {
         let TargetTerm { id, term } = &*this.target();
 
         match term {
-            TermEnum::Type | TermEnum::Pi(_) => Term::type_of_type(id.typ()),
+            TermEnum::Type => self.clone(),
+	    TermEnum::Pi(_) => Term::type_of_type(id.typ(todo!())),
             TermEnum::Apply { typ, .. }
             | TermEnum::Unknown { typ, .. }
             | TermEnum::Variable { typ, .. }
             | TermEnum::Constant { typ, .. } => typ.clone(),
             TermEnum::Let { binding, .. } => binding.in_term.typ(),
             TermEnum::Lambda(binding) => Term::pi_type(
-                id.typ(),
+                id.typ(todo!()),
                 binding.variable.clone(),
                 binding.in_term.typ(),
                 binding.discriminator,
