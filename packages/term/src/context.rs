@@ -180,7 +180,7 @@ enum TermOrigin {
 
 #[derive(Clone)]
 pub struct TermId {
-    id: TermIdKey, // TODO
+    id: TermIdKey,
     origin: Rc<TermOrigin>,
 }
 
@@ -225,10 +225,13 @@ impl TermId {
 
     /// Apply `self` (function) to `argument`
     pub fn apply(&self, ctx: &Context, argument: &Self) -> Self {
-        Self::new(ctx, TermOrigin::Apply {
-            function: self.clone(),
-            argument: argument.clone(),
-        })
+        Self::new(
+            ctx,
+            TermOrigin::Apply {
+                function: self.clone(),
+                argument: argument.clone(),
+            },
+        )
     }
 
     fn new(ctx: &Context, origin: TermOrigin) -> Self {

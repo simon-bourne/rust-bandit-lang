@@ -304,7 +304,7 @@ impl<'src> Term<'src> {
                     },
                 )?
             }
-            TermEnum::Lambda(binding) => Core::lambda(id, binding.desugar(ctx, variables)?),
+            TermEnum::Lambda(binding) => Core::lambda(ctx, id, binding.desugar(ctx, variables)?),
             TermEnum::HasType { term, typ } => term
                 .desugar_local(ctx, variables, arg_style)?
                 .has_type(ctx, typ.desugar_local(ctx, variables, Explicit)?)?,

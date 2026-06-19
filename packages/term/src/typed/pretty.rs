@@ -31,7 +31,7 @@ impl<'src> Pretty for Term<'src> {
                 has_type(WithId::new(self, None), typ).to_document(parent, layout)
             }
             TermEnum::Let { value, binding } => binding.let_to_document(value, parent, layout),
-            TermEnum::Pi(binding) => {
+            TermEnum::Pi { binding, .. } => {
                 if binding.variable_name().is_none() {
                     let layout = layout.without_types();
                     Operator::Arrow(binding.discriminator).to_document(
@@ -45,7 +45,7 @@ impl<'src> Pretty for Term<'src> {
                     binding.pi_to_document(parent, layout)
                 }
             }
-            TermEnum::Lambda(binding) => binding.lambda_to_document(parent, layout),
+            TermEnum::Lambda { binding, .. } => binding.lambda_to_document(parent, layout),
         }
     }
 }

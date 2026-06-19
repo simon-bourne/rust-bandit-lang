@@ -30,11 +30,11 @@ impl<'src> Term<'src> {
         Self::new(id, TermEnum::Type)
     }
 
-    pub fn unknown_value(ctx: &Context<'src>,id: TermId) -> Self {
+    pub fn unknown_value(ctx: &Context<'src>, id: TermId) -> Self {
         Self::unknown(id.clone(), Self::unknown_type(ctx, id.typ(ctx)))
     }
 
-    pub fn unknown_type(ctx: &Context<'src>,id: TermId) -> Self {
+    pub fn unknown_type(ctx: &Context<'src>, id: TermId) -> Self {
         Self::unknown(id.clone(), Self::type_of_type(id.typ(ctx)))
     }
 
@@ -138,6 +138,7 @@ impl<'src> Term<'src> {
                 let variable =
                     Self::variable(&ctx, function_typ_id.domain(&ctx), None, argument.typ())?;
                 let mut function_type = Self::pi_type(
+                    &ctx,
                     function_typ_id.clone(),
                     variable,
                     Self::unknown_type(&ctx, function_typ_id.range(&ctx)),
@@ -147,11 +148,12 @@ impl<'src> Term<'src> {
                 // Wait for unknowns so `binding.apply` replaces all occurrences of `variable`.
                 function_type.await_all_unknowns().await?;
 
-                let mut result_type = if let TermEnum::Pi(binding) = &mut *function_type.value() {
-                    binding.apply(&argument)?
-                } else {
-                    panic!("Expected a PI type")
-                };
+                let mut result_type =
+                    if let TermEnum::Pi { binding, .. } = &mut *function_type.value() {
+                        binding.apply(&argument)?
+                    } else {
+                        panic!("Expected a PI type")
+                    };
 
                 Self::unify(&ctx, &mut typ, &mut result_type)
             }
@@ -216,7 +218,8 @@ impl<'src> Term<'src> {
         mut binding: VariableBinding<Self, ArgumentStyle>,
     ) -> Result<Self> {
         binding.in_term.unify_type(ctx)?;
-        Ok(Self::new(id, TermEnum::Pi(binding)))
+        let typ = Term::type_of_type(id.typ(ctx));
+        Ok(Self::new(id, TermEnum::Pi { binding, typ }))
     }
 
     #[cfg_attr(doc, katexit)]
@@ -231,8 +234,19 @@ impl<'src> Term<'src> {
     ///     \Gamma \vdash \lambda x : A . \\: e : \Pi x : A . \\: B
     /// }
     /// $$
-    pub(crate) fn lambda(id: TermId, binding: VariableBinding<Self, ArgumentStyle>) -> Self {
-        Self::new(id, TermEnum::Lambda(binding))
+    pub(crate) fn lambda(
+        ctx: &Context<'src>,
+        id: TermId,
+        binding: VariableBinding<Self, ArgumentStyle>,
+    ) -> Self {
+        let typ = Self::pi_type(
+            ctx,
+            id.typ(ctx),
+            binding.variable.clone(),
+            binding.in_term.typ(),
+            binding.discriminator,
+        );
+        Self::new(id, TermEnum::Lambda { binding, typ })
     }
 
     pub(crate) fn apply_implicits(&mut self, ctx: &Context<'src>) -> Self {
@@ -318,8 +332,14 @@ impl<'src> Term<'src> {
                     value: value.fresh_variables()?,
                     binding: binding.fresh_variables()?,
                 },
-                TermEnum::Pi(binding) => TermEnum::Pi(binding.fresh_variables()?),
-                TermEnum::Lambda(binding) => TermEnum::Lambda(binding.fresh_variables()?),
+                TermEnum::Pi { binding, typ } => TermEnum::Pi {
+                    binding: binding.fresh_variables()?,
+                    typ: typ.fresh_variables()?,
+                },
+                TermEnum::Lambda { binding, typ } => TermEnum::Lambda {
+                    binding: binding.fresh_variables()?,
+                    typ: typ.fresh_variables()?,
+                },
                 TermEnum::Type => TermEnum::Type,
                 TermEnum::Apply {
                     function,
@@ -337,18 +357,23 @@ impl<'src> Term<'src> {
     }
 
     fn pi_type(
+        ctx: &Context<'src>,
         id: TermId,
         variable: Self,
         result_type: Self,
         discriminator: ArgumentStyle,
     ) -> Self {
+        let typ = Term::type_of_type(id.typ(ctx));
         Self::new(
             id,
-            TermEnum::Pi(VariableBinding {
-                variable,
-                in_term: result_type,
-                discriminator,
-            }),
+            TermEnum::Pi {
+                binding: VariableBinding {
+                    variable,
+                    in_term: result_type,
+                    discriminator,
+                },
+                typ,
+            },
         )
     }
 
@@ -363,7 +388,6 @@ impl<'src> Term<'src> {
         f(self)?;
 
         match &mut *self.try_value()? {
-            TermEnum::Variable { typ, .. } => typ.for_each(f)?,
             TermEnum::Type => (),
             TermEnum::Apply {
                 function,
@@ -375,14 +399,17 @@ impl<'src> Term<'src> {
                 argument.for_each(f)?;
                 typ.for_each(f)?;
             }
-            TermEnum::Constant { typ, .. } => typ.for_each(f)?,
-            TermEnum::Unknown { typ, .. } => typ.for_each(f)?,
+            TermEnum::Variable { typ, .. }
+            | TermEnum::Constant { typ, .. }
+            | TermEnum::Unknown { typ, .. } => typ.for_each(f)?,
             TermEnum::Let { value, binding } => {
                 value.for_each(f)?;
                 binding.for_each(f)?;
             }
-            TermEnum::Pi(binding) => binding.for_each(f)?,
-            TermEnum::Lambda(binding) => binding.for_each(f)?,
+            TermEnum::Pi { binding, typ } | TermEnum::Lambda { binding, typ } => {
+                binding.for_each(f)?;
+                typ.for_each(f)?;
+            }
         }
 
         Ok(())
@@ -433,8 +460,10 @@ impl<'src> Term<'src> {
                 value.check_child_scope()?;
                 binding.check_scope()?
             }
-            TermEnum::Pi(binding) => binding.check_scope()?,
-            TermEnum::Lambda(binding) => binding.check_scope()?,
+            TermEnum::Lambda { binding, typ } | TermEnum::Pi { binding, typ } => {
+                binding.check_scope()?;
+                typ.check_scope()?
+            }
         }
 
         Ok(())
@@ -451,7 +480,11 @@ impl<'src> Term<'src> {
     }
 
     fn unify_type(&mut self, ctx: &Context<'src>) -> Result<()> {
-        Self::unify(ctx, &mut self.typ(), &mut Self::type_of_type(TermId::type_of_type(ctx)))
+        Self::unify(
+            ctx,
+            &mut self.typ(),
+            &mut Self::type_of_type(TermId::type_of_type(ctx)),
+        )
     }
 
     fn unify_unknown(&mut self, ctx: &Context<'src>, other: &mut Self) -> Result<ControlFlow<()>> {
@@ -530,20 +563,22 @@ impl<'src> Term<'src> {
         typ.evaluate(ctx)?;
 
         match &mut *self.value() {
-            TermEnum::Lambda(binding) => return Ok(Some(binding.apply(argument)?)),
+            TermEnum::Lambda { binding, .. } => return Ok(Some(binding.apply(argument)?)),
             TermEnum::Let { .. }
             | TermEnum::Apply { .. }
             | TermEnum::Variable { .. }
             | TermEnum::Constant { .. }
             | TermEnum::Unknown { .. } => {}
-            TermEnum::Pi(_) | TermEnum::Type => Err(InferenceError::UnexpectedTypeDuringEval)?,
+            TermEnum::Pi { binding: _, typ: _ } | TermEnum::Type => {
+                Err(InferenceError::UnexpectedTypeDuringEval)?
+            }
         }
 
         Ok(None)
     }
 
     fn add_implicit_arguments(&mut self, ctx: &Context<'src>, input_type: &mut Self) -> Self {
-        if let TermEnum::Pi(binding) = &mut *input_type.value()
+        if let TermEnum::Pi { binding, .. } = &mut *input_type.value()
             && binding.discriminator == ArgumentStyle::Implicit
         {
             let function = self.add_implicit_arguments(ctx, &mut binding.in_term);
@@ -567,7 +602,7 @@ impl<'src> Term<'src> {
     fn strip_implicits(&mut self, ctx: &Context<'src>) -> Result<Self> {
         if let TargetTerm {
             id,
-            term: TermEnum::Pi(binding),
+            term: TermEnum::Pi { binding, .. },
         } = &mut *self.target()
             && binding.discriminator == ArgumentStyle::Implicit
         {
@@ -595,7 +630,7 @@ impl<'src> Term<'src> {
     async fn codomain(&mut self) -> Result<Self> {
         self.await_unknown().await?;
         let mut in_term = {
-            let TermEnum::Pi(binding) = &mut *self.try_value()? else {
+            let TermEnum::Pi { binding, .. } = &mut *self.try_value()? else {
                 return Ok(self.clone());
             };
 
@@ -684,13 +719,28 @@ impl<'src> Term<'src> {
                 Self::unify(ctx, value, value1)?;
                 VariableBinding::unify(ctx, binding, binding1)?
             }
-            (TermEnum::Pi(binding0), TermEnum::Pi(binding1))
-                if binding0.discriminator == binding1.discriminator =>
-            {
-                VariableBinding::unify(ctx, binding0, binding1)?
-            }
-            (TermEnum::Lambda(binding0), TermEnum::Lambda(binding1)) => {
-                VariableBinding::unify(ctx, binding0, binding1)?
+            (
+                TermEnum::Lambda {
+                    binding: binding0,
+                    typ: typ0,
+                },
+                TermEnum::Lambda {
+                    binding: binding1,
+                    typ: typ1,
+                },
+            )
+            | (
+                TermEnum::Pi {
+                    binding: binding0,
+                    typ: typ0,
+                },
+                TermEnum::Pi {
+                    binding: binding1,
+                    typ: typ1,
+                },
+            ) if binding0.discriminator == binding1.discriminator => {
+                VariableBinding::unify(ctx, binding0, binding1)?;
+                Self::unify(ctx, typ0, typ1)?;
             }
             // It's safer to explicitly ignore each variant
             (TermEnum::Type, _rhs)
@@ -699,8 +749,8 @@ impl<'src> Term<'src> {
             | (TermEnum::Constant { .. }, _rhs)
             | (TermEnum::Unknown { .. }, _rhs)
             | (TermEnum::Let { .. }, _rhs)
-            | (TermEnum::Pi(_), _rhs)
-            | (TermEnum::Lambda(_), _rhs) => {
+            | (TermEnum::Pi { .. }, _rhs)
+            | (TermEnum::Lambda { .. }, _rhs) => {
                 drop((x_ref, y_ref));
 
                 if x.is_reducible() || y.is_reducible() {
@@ -812,23 +862,15 @@ impl<'src> Term<'src> {
     }
 
     fn typ(&self) -> Self {
-        let mut this = self.clone();
-        let TargetTerm { id, term } = &*this.target();
-
-        match term {
+        match &self.clone().target().term {
             TermEnum::Type => self.clone(),
-	    TermEnum::Pi(_) => Term::type_of_type(id.typ(todo!())),
-            TermEnum::Apply { typ, .. }
+            TermEnum::Pi { typ, .. }
+            | TermEnum::Lambda { typ, .. }
+            | TermEnum::Apply { typ, .. }
             | TermEnum::Unknown { typ, .. }
             | TermEnum::Variable { typ, .. }
             | TermEnum::Constant { typ, .. } => typ.clone(),
             TermEnum::Let { binding, .. } => binding.in_term.typ(),
-            TermEnum::Lambda(binding) => Term::pi_type(
-                id.typ(todo!()),
-                binding.variable.clone(),
-                binding.in_term.typ(),
-                binding.discriminator,
-            ),
         }
     }
 }
@@ -866,8 +908,14 @@ enum TermEnum<'src> {
         value: Term<'src>,
         binding: VariableBinding<Term<'src>, ()>,
     },
-    Pi(VariableBinding<Term<'src>, ArgumentStyle>),
-    Lambda(VariableBinding<Term<'src>, ArgumentStyle>),
+    Pi {
+        binding: VariableBinding<Term<'src>, ArgumentStyle>,
+        typ: Term<'src>,
+    },
+    Lambda {
+        binding: VariableBinding<Term<'src>, ArgumentStyle>,
+        typ: Term<'src>,
+    },
 }
 
 enum VariableScope {
