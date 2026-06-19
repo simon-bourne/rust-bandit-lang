@@ -166,6 +166,7 @@ impl<'a> ContextOwner<'a> {
     }
 }
 
+#[allow(unused)] // TODO: Use
 enum TermOrigin {
     Source(Source),
     AnonymousVariable(TermId),
@@ -178,6 +179,7 @@ enum TermOrigin {
     Type,
 }
 
+#[allow(unused)] // TODO: Use
 #[derive(Clone)]
 pub struct TermId {
     id: TermIdKey,
