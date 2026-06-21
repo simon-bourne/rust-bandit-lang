@@ -233,10 +233,7 @@ impl<'src> Term<'src> {
     ///     \Gamma \vdash \lambda x : A . \\: e : \Pi x : A . \\: B
     /// }
     /// $$
-    pub(crate) fn lambda(
-        id: TermId,
-        binding: VariableBinding<Self, ArgumentStyle>,
-    ) -> Self {
+    pub(crate) fn lambda(id: TermId, binding: VariableBinding<Self, ArgumentStyle>) -> Self {
         let typ = Self::pi_type(
             id.typ(),
             binding.variable.clone(),
