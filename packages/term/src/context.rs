@@ -163,7 +163,7 @@ impl<'a> ContextOwner<'a> {
 }
 
 #[allow(unused)] // TODO: Use
-enum TermOriginData {
+enum TermOrigin {
     Source(Source),
     AnonymousVariable(TermId),
     TypeOf(TermId),
@@ -177,56 +177,56 @@ enum TermOriginData {
 
 #[allow(unused)] // TODO: Use
 #[derive(Clone)]
-pub struct TermId(Rc<TermOriginData>);
+pub struct TermId(Rc<TermOrigin>);
 
 impl TermId {
     pub fn type_of_type() -> Self {
-        Self::new(TermOriginData::Type)
+        Self::new(TermOrigin::Type)
     }
 
     pub fn source(source: Source) -> Self {
-        Self::new(TermOriginData::Source(source))
+        Self::new(TermOrigin::Source(source))
     }
 
     /// The type of a value.
     pub fn typ(&self) -> Self {
-        Self::new(TermOriginData::TypeOf(self.clone()))
+        Self::new(TermOrigin::TypeOf(self.clone()))
     }
 
     /// An anonymous variable with type `typ`
     pub fn anonymous_variable(typ: &Self) -> Self {
-        Self::new(TermOriginData::AnonymousVariable(typ.clone()))
+        Self::new(TermOrigin::AnonymousVariable(typ.clone()))
     }
 
     /// The domain of a type. `self` must be a Π type.
     pub fn domain(&self) -> Self {
-        Self::new(TermOriginData::Domain(self.clone()))
+        Self::new(TermOrigin::Domain(self.clone()))
     }
 
     /// The range of a type. `self` must be a Π type.
     pub fn range(&self) -> Self {
-        Self::new(TermOriginData::Range(self.clone()))
+        Self::new(TermOrigin::Range(self.clone()))
     }
 
     /// The result after all implicit arguments have been applied.
     pub fn with_implicits(&self) -> Self {
-        Self::new(TermOriginData::WithImplicits(self.clone()))
+        Self::new(TermOrigin::WithImplicits(self.clone()))
     }
 
     /// The implicit argument to `self`
     pub fn implicit_argument(&self) -> Self {
-        Self::new(TermOriginData::ImplicitArgument(self.clone()))
+        Self::new(TermOrigin::ImplicitArgument(self.clone()))
     }
 
     /// Apply `self` (function) to `argument`
     pub fn apply(&self, argument: &Self) -> Self {
-        Self::new(TermOriginData::Apply {
+        Self::new(TermOrigin::Apply {
             function: self.clone(),
             argument: argument.clone(),
         })
     }
 
-    fn new(origin: TermOriginData) -> Self {
+    fn new(origin: TermOrigin) -> Self {
         Self(Rc::new(origin))
     }
 }
