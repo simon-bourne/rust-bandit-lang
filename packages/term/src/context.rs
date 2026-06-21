@@ -300,12 +300,7 @@ impl<'a> Context<'a> {
         }
 
         let mut term = if let Some(constant) = this.constants.get(name) {
-            typed::Term::constant(
-                self,
-                constant.id(),
-                name,
-                self.desugar_term(&constant.typ)?,
-            )?
+            typed::Term::constant(self, constant.id(), name, self.desugar_term(&constant.typ)?)?
         } else if let Some(data) = this.types.get(name) {
             self.desugar_constant(&data.type_constructor)?
         } else {
