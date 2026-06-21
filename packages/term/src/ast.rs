@@ -60,11 +60,11 @@ impl<'src> Declaration<'src> {
     }
 
     pub fn desugar_constant(&self, ctx: &Context<'src>) -> Result<typed::Term<'src>> {
-        let id = TermId::source(ctx, self.source);
+        let id = TermId::source(self.source);
         let typ = if let Some(typ) = self.typ.as_ref() {
             typ.desugar(ctx)?
         } else {
-            typed::Term::unknown_type(ctx, id.typ(ctx))
+            typed::Term::unknown_type(id.typ())
         };
         typed::Term::constant(ctx, id, self.name, typ)
     }
@@ -74,11 +74,11 @@ impl<'src> Declaration<'src> {
         ctx: &Context<'src>,
         variables: &mut LocalVariables<'src>,
     ) -> Result<typed::Term<'src>> {
-        let id = TermId::source(ctx, self.source);
+        let id = TermId::source(self.source);
         let typ = if let Some(typ) = &self.typ {
             typ.desugar_local(ctx, variables, Explicit)?
         } else {
-            typed::Term::unknown_type(ctx, id.typ(ctx))
+            typed::Term::unknown_type(id.typ())
         };
 
         typed::Term::variable(ctx, id, Some(self.name), typ)
@@ -267,7 +267,7 @@ impl<'src> Term<'src> {
         arg_style: ArgumentStyle,
     ) -> Result<typed::Term<'src>> {
         use typed::Term as Core;
-        let id = TermId::source(ctx, self.source);
+        let id = TermId::source(self.source);
 
         Ok(match self.value.as_ref() {
             TermEnum::Type => Core::type_of_type(id),
@@ -276,11 +276,11 @@ impl<'src> Term<'src> {
                 id.clone(),
                 function.desugar_local(ctx, variables, arg_style)?,
                 argument.desugar_local(ctx, variables, Explicit)?,
-                Core::unknown_type(ctx, id),
+                Core::unknown_type(id),
                 arg_style,
             ),
             TermEnum::Variable(name) => ctx.lookup(variables, name, arg_style)?,
-            TermEnum::Unknown => Core::unknown_value(ctx, id),
+            TermEnum::Unknown => Core::unknown_value(id),
             TermEnum::Let { value, binding } => Core::let_binding(
                 ctx,
                 id.clone(),
@@ -291,7 +291,7 @@ impl<'src> Term<'src> {
             TermEnum::FunctionType(left, right, discriminator) => {
                 let left = left.desugar_local(ctx, variables, Explicit)?;
                 let variable =
-                    Core::variable(ctx, TermId::anonymous_variable(&left.id(), ctx), None, left)?;
+                    Core::variable(ctx, TermId::anonymous_variable(&left.id()), None, left)?;
                 let in_term = right.desugar_local(ctx, variables, Explicit)?;
 
                 Core::pi(
@@ -304,7 +304,7 @@ impl<'src> Term<'src> {
                     },
                 )?
             }
-            TermEnum::Lambda(binding) => Core::lambda(ctx, id, binding.desugar(ctx, variables)?),
+            TermEnum::Lambda(binding) => Core::lambda(id, binding.desugar(ctx, variables)?),
             TermEnum::HasType { term, typ } => term
                 .desugar_local(ctx, variables, arg_style)?
                 .has_type(ctx, typ.desugar_local(ctx, variables, Explicit)?)?,

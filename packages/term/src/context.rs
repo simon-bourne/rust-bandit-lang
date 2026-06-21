@@ -4,8 +4,6 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use slotmap::SlotMap;
-
 use crate::{
     ArgumentStyle, InferenceError, Result,
     ast::{self, Source},
@@ -28,10 +26,10 @@ impl<'a> MutableValue<'a> {
     // Constants and their values need separate id's. So where `name = value`,
     // `name` and `value` have separate id's. The source locations for each name
     // should be passed into `ContextOwner::new`, which can allocate ids.
-    fn id(&self, ctx: &Context<'a>) -> TermId {
+    fn id(&self) -> TermId {
         match &*self.value.borrow() {
             Term::Typed(term) => term.id(),
-            Term::Ast(_) => TermId::source(ctx, Source::begin()),
+            Term::Ast(_) => TermId::source(Source::begin()),
         }
     }
 }
@@ -137,7 +135,6 @@ pub struct ContextData<'a> {
     types: HashMap<&'a str, Data<'a>>,
     constants: HashMap<&'a str, MutableValue<'a>>,
     constraints: Constraints<'a>,
-    term_sources: RefCell<SlotMap<TermIdKey, ()>>,
 }
 
 pub struct ContextOwner<'a>(Rc<ContextData<'a>>);
@@ -157,7 +154,6 @@ impl<'a> ContextOwner<'a> {
                 .map(|(name, value)| (name, value.into()))
                 .collect(),
             constraints: Constraints::default(),
-            term_sources: RefCell::new(SlotMap::with_key()),
         }))
     }
 
@@ -167,7 +163,7 @@ impl<'a> ContextOwner<'a> {
 }
 
 #[allow(unused)] // TODO: Use
-enum TermOrigin {
+enum TermOriginData {
     Source(Source),
     AnonymousVariable(TermId),
     TypeOf(TermId),
@@ -181,66 +177,57 @@ enum TermOrigin {
 
 #[allow(unused)] // TODO: Use
 #[derive(Clone)]
-pub struct TermId {
-    id: TermIdKey,
-    origin: Rc<TermOrigin>,
-}
+pub struct TermId(Rc<TermOriginData>);
 
 impl TermId {
-    pub fn type_of_type(ctx: &Context) -> Self {
-        Self::new(ctx, TermOrigin::Type)
+    pub fn type_of_type() -> Self {
+        Self::new(TermOriginData::Type)
     }
 
-    pub fn source(ctx: &Context, source: Source) -> Self {
-        Self::new(ctx, TermOrigin::Source(source))
+    pub fn source(source: Source) -> Self {
+        Self::new(TermOriginData::Source(source))
     }
 
     /// The type of a value.
-    pub fn typ(&self, ctx: &Context) -> Self {
-        Self::new(ctx, TermOrigin::TypeOf(self.clone()))
+    pub fn typ(&self) -> Self {
+        Self::new(TermOriginData::TypeOf(self.clone()))
     }
 
     /// An anonymous variable with type `typ`
-    pub fn anonymous_variable(typ: &Self, ctx: &Context) -> Self {
-        Self::new(ctx, TermOrigin::AnonymousVariable(typ.clone()))
+    pub fn anonymous_variable(typ: &Self) -> Self {
+        Self::new(TermOriginData::AnonymousVariable(typ.clone()))
     }
 
     /// The domain of a type. `self` must be a Π type.
-    pub fn domain(&self, ctx: &Context) -> Self {
-        Self::new(ctx, TermOrigin::Domain(self.clone()))
+    pub fn domain(&self) -> Self {
+        Self::new(TermOriginData::Domain(self.clone()))
     }
 
     /// The range of a type. `self` must be a Π type.
-    pub fn range(&self, ctx: &Context) -> Self {
-        Self::new(ctx, TermOrigin::Range(self.clone()))
+    pub fn range(&self) -> Self {
+        Self::new(TermOriginData::Range(self.clone()))
     }
 
     /// The result after all implicit arguments have been applied.
-    pub fn with_implicits(&self, ctx: &Context) -> Self {
-        Self::new(ctx, TermOrigin::WithImplicits(self.clone()))
+    pub fn with_implicits(&self) -> Self {
+        Self::new(TermOriginData::WithImplicits(self.clone()))
     }
 
     /// The implicit argument to `self`
-    pub fn implicit_argument(&self, ctx: &Context) -> Self {
-        Self::new(ctx, TermOrigin::ImplicitArgument(self.clone()))
+    pub fn implicit_argument(&self) -> Self {
+        Self::new(TermOriginData::ImplicitArgument(self.clone()))
     }
 
     /// Apply `self` (function) to `argument`
-    pub fn apply(&self, ctx: &Context, argument: &Self) -> Self {
-        Self::new(
-            ctx,
-            TermOrigin::Apply {
-                function: self.clone(),
-                argument: argument.clone(),
-            },
-        )
+    pub fn apply(&self, argument: &Self) -> Self {
+        Self::new(TermOriginData::Apply {
+            function: self.clone(),
+            argument: argument.clone(),
+        })
     }
 
-    fn new(ctx: &Context, origin: TermOrigin) -> Self {
-        Self {
-            id: ctx.rc().term_sources.borrow_mut().insert(()),
-            origin: Rc::new(origin),
-        }
+    fn new(origin: TermOriginData) -> Self {
+        Self(Rc::new(origin))
     }
 }
 
@@ -315,7 +302,7 @@ impl<'a> Context<'a> {
         let mut term = if let Some(constant) = this.constants.get(name) {
             typed::Term::constant(
                 self,
-                constant.id(self),
+                constant.id(),
                 name,
                 self.desugar_term(&constant.typ)?,
             )?
