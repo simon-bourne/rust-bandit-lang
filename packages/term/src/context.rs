@@ -304,7 +304,7 @@ impl<'a> Context<'a> {
         } else if let Some(data) = this.types.get(name) {
             self.desugar_constant(&data.type_constructor)?
         } else {
-            return Err(InferenceError::VariableNotFound)?;
+            return Err(InferenceError::variable_not_found())?;
         };
 
         Ok(if arg_style == ArgumentStyle::Explicit {
@@ -325,7 +325,7 @@ impl<'a> Context<'a> {
     fn desugar_term(&self, term: &RefCell<Term<'a>>) -> Result<typed::Term<'a>> {
         let mut term = term
             .try_borrow_mut()
-            .map_err(|_| InferenceError::TopLevelCircularDependency)?;
+            .map_err(|_| InferenceError::top_level_circular_dependency())?;
 
         let typed_term = match &mut *term {
             Term::Typed(term) => term.clone(),
@@ -340,7 +340,7 @@ impl<'a> Context<'a> {
     fn desugar_constant(&self, constant: &MutableConstant<'a>) -> Result<typed::Term<'a>> {
         let mut constant = constant
             .try_borrow_mut()
-            .map_err(|_| InferenceError::TopLevelCircularDependency)?;
+            .map_err(|_| InferenceError::top_level_circular_dependency())?;
 
         let typed_constant = match &mut *constant {
             Constant::Typed(constant) => constant.clone(),

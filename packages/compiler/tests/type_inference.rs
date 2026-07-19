@@ -1,6 +1,6 @@
 use bandit_parser::parse;
 use bandit_term::{
-    InferenceError, Pretty,
+    InferenceError, Pretty, Result,
     ast::{Data, Declaration, Source, Term},
     context::{ContextOwner, Value},
     typed,
@@ -63,7 +63,7 @@ impl Test for &str {
     }
 }
 
-fn infer_types<'src>(input: &'src str) -> Result<typed::Term<'src>, InferenceError> {
+fn infer_types<'src>(input: &'src str) -> Result<typed::Term<'src>> {
     let ctx_owner = context();
     let mut ctx = ctx_owner.handle();
     let mut term = term(input).desugar(&ctx)?;

@@ -54,7 +54,49 @@ impl<T> Clone for SharedMut<T> {
     }
 }
 
-pub type Result<T> = result::Result<T, InferenceError>;
+#[derive(Debug)]
+pub struct ErrorContext<T> {
+    error: T,
+    context: Vec<Self>,
+}
+
+impl<T> ErrorContext<T> {
+    fn new(error: T) -> Self {
+        Self {
+            error,
+            context: Vec::new(),
+        }
+    }
+}
+
+impl<T: fmt::Debug + fmt::Display> Error for ErrorContext<T> {}
+
+impl<T: fmt::Display> fmt::Display for ErrorContext<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{}", self.error)?;
+
+        for context in &self.context {
+            writeln!(f, "Context: {context}")?;
+        }
+
+        Ok(())
+    }
+}
+
+pub trait AddErrorContext<T> {
+    fn context(self, ctx: ErrorContext<T>) -> Self;
+}
+
+pub type Result<T> = result::Result<T, ErrorContext<InferenceError>>;
+
+impl<T> AddErrorContext<InferenceError> for Result<T> {
+    fn context(self, ctx: ErrorContext<InferenceError>) -> Self {
+        self.map_err(|mut e| {
+            e.context.push(ctx);
+            e
+        })
+    }
+}
 
 // TODO: Better error handling.
 #[derive(Debug)]
@@ -66,6 +108,36 @@ pub enum InferenceError {
     VariableNotFound,
     TopLevelCircularDependency,
     OutOfScope,
+}
+
+impl InferenceError {
+    pub fn couldnt_infer_all_types() -> ErrorContext<Self> {
+        ErrorContext::new(InferenceError::CouldntInferAllTypes)
+    }
+
+    pub fn unexpected_type_during_eval() -> ErrorContext<Self> {
+        ErrorContext::new(InferenceError::UnexpectedTypeDuringEval)
+    }
+
+    pub fn couldnt_unify() -> ErrorContext<Self> {
+        ErrorContext::new(InferenceError::CouldntUnify)
+    }
+
+    pub fn infinite_term() -> ErrorContext<Self> {
+        ErrorContext::new(InferenceError::InfiniteTerm)
+    }
+
+    pub fn variable_not_found() -> ErrorContext<Self> {
+        ErrorContext::new(InferenceError::VariableNotFound)
+    }
+
+    pub fn top_level_circular_dependency() -> ErrorContext<Self> {
+        ErrorContext::new(InferenceError::TopLevelCircularDependency)
+    }
+
+    pub fn out_of_scope() -> ErrorContext<Self> {
+        ErrorContext::new(InferenceError::OutOfScope)
+    }
 }
 
 impl fmt::Display for InferenceError {

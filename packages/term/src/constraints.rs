@@ -28,7 +28,7 @@ impl<'a> Constraints<'a> {
             if task.is_finished() {
                 block_on(task)?;
             } else {
-                return Err(InferenceError::CouldntInferAllTypes);
+                return Err(InferenceError::couldnt_infer_all_types());
             }
         }
 
