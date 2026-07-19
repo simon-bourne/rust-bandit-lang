@@ -1,6 +1,6 @@
 use bandit_parser::parse;
 use bandit_term::{
-    InferenceError, Pretty, Result,
+    Pretty, Result,
     ast::{Data, Declaration, Source, Term},
     context::{ContextOwner, Value},
     typed,
