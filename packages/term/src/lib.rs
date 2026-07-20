@@ -55,13 +55,13 @@ impl<T> Clone for SharedMut<T> {
 }
 
 #[derive(Debug)]
-pub struct ErrorContext<T> {
-    error: T,
-    context: Vec<Self>,
+pub struct ErrorContext<Error, Context> {
+    error: Error,
+    context: Vec<Context>,
 }
 
-impl<T> ErrorContext<T> {
-    fn new(error: T) -> Self {
+impl<E, C> ErrorContext<E, C> {
+    fn new(error: E) -> Self {
         Self {
             error,
             context: Vec::new(),
@@ -69,9 +69,18 @@ impl<T> ErrorContext<T> {
     }
 }
 
-impl<T: fmt::Debug + fmt::Display> Error for ErrorContext<T> {}
+impl<E, C> Error for ErrorContext<E, C>
+where
+    E: fmt::Debug + fmt::Display,
+    C: fmt::Debug + fmt::Display,
+{
+}
 
-impl<T: fmt::Display> fmt::Display for ErrorContext<T> {
+impl<E, C> fmt::Display for ErrorContext<E, C>
+where
+    E: fmt::Display,
+    C: fmt::Display,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{}", self.error)?;
 
@@ -83,14 +92,23 @@ impl<T: fmt::Display> fmt::Display for ErrorContext<T> {
     }
 }
 
-pub trait AddErrorContext<T> {
-    fn context(self, ctx: ErrorContext<T>) -> Self;
+pub trait AddErrorContext<T, C> {
+    fn context(self, ctx: C) -> Self;
 }
 
-pub type Result<T> = result::Result<T, ErrorContext<InferenceError>>;
+#[derive(Debug)]
+pub struct InferenceErrorContext;
 
-impl<T> AddErrorContext<InferenceError> for Result<T> {
-    fn context(self, ctx: ErrorContext<InferenceError>) -> Self {
+impl fmt::Display for InferenceErrorContext {
+    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Ok(())
+    }
+}
+
+pub type Result<T> = result::Result<T, ErrorContext<InferenceError, InferenceErrorContext>>;
+
+impl<T> AddErrorContext<InferenceError, InferenceErrorContext> for Result<T> {
+    fn context(self, ctx: InferenceErrorContext) -> Self {
         self.map_err(|mut e| {
             e.context.push(ctx);
             e
@@ -111,31 +129,31 @@ pub enum InferenceError {
 }
 
 impl InferenceError {
-    pub fn couldnt_infer_all_types() -> ErrorContext<Self> {
+    pub fn couldnt_infer_all_types() -> ErrorContext<Self, InferenceErrorContext> {
         ErrorContext::new(InferenceError::CouldntInferAllTypes)
     }
 
-    pub fn unexpected_type_during_eval() -> ErrorContext<Self> {
+    pub fn unexpected_type_during_eval() -> ErrorContext<Self, InferenceErrorContext> {
         ErrorContext::new(InferenceError::UnexpectedTypeDuringEval)
     }
 
-    pub fn couldnt_unify() -> ErrorContext<Self> {
+    pub fn couldnt_unify() -> ErrorContext<Self, InferenceErrorContext> {
         ErrorContext::new(InferenceError::CouldntUnify)
     }
 
-    pub fn infinite_term() -> ErrorContext<Self> {
+    pub fn infinite_term() -> ErrorContext<Self, InferenceErrorContext> {
         ErrorContext::new(InferenceError::InfiniteTerm)
     }
 
-    pub fn variable_not_found() -> ErrorContext<Self> {
+    pub fn variable_not_found() -> ErrorContext<Self, InferenceErrorContext> {
         ErrorContext::new(InferenceError::VariableNotFound)
     }
 
-    pub fn top_level_circular_dependency() -> ErrorContext<Self> {
+    pub fn top_level_circular_dependency() -> ErrorContext<Self, InferenceErrorContext> {
         ErrorContext::new(InferenceError::TopLevelCircularDependency)
     }
 
-    pub fn out_of_scope() -> ErrorContext<Self> {
+    pub fn out_of_scope() -> ErrorContext<Self, InferenceErrorContext> {
         ErrorContext::new(InferenceError::OutOfScope)
     }
 }
