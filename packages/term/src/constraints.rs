@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use async_executor::{LocalExecutor, Task};
 use futures::executor::block_on;
 
-use crate::{InferenceError, Result};
+use crate::{InferenceErrorKind, Result};
 
 #[derive(Default)]
 pub struct Constraints<'a> {
@@ -28,7 +28,7 @@ impl<'a> Constraints<'a> {
             if task.is_finished() {
                 block_on(task)?;
             } else {
-                return Err(InferenceError::couldnt_infer_all_types());
+                return InferenceErrorKind::CouldntInferAllTypes.result();
             }
         }
 

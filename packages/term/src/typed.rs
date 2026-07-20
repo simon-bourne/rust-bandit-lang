@@ -5,7 +5,7 @@ use clonelet::clone;
 use katexit::katexit;
 
 use crate::{
-    ArgumentStyle, InferenceError, Pretty, Result, SharedMut, Variable, VariableBinding,
+    ArgumentStyle, InferenceErrorKind, Pretty, Result, SharedMut, Variable, VariableBinding,
     context::{Context, TermId},
     sync::Latch,
 };
@@ -430,7 +430,7 @@ impl<'src> Term<'src> {
             TermEnum::Variable { scope, typ, .. } => {
                 match scope {
                     Scope::Unseen => *scope = Scope::Free,
-                    Scope::OutOfScope => Err(InferenceError::out_of_scope())?,
+                    Scope::OutOfScope => InferenceErrorKind::OutOfScope.result()?,
                     Scope::Free | Scope::Bound => (),
                 }
 
@@ -563,7 +563,7 @@ impl<'src> Term<'src> {
             | TermEnum::Constant { .. }
             | TermEnum::Unknown { .. } => {}
             TermEnum::Pi { binding: _, typ: _ } | TermEnum::Type => {
-                Err(InferenceError::unexpected_type_during_eval())?
+                InferenceErrorKind::UnexpectedTypeDuringEval.result()?
             }
         }
 
@@ -751,7 +751,7 @@ impl<'src> Term<'src> {
 
                     return Ok(());
                 } else {
-                    return Err(InferenceError::couldnt_unify());
+                    return InferenceErrorKind::CouldntUnify.result();
                 };
             }
         }
@@ -802,7 +802,7 @@ impl<'src> Term<'src> {
             let mut borrow = self
                 .0
                 .try_borrow_mut()
-                .map_err(|_| InferenceError::infinite_term())?;
+                .map_err(|_| InferenceErrorKind::InfiniteTerm.error())?;
 
             let IndirectTerm::Link { target } = &mut *borrow else {
                 return Ok(());
@@ -832,7 +832,7 @@ impl<'src> Term<'src> {
         let borrow = self
             .0
             .try_borrow_mut()
-            .map_err(|_| InferenceError::infinite_term())?;
+            .map_err(|_| InferenceErrorKind::InfiniteTerm.error())?;
 
         Ok(RefMut::map(borrow, |x| match x {
             IndirectTerm::Target(target) => target,
@@ -988,7 +988,7 @@ impl<'src, Discriminator: Clone + Eq + PartialEq> VariableBinding<Term<'src>, Di
 
     fn unify(ctx: &Context<'src>, binding0: &mut Self, binding1: &mut Self) -> Result<()> {
         if binding0.discriminator != binding1.discriminator {
-            return Err(InferenceError::couldnt_unify());
+            return InferenceErrorKind::CouldntUnify.result();
         }
 
         Term::unify(
@@ -1028,7 +1028,7 @@ impl<'src, Discriminator: Clone + Eq + PartialEq> VariableBinding<Term<'src>, Di
                     *scope = Scope::OutOfScope;
                 }
             }
-            Scope::Free | Scope::Bound => Err(InferenceError::out_of_scope())?,
+            Scope::Free | Scope::Bound => InferenceErrorKind::OutOfScope.result()?,
         }
 
         Ok(())

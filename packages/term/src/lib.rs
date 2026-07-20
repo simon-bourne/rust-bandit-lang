@@ -61,11 +61,16 @@ pub struct ErrorContext<Error, Context> {
 }
 
 impl<E, C> ErrorContext<E, C> {
-    fn new(error: E) -> Self {
+    pub fn new(error: E) -> Self {
         Self {
             error,
             context: Vec::new(),
         }
+    }
+
+    pub fn context(mut self, ctx: C) -> Self {
+        self.context.push(ctx);
+        self
     }
 }
 
@@ -92,8 +97,14 @@ where
     }
 }
 
-pub trait AddErrorContext<T, C> {
-    fn context(self, ctx: C) -> Self;
+pub trait AddInferenceErrorContext {
+    fn when_unifying(self) -> Self;
+}
+
+impl<T> AddInferenceErrorContext for Result<T> {
+    fn when_unifying(self) -> Self {
+        self.map_err(|e| e.context(InferenceErrorContext))
+    }
 }
 
 #[derive(Debug)]
@@ -105,20 +116,11 @@ impl fmt::Display for InferenceErrorContext {
     }
 }
 
-pub type Result<T> = result::Result<T, ErrorContext<InferenceError, InferenceErrorContext>>;
-
-impl<T> AddErrorContext<InferenceError, InferenceErrorContext> for Result<T> {
-    fn context(self, ctx: InferenceErrorContext) -> Self {
-        self.map_err(|mut e| {
-            e.context.push(ctx);
-            e
-        })
-    }
-}
+pub type Result<T> = result::Result<T, ErrorContext<InferenceErrorKind, InferenceErrorContext>>;
 
 // TODO: Better error handling.
 #[derive(Debug)]
-pub enum InferenceError {
+pub enum InferenceErrorKind {
     CouldntInferAllTypes,
     UnexpectedTypeDuringEval,
     CouldntUnify,
@@ -128,51 +130,31 @@ pub enum InferenceError {
     OutOfScope,
 }
 
-impl InferenceError {
-    pub fn couldnt_infer_all_types() -> ErrorContext<Self, InferenceErrorContext> {
-        ErrorContext::new(InferenceError::CouldntInferAllTypes)
+impl InferenceErrorKind {
+    pub fn result<T>(self) -> Result<T> {
+        Err(self.error())
     }
 
-    pub fn unexpected_type_during_eval() -> ErrorContext<Self, InferenceErrorContext> {
-        ErrorContext::new(InferenceError::UnexpectedTypeDuringEval)
-    }
-
-    pub fn couldnt_unify() -> ErrorContext<Self, InferenceErrorContext> {
-        ErrorContext::new(InferenceError::CouldntUnify)
-    }
-
-    pub fn infinite_term() -> ErrorContext<Self, InferenceErrorContext> {
-        ErrorContext::new(InferenceError::InfiniteTerm)
-    }
-
-    pub fn variable_not_found() -> ErrorContext<Self, InferenceErrorContext> {
-        ErrorContext::new(InferenceError::VariableNotFound)
-    }
-
-    pub fn top_level_circular_dependency() -> ErrorContext<Self, InferenceErrorContext> {
-        ErrorContext::new(InferenceError::TopLevelCircularDependency)
-    }
-
-    pub fn out_of_scope() -> ErrorContext<Self, InferenceErrorContext> {
-        ErrorContext::new(InferenceError::OutOfScope)
+    pub fn error(self) -> ErrorContext<Self, InferenceErrorContext> {
+        ErrorContext::new(self)
     }
 }
 
-impl fmt::Display for InferenceError {
+impl fmt::Display for InferenceErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            InferenceError::CouldntInferAllTypes => "CouldntInferAllTypes",
-            InferenceError::UnexpectedTypeDuringEval => "UnexpectedTypeDuringEval",
-            InferenceError::CouldntUnify => "CouldntUnify",
-            InferenceError::InfiniteTerm => "InfiniteTerm",
-            InferenceError::VariableNotFound => "VariableNotFound",
-            InferenceError::TopLevelCircularDependency => "TopLevelCircularDependency",
-            InferenceError::OutOfScope => "OutOfScope",
+            InferenceErrorKind::CouldntInferAllTypes => "CouldntInferAllTypes",
+            InferenceErrorKind::UnexpectedTypeDuringEval => "UnexpectedTypeDuringEval",
+            InferenceErrorKind::CouldntUnify => "CouldntUnify",
+            InferenceErrorKind::InfiniteTerm => "InfiniteTerm",
+            InferenceErrorKind::VariableNotFound => "VariableNotFound",
+            InferenceErrorKind::TopLevelCircularDependency => "TopLevelCircularDependency",
+            InferenceErrorKind::OutOfScope => "OutOfScope",
         })
     }
 }
 
-impl Error for InferenceError {}
+impl Error for InferenceErrorKind {}
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum ArgumentStyle {
