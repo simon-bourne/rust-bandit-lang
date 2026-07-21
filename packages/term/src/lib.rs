@@ -55,21 +55,24 @@ impl<T> Clone for SharedMut<T> {
 }
 
 #[derive(Debug)]
-pub struct ErrorContext<Error, Context> {
+pub struct ErrorContext<Error, Context>(Box<ErrorContextData<Error, Context>>);
+
+#[derive(Debug)]
+struct ErrorContextData<Error, Context> {
     error: Error,
     context: Vec<Context>,
 }
 
 impl<E, C> ErrorContext<E, C> {
     pub fn new(error: E) -> Self {
-        Self {
+        Self(Box::new(ErrorContextData {
             error,
             context: Vec::new(),
-        }
+        }))
     }
 
     pub fn context(mut self, ctx: C) -> Self {
-        self.context.push(ctx);
+        self.0.context.push(ctx);
         self
     }
 }
@@ -87,9 +90,9 @@ where
     C: fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{}", self.error)?;
+        writeln!(f, "{}", self.0.error)?;
 
-        for context in &self.context {
+        for context in &self.0.context {
             writeln!(f, "Context: {context}")?;
         }
 
