@@ -15,6 +15,8 @@ pub mod typed;
 
 pub use pretty::Pretty;
 
+use crate::context::TermId;
+
 #[derive(Default)]
 struct SharedMut<T>(Rc<RefCell<T>>);
 
@@ -101,17 +103,21 @@ where
 }
 
 pub trait AddInferenceErrorContext {
-    fn when_unifying(self) -> Self;
+    // TODO: This should take a lambda, so clients don't have to create a new id if
+    // there's no error
+    fn when_unifying(self, x: TermId, y: TermId) -> Self;
 }
 
 impl<T> AddInferenceErrorContext for Result<T> {
-    fn when_unifying(self) -> Self {
-        self.map_err(|e| e.context(InferenceErrorContext))
+    fn when_unifying(self, x: TermId, y: TermId) -> Self {
+        self.map_err(move |e| e.context(InferenceErrorContext::Unifying(x, y)))
     }
 }
 
 #[derive(Debug)]
-pub struct InferenceErrorContext;
+pub enum InferenceErrorContext {
+    Unifying(TermId, TermId),
+}
 
 impl fmt::Display for InferenceErrorContext {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -2,6 +2,7 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     rc::{Rc, Weak},
+    sync::Arc,
 };
 
 use crate::{
@@ -163,6 +164,7 @@ impl<'a> ContextOwner<'a> {
 }
 
 #[allow(unused)] // TODO: Use
+#[derive(Debug)]
 enum TermOrigin {
     Source(Source),
     AnonymousVariable(TermId),
@@ -176,8 +178,8 @@ enum TermOrigin {
 }
 
 #[allow(unused)] // TODO: Use
-#[derive(Clone)]
-pub struct TermId(Rc<TermOrigin>);
+#[derive(Clone, Debug)]
+pub struct TermId(Arc<TermOrigin>);
 
 impl TermId {
     pub fn type_of_type() -> Self {
@@ -227,7 +229,7 @@ impl TermId {
     }
 
     fn new(origin: TermOrigin) -> Self {
-        Self(Rc::new(origin))
+        Self(Arc::new(origin))
     }
 }
 

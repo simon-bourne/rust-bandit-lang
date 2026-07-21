@@ -121,7 +121,7 @@ impl<'src> Definition<'src> {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Source {
     begin: usize,
     end: usize,

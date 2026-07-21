@@ -5,7 +5,8 @@ use clonelet::clone;
 use katexit::katexit;
 
 use crate::{
-    ArgumentStyle, InferenceErrorKind, Pretty, Result, SharedMut, Variable, VariableBinding,
+    AddInferenceErrorContext, ArgumentStyle, InferenceErrorKind, Pretty, Result, SharedMut,
+    Variable, VariableBinding,
     context::{Context, TermId},
     sync::Latch,
 };
@@ -506,7 +507,7 @@ impl<'src> Term<'src> {
             return Ok(());
         }
 
-        Self::unify_known(ctx, x, y)
+        Self::unify_known(ctx, x, y).when_unifying(x.id(), y.id())
     }
 
     async fn evaluate_known(&mut self, ctx: &Context<'src>) -> Result<()> {
