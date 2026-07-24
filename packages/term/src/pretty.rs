@@ -3,8 +3,7 @@ use std::fmt;
 use derive_more::Constructor;
 use pretty::RcDoc;
 
-use super::VariableBinding;
-use crate::{ArgumentStyle, Variable};
+use crate::{ArgumentStyle, Variable, VariableBinding};
 
 pub trait Pretty {
     fn to_document(&self, parent: Option<(Operator, Side)>, layout: Layout) -> Document;
