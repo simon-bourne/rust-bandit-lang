@@ -5,10 +5,7 @@ use clonelet::clone;
 use katexit::katexit;
 
 use crate::{
-    AddInferenceErrorContext, ArgumentStyle, InferenceErrorKind, Pretty, Result, SharedMut,
-    Variable, VariableBinding,
-    context::{Context, TermId},
-    sync::Latch,
+    AddInferenceErrorContext, ArgumentStyle, InferenceErrorKind, Pretty, Result, SharedMut, Variable, VariableBinding, context::{Context, TermId}, eval, sync::Latch,
 };
 
 mod pretty;
@@ -1038,5 +1035,11 @@ impl<'src, Discriminator: Clone + Eq + PartialEq> VariableBinding<Term<'src>, Di
     fn for_each(&mut self, f: &mut impl FnMut(&mut Term<'src>) -> Result<()>) -> Result<()> {
         self.variable.for_each(f)?;
         self.in_term.for_each(f)
+    }
+}
+
+impl<'src> From<Term<'src>> for eval::Term<'src> {
+    fn from(value: Term<'src>) -> Self {
+        todo!()
     }
 }
