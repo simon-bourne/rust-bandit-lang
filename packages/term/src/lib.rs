@@ -9,6 +9,7 @@ use std::{
 pub mod ast;
 pub mod constraints;
 pub mod context;
+mod eval;
 mod pretty;
 mod sync;
 pub mod typed;
