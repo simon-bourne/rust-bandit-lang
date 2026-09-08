@@ -34,6 +34,31 @@ impl<'src> Term<'src> {
             },
         )
     }
+
+    pub fn bound_variable(
+        id: TermId,
+        name: Option<&'src str>,
+        typ: Self,
+        de_bruijn_index: usize,
+    ) -> Self {
+        Self::new(
+            id,
+            TermEnum::BoundVariable {
+                name,
+                typ,
+                de_bruijn_index,
+            },
+        )
+    }
+
+    pub fn free_variable(id: TermId, variable: typed::Term<'src>) -> Self {
+	Self::new(id , TermEnum::FreeVariable(variable))
+    }
+
+    pub fn constant(id: TermId, name: &'src str,
+		    typ: Self) -> Self {
+	Self::new(id, TermEnum::Constant{ name, typ })
+    }
 }
 
 impl<'src> Variable for Term<'src> {
