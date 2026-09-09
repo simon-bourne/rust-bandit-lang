@@ -882,9 +882,12 @@ enum TermEnum<'src> {
     },
     Variable {
         name: Option<&'src str>,
+        typ: Term<'src>,
+
+        // TODO: Should `fresh` and `scope` be replaced with a slotmap index? That way, we can
+        // lookup any extra data in a slotmap.
         fresh: Option<Term<'src>>,
         scope: VariableScope,
-        typ: Term<'src>,
     },
     Constant {
         name: &'src str,
