@@ -73,7 +73,7 @@ impl<'src> Term<'src> {
         )
     }
 
-    pub fn pi(id: TermId,in_term: Self, typ: Self, discriminator: ArgumentStyle) -> Self {
+    pub fn pi(id: TermId, in_term: Self, typ: Self, discriminator: ArgumentStyle) -> Self {
         Self::new(
             id,
             TermEnum::Pi {
@@ -87,7 +87,7 @@ impl<'src> Term<'src> {
         )
     }
 
-    pub fn lambda(id: TermId,in_term: Self, typ: Self, discriminator: ArgumentStyle) -> Self {
+    pub fn lambda(id: TermId, in_term: Self, typ: Self, discriminator: ArgumentStyle) -> Self {
         Self::new(
             id,
             TermEnum::Lambda {

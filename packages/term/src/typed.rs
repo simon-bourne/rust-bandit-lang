@@ -5,7 +5,11 @@ use clonelet::clone;
 use katexit::katexit;
 
 use crate::{
-    AddInferenceErrorContext, ArgumentStyle, InferenceErrorKind, Pretty, Result, SharedMut, Variable, VariableBinding, context::{Context, TermId}, eval, sync::Latch,
+    AddInferenceErrorContext, ArgumentStyle, InferenceErrorKind, Pretty, Result, SharedMut,
+    Variable, VariableBinding,
+    context::{Context, TermId},
+    eval,
+    sync::Latch,
 };
 
 mod pretty;
@@ -142,7 +146,8 @@ impl<'src> Term<'src> {
                     argument_style,
                 );
                 Self::unify(&ctx, &mut function_type, &mut function.typ())?;
-                // Wait for unknowns so `binding.apply` replaces all occurrences of `variable`.
+                // Wait for unknowns so `binding.apply` replaces all occurrences
+                // of `variable`.
                 function_type.await_all_unknowns().await?;
 
                 let mut result_type =
@@ -519,8 +524,8 @@ impl<'src> Term<'src> {
     }
 
     fn evaluate(&mut self, ctx: &Context<'src>) -> Result<Self> {
-        // TODO: This does evaluation by substitution, which is very inefficient. We
-        // should use a stack and De Bruijn Indices.
+        // TODO: This does evaluation by substitution, which is very
+        // inefficient. We should use a stack and De Bruijn Indices.
         let reduced = match &mut *self.value() {
             TermEnum::Apply {
                 function,
@@ -669,10 +674,11 @@ impl<'src> Term<'src> {
         let mut x_ref = x.try_value()?;
         let mut y_ref = y.try_value()?;
 
-        // TODO: This isn't enough to do an occurs check, as unification can span
-        // several constraints. We need to do a separate occurs check, one for
-        // each eval, and one at the end. This can use `RefCell` mutable borrowing.
-        // We'll need to use a pool of terms so we don't leak memory.
+        // TODO: This isn't enough to do an occurs check, as unification can
+        // span several constraints. We need to do a separate occurs
+        // check, one for each eval, and one at the end. This can use
+        // `RefCell` mutable borrowing. We'll need to use a pool of
+        // terms so we don't leak memory.
         match (&mut *x_ref, &mut *y_ref) {
             (TermEnum::Type, TermEnum::Type) => {}
             (
@@ -793,8 +799,8 @@ impl<'src> Term<'src> {
     }
 
     fn try_collapse_links(&mut self) -> Result<()> {
-        // Collapse links from the bottom up so they are also collapsed for other
-        // terms that reference this chain.
+        // Collapse links from the bottom up so they are also collapsed for
+        // other terms that reference this chain.
 
         *self = {
             let mut borrow = self
@@ -812,7 +818,8 @@ impl<'src> Term<'src> {
         Ok(())
     }
 
-    // TODO: Go through all uses of this and see if we should be using `try_value`
+    // TODO: Go through all uses of this and see if we should be using
+    // `try_value`
     fn value<'a>(&'a mut self) -> RefMut<'a, TermEnum<'src>> {
         self.try_value().unwrap()
     }
@@ -929,10 +936,11 @@ impl<'src, Discriminator: Clone + Eq + PartialEq> VariableBinding<Term<'src>, Di
     }
 
     fn apply(&mut self, argument: &Term<'src>) -> Result<Term<'src>> {
-        // We need all bound variables to be fresh, as this variable might appear in the
-        // type of other bound variables. e.g. `∀a. ∀b. b : a`. Free variables don't
-        // need to be fresh, as this variable would be out of scope. For example, `b` is
-        // out of scope when used in the type of `a` here: `∀a : b. ∀b. a : b`.
+        // We need all bound variables to be fresh, as this variable might
+        // appear in the type of other bound variables. e.g. `∀a. ∀b. b
+        // : a`. Free variables don't need to be fresh, as this variable
+        // would be out of scope. For example, `b` is out of scope when
+        // used in the type of `a` here: `∀a : b. ∀b. a : b`.
         let Self {
             mut variable,
             in_term,

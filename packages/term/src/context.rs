@@ -265,8 +265,8 @@ impl<'a> Context<'a> {
 
         this.constraints.solve()?;
 
-        // We need to solve constraints before we `check_scope`, so we don't introduce
-        // any new scope escapes
+        // We need to solve constraints before we `check_scope`, so we don't
+        // introduce any new scope escapes
         for term in &mut terms {
             term.check_scope()?;
         }

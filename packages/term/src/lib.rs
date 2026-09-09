@@ -104,8 +104,8 @@ where
 }
 
 pub trait AddInferenceErrorContext {
-    // TODO: This should take a lambda, so clients don't have to create a new id if
-    // there's no error
+    // TODO: This should take a lambda, so clients don't have to create a new id
+    // if there's no error
     fn when_unifying(self, x: TermId, y: TermId) -> Self;
 }
 
