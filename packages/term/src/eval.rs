@@ -52,12 +52,53 @@ impl<'src> Term<'src> {
     }
 
     pub fn free_variable(id: TermId, variable: typed::Term<'src>) -> Self {
-	Self::new(id , TermEnum::FreeVariable(variable))
+        Self::new(id, TermEnum::FreeVariable(variable))
     }
 
-    pub fn constant(id: TermId, name: &'src str,
-		    typ: Self) -> Self {
-	Self::new(id, TermEnum::Constant{ name, typ })
+    pub fn constant(id: TermId, name: &'src str, typ: Self) -> Self {
+        Self::new(id, TermEnum::Constant { name, typ })
+    }
+
+    pub fn let_binding(id: TermId, value: Self, in_term: Self) -> Self {
+        Self::new(
+            id,
+            TermEnum::Let {
+                value,
+                binding: VariableBinding {
+                    variable: (),
+                    in_term,
+                    discriminator: (),
+                },
+            },
+        )
+    }
+
+    pub fn pi(id: TermId,in_term: Self, typ: Self, discriminator: ArgumentStyle) -> Self {
+        Self::new(
+            id,
+            TermEnum::Pi {
+                binding: VariableBinding {
+                    variable: (),
+                    in_term,
+                    discriminator,
+                },
+                typ,
+            },
+        )
+    }
+
+    pub fn lambda(id: TermId,in_term: Self, typ: Self, discriminator: ArgumentStyle) -> Self {
+        Self::new(
+            id,
+            TermEnum::Lambda {
+                binding: VariableBinding {
+                    variable: (),
+                    in_term,
+                    discriminator,
+                },
+                typ,
+            },
+        )
     }
 }
 
