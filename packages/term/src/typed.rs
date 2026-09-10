@@ -1048,9 +1048,3 @@ impl<'src, Discriminator: Clone + Eq + PartialEq> VariableBinding<Term<'src>, Di
         self.in_term.for_each(f)
     }
 }
-
-impl<'src> From<Term<'src>> for eval::Term<'src> {
-    fn from(value: Term<'src>) -> Self {
-        todo!()
-    }
-}
