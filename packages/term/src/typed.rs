@@ -871,6 +871,16 @@ impl<'src> Term<'src> {
             TermEnum::Let { binding, .. } => binding.in_term.typ(),
         }
     }
+
+    async fn to_eval(&mut self) -> eval::Term<'src> {
+	let value = self.target();
+	let id = value.id.clone();
+
+	match &value.term {
+	    TermEnum::Type => eval::Term::typ(id),
+	    _ => todo!()
+	}
+    }
 }
 
 impl fmt::Debug for Term<'_> {
