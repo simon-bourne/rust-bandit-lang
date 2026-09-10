@@ -28,6 +28,10 @@ struct TargetTerm<'src> {
 }
 
 impl<'src> Term<'src> {
+    pub fn id(&self) -> TermId {
+        self.clone().target().id.clone()
+    }
+
     pub fn type_of_type(id: TermId) -> Self {
         Self::new(id, TermEnum::Type)
     }
@@ -853,10 +857,6 @@ impl<'src> Term<'src> {
 
     fn is_unknown(&self) -> bool {
         matches!(&*self.clone().value(), TermEnum::Unknown { .. })
-    }
-
-    pub fn id(&self) -> TermId {
-        self.clone().target().id.clone()
     }
 
     fn typ(&self) -> Self {
